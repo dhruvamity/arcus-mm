@@ -1,0 +1,5 @@
+=== R-06 AUDIT CHECK ===
+Uses ArcusEventBacktester: False
+Searches tel_c fills: True
+Searches fills_c_count: False
+STATUS: CONFIRMED. Script reimplements an independent loop rather than routing through a shared engine.

@@ -78,7 +78,10 @@ async def main():
         except Exception as e:
             logger.warning(f"[{m}] Error fetching funding rates: {e}")
 
-    logger.info("Historical data enrichment complete.")
+    logger.info("""LEGACY SCRIPT - DEPRECATED.
+DO NOT USE FOR FORMAL BACKTESTING OR RESEARCH.
+Historical REST fetcher preserved for archival purposes only.
+""")
 
 
 if __name__ == "__main__":

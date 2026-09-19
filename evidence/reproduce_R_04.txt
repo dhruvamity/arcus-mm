@@ -1,0 +1,4 @@
+=== R-04 AUDIT CHECK ===
+src/strategies/avellaneda.py exists: False
+Test search: TEST NOT FOUND
+Old formula spread: 131.16 bps

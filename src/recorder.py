@@ -357,8 +357,8 @@ class ArcusStreamRecorder:
             try:
                 total, used, free = shutil.disk_usage(self.output_dir.resolve().parent)
                 free_gb = free / (1024 ** 3)
-                if free_gb < 2.0:
-                    logger.error(f"CRITICAL DISK ALARM: Free disk space is only {free_gb:.2f} GB!")
+                if free_gb < 30.0:
+                    logger.warning(f"DISK ALARM: Free disk space is {free_gb:.2f} GB (< 30.0 GB threshold)!")
 
                 heartbeat_data = {
                     "timestamp_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
@@ -368,6 +368,7 @@ class ArcusStreamRecorder:
                     "active_pools": len(self._pools),
                     "active_sockets": sum(len(p) for p in self._pools.values()),
                     "disk_free_gb": round(free_gb, 2),
+                    "gap_intervals": self._invalid_intervals,
                     "metrics": self.metrics,
                 }
                 heartbeat_file.write_text(json.dumps(heartbeat_data, indent=2), encoding="utf-8")

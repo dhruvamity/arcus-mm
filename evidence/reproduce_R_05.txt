@@ -1,0 +1,12 @@
+=== R-05 AUDIT CHECK ===
+Total referenced test names in research/audit.md: 9
+  test_avellaneda_monotonic_and_calibrated: MISSING
+  test_calendar_regimes: MISSING
+  test_fill_monotonicity: EXISTS
+  test_harness_integrity: MISSING
+  test_markout_horizons_random_walk: EXISTS
+  test_no_synthetic_candle_replay: MISSING
+  test_pnl_balance_sheet_identity: MISSING
+  test_quantisation_and_min_notional: MISSING
+  test_single_monotonic_clock: EXISTS
+Total missing tests: 6

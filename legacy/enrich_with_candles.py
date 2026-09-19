@@ -1,4 +1,8 @@
-"""Fetches historical 1m candles to generate a continuous BBO series covering all trades.
+"""LEGACY SCRIPT - DEPRECATED.
+DO NOT USE FOR FORMAL BACKTESTING OR RESEARCH.
+Historical candle enrichment script preserved for archival purposes only.
+
+Fetches historical 1m candles to generate a continuous BBO series covering all trades.
 
 Ensures that every historical trade has concurrent active quotes and book state,
 enabling rich backtest simulations with dozens of fills per candidate market.

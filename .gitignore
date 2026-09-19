@@ -36,6 +36,7 @@ wheels/
 # Data and research artifacts (large binaries and runtime recordings)
 data/*
 !data/.gitkeep
+!data/MANIFEST_*.sha256
 *.parquet
 *.h5
 *.feather
