@@ -27,7 +27,7 @@
 | **R-16** | MAJOR | Testnet execution missing; faucet funds available but unapproved. | **CONFIRMED** | `prompt.md` switch | `APPROVE_TESTNET_FAUCET_FUNDING = NO` respected; plumbing ready for Gate G5a |
 | **R-17** | MINOR | `verify_report.py` only checks text-vs-table consistency, cannot detect fabricated data. | **OPEN** | [`scripts/verify_report.py`](file:///Users/dhruv/Desktop/CodeWithD/arcus-mm/scripts/verify_report.py) | Will extend to assert computed provenance in WS-0 |
 | **R-18** | MINOR | Calendar labels weekend as US_LATE; MON_GAP timestamp not sourced. | **OPEN** | [`src/calendar.py`](file:///Users/dhruv/Desktop/CodeWithD/arcus-mm/src/calendar.py) | Calendar regime tagging cleanup in WS-2 |
-| **R-19** | MINOR | Stale scripts runnable: `enrich_with_candles.py`, `fetch_historical_rest.py`. | **FIXED** | [`legacy/`](file:///Users/dhruv/Desktop/CodeWithD/arcus-mm/legacy/) | Moved to `legacy/` with explicit deprecation headers |
+| **R-19** | MINOR | Stale scripts runnable: `enrich_with_candles.py`, `fetch_historical_rest.py`, `run_backtest_matrix.py`, `run_walk_forward.py`, `src/walk_forward.py`. | **FIXED** | [`legacy/`](file:///Users/dhruv/Desktop/CodeWithD/arcus-mm/legacy/) | All stale/superseded scripts quarantined to `legacy/` with explicit deprecation headers |
 | **R-20** | MINOR | Economic scale sanity: $8 clip + 2 bps net = $0.0016/fill ($0.16/day on 100 fills). | **DOCUMENTED** | [`reports/followup_gate_report.md`](file:///Users/dhruv/Desktop/CodeWithD/arcus-mm/reports/followup_gate_report.md) | All reports document edge-per-fill ($/bps) side-by-side |
 
 ---

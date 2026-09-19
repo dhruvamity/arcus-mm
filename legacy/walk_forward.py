@@ -1,7 +1,7 @@
 """LEGACY MODULE - DEPRECATED.
 DO NOT USE FOR FORMAL BACKTESTING OR RESEARCH.
 Superseded by canonical SimEngine (src/sim/engine.py) and Pre-registration Protocol v3 (research/prereg_backtest.md).
-Preserved for backward test compatibility only.
+Preserved for archival purposes and backward test compatibility only.
 
 Formal Walk-Forward Validation, Multiple-Testing Control & Machine-Checkable Gates.
 

@@ -22,7 +22,7 @@ def main():
     text = AUDIT_FILE.read_text(encoding="utf-8")
 
     # Extract test names (e.g. test_xxx)
-    raw_tests = re.findall(r"test_[a-zA-Z0-9_]+", text)
+    raw_tests = re.findall(r"\btest_[a-zA-Z0-9_]+", text)
     tests = sorted(set(raw_tests))
 
     # Search tests and scripts directory
