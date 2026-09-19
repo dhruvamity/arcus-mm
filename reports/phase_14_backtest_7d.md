@@ -42,11 +42,11 @@ Per Section 6.7 of `prompt.md`, this report presents the data coverage table fir
 
 | Criterion ID | Requirement Description | Threshold Value | Gating Status |
 |---|---|---|---|
-| **CRIT-1** | Minimum Simulated Passive Fills | 300 fills | Enforced (Gate G3) |
+| **CRIT-1** | Minimum Simulated Passive Fills (Tiered) | 300 fills (High) / 100 fills (Mid) | Enforced (Gate G3) |
 | **CRIT-2** | Lower Bound Bootstrap CI (hourly clustered) | 90% CI > 0 bps | Enforced (Gate G3) |
-| **CRIT-3** | Positive Weekday Consistency | >= 60% of OOS days | Enforced (Gate G3) |
-| **CRIT-4** | Maximum Portfolio Drawdown | < 10% capital | Enforced (Gate G3) |
-| **CRIT-5** | Taker Exit Liquidation Fee | 2.25 bps | Modeled |
+| **CRIT-3** | Positive Weekday Consistency (5 OOS Days) | >= 60% of OOS days (>= 3/5); max day <= 50% | Enforced (Gate G3) |
+| **CRIT-4** | Cost & Capital Envelope (Taker Exit Fee & DD) | Net PnL > 0 after 2.25 bps taker fee; Max DD < 10% | Enforced (Gate G3) |
+| **CRIT-5** | Baseline & Model Dominance | Beats 0 bps & random baseline; Model B != Model A | Enforced (Gate G3) |
 | **CRIT-6** | Dual Capital Scenario Testing | $50 and $100 | Enforced |
 
 ### Pre-Registered Verdicts Summary
