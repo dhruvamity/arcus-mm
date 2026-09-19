@@ -124,6 +124,31 @@ class TestReportProvenance(unittest.TestCase):
         self.assertFalse(corrected[2]["is_statistically_significant"])
         self.assertFalse(corrected[3]["is_statistically_significant"])
 
+    def test_verify_generator_scripts_catches_hardcoded_verdicts(self):
+        """Verify scripts/verify_report.py catches hardcoded status literals and fabricated fills (R-02, R-17)."""
+        import tempfile
+        from scripts.verify_report import verify_generator_scripts
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            # Script with hardcoded RESOLVED
+            bad_script = tmp_path / "run_test_bad.py"
+            bad_script.write_text("verdict = 'RESOLVED & TESTED'\n", encoding="utf-8")
+            valid, errors = verify_generator_scripts(tmp_path)
+            self.assertFalse(valid)
+            self.assertTrue(any("hardcoded status literal" in e for e in errors))
+
+            # Script with fabricated fills
+            bad_script.write_text("fills = int(trades_count * 0.02)\n", encoding="utf-8")
+            valid, errors = verify_generator_scripts(tmp_path)
+            self.assertFalse(valid)
+            self.assertTrue(any("fabricated fills expression" in e for e in errors))
+
+            # Clean script
+            bad_script.write_text("fills = len(sim_engine.fills)\nif verdict == 'VALIDATED': pass\n", encoding="utf-8")
+            valid, errors = verify_generator_scripts(tmp_path)
+            self.assertTrue(valid)
+
 
 if __name__ == "__main__":
     unittest.main()

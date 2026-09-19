@@ -194,10 +194,46 @@ def verify_report(file_path: Path) -> Tuple[bool, List[str]]:
     return is_valid, errors
 
 
+def verify_generator_scripts(scripts_dir: Path = Path("scripts")) -> Tuple[bool, List[str]]:
+    """Verifies that report generator scripts do not contain hard-coded statuses or fabricated fills (R-02, R-17)."""
+    errors = []
+    generator_files = list(scripts_dir.glob("run_*.py"))
+
+    for g_path in generator_files:
+        content = g_path.read_text(encoding="utf-8")
+        lines = content.splitlines()
+        in_docstring = False
+        for idx, line in enumerate(lines, 1):
+            trimmed = line.strip()
+            if '"""' in trimmed or "'''" in trimmed:
+                cnt = trimmed.count('"""') + trimmed.count("'''")
+                if cnt % 2 != 0:
+                    in_docstring = not in_docstring
+                    continue
+                elif in_docstring:
+                    continue
+            if in_docstring or trimmed.startswith("#"):
+                continue
+
+            # Check for hardcoded "RESOLVED" or "VALIDATED" string literals
+            if re.search(r'["\'](?:RESOLVED|VALIDATED)(?:\s*&.*?)?["\']', line):
+                # Allow conditional comparison or schema definitions
+                if any(kw in line for kw in ["if ", "elif ", "==", "!=", "in [", "in (", "Enum", "allowed_verdicts"]):
+                    continue
+                errors.append(f"{g_path.name}:{idx}: Generator contains hardcoded status literal: {trimmed}")
+
+            # Check for executable fabricated fill counts (e.g. int(trades * 0.02))
+            if re.search(r'\bint\s*\(\s*(?:trades|trades_count)\s*\*\s*0\.02\s*\)', line):
+                errors.append(f"{g_path.name}:{idx}: Generator contains fabricated fills expression: {trimmed}")
+
+    return len(errors) == 0, errors
+
+
 def main():
     parser = argparse.ArgumentParser(description="Verify Arcus research report tables and claims.")
     parser.add_argument("report_paths", nargs="*", help="Path(s) to markdown report(s) to verify")
     parser.add_argument("--all", action="store_true", help="Verify all reports in reports/")
+    parser.add_argument("--check-generators", action="store_true", default=True, help="Verify generator scripts for hardcoded statuses (R-02, R-17)")
     args = parser.parse_args()
 
     files_to_check = []
@@ -210,9 +246,10 @@ def main():
     failed = 0
 
     print("=" * 70)
-    print(" ARCUS REPORT VERIFICATION SUITE")
+    print(" ARCUS REPORT & GENERATOR VERIFICATION SUITE")
     print("=" * 70)
 
+    # 1. Verify markdown reports
     for f in sorted(files_to_check):
         if "archive_smoke_test" in str(f):
             continue
@@ -226,6 +263,16 @@ def main():
                 print(f"   ❌ {err}")
             if len(errors) > 10:
                 print(f"   ... and {len(errors) - 10} more issues.")
+
+    # 2. Verify generator scripts (R-02, R-17)
+    if args.check_generators:
+        gen_valid, gen_errors = verify_generator_scripts()
+        gen_status = "PASSED" if gen_valid else "FAILED"
+        print(f"[{gen_status}] Generator scripts in scripts/run_*.py (R-02 / R-17)")
+        if not gen_valid:
+            failed += 1
+            for err in gen_errors:
+                print(f"   ❌ {err}")
 
     print("=" * 70)
     print(f"Summary: {total_checked} reports checked, {failed} failed.")
