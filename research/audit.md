@@ -48,3 +48,5 @@ All test references in this audit ledger are verified to exist on disk in `tests
 - [`tests/test_harness_integrity.py`](file:///Users/dhruv/Desktop/CodeWithD/arcus-mm/tests/test_harness_integrity.py)
 - [`tests/test_live_paper_trader.py`](file:///Users/dhruv/Desktop/CodeWithD/arcus-mm/tests/test_live_paper_trader.py)
 - [`tests/test_calendar_regimes.py`](file:///Users/dhruv/Desktop/CodeWithD/arcus-mm/tests/test_calendar_regimes.py)
+- [`tests/test_storage_manager.py`](file:///Users/dhruv/Desktop/CodeWithD/arcus-mm/tests/test_storage_manager.py)
+- [`tests/test_exec_stack.py`](file:///Users/dhruv/Desktop/CodeWithD/arcus-mm/tests/test_exec_stack.py)
