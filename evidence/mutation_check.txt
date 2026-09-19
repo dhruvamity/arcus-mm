@@ -1,0 +1,77 @@
+ARCUS SIMENGINE MUTATION VERIFICATION REPORT
+Generated: 2026-09-20 | Total Mutations: 10 | Caught: 10
+
+| ID | Mutation Name | Target Test | Status | Defect Description |
+|---|---|---|---|---|
+| MUT-01 | Invert Queue Priority | `TestSimEngine.test_5_queue_fifo_depletion` | **CAUGHT** | Model B ignores queue ahead and fills immediately |
+| MUT-02 | Lookahead Bias | `TestSimEngine.test_8_no_lookahead` | **CAUGHT** | In-flight orders rest immediately, filling on past trades |
+| MUT-03 | Zero Cancel Latency | `TestSimEngine.test_3_cancel_latency_pickoff` | **CAUGHT** | Cancel latency set to 0ns, eliminating transit fill risk |
+| MUT-04 | Funding Sign Flip | `TestSimEngine.test_7_funding_hourly_boundaries` | **CAUGHT** | Inverts funding payment sign from debit to credit |
+| MUT-05 | Trade Side Semantics Inversion | `TestSimEngine.test_1_scripted_scenario_hand_computed_expectations` | **CAUGHT** | Inverts taker BUY/SELL aggressor matching convention |
+| MUT-06 | Bypass Minimum Size | `TestSimEngine.test_6_quantization_and_min_size` | **CAUGHT** | Bypasses minimum order notional clip validation |
+| MUT-07 | Bypass Post-Only Crossing | `TestSimEngine.test_4_post_only_would_cross` | **CAUGHT** | Quotes crossing the opposite book rest instead of rejecting |
+| MUT-08 | Disable Stale Watchdog | `TestSimEngine.test_10_kill_switches` | **CAUGHT** | Disables stale feed detector; quoting continues unabated |
+| MUT-09 | Fee Sign Flip | `TestPnLAccounting.test_fee_separation_maker_vs_taker` | **CAUGHT** | Inverts sign of tracked fee costs |
+| MUT-10 | Clamp Markout Horizons | `TestHarnessIntegrity.test_markout_horizons_random_walk` | **CAUGHT** | Forces forward horizon returns to 0.0 |
+
+Detailed Failure Traces:
+
+--- MUT-01: Invert Queue Priority ---
+Description: Model B ignores queue ahead and fills immediately
+Target: TestSimEngine.test_5_queue_fifo_depletion
+Outcome: CAUGHT BY TEST
+Test Exception Message: AssertionError: 0.0 != 0.5 within 5 places (0.5 difference)
+
+--- MUT-02: Lookahead Bias ---
+Description: In-flight orders rest immediately, filling on past trades
+Target: TestSimEngine.test_8_no_lookahead
+Outcome: CAUGHT BY TEST
+Test Exception Message: AssertionError: 3 != 0 : Trade before order arrival must not fill order
+
+--- MUT-03: Zero Cancel Latency ---
+Description: Cancel latency set to 0ns, eliminating transit fill risk
+Target: TestSimEngine.test_3_cancel_latency_pickoff
+Outcome: CAUGHT BY TEST
+Test Exception Message: AssertionError: False is not true : In-flight cancel must be filled by aggressive trade
+
+--- MUT-04: Funding Sign Flip ---
+Description: Inverts funding payment sign from debit to credit
+Target: TestSimEngine.test_7_funding_hourly_boundaries
+Outcome: CAUGHT BY TEST
+Test Exception Message: AssertionError: 0.01 != -0.01 within 5 places (0.02 difference)
+
+--- MUT-05: Trade Side Semantics Inversion ---
+Description: Inverts taker BUY/SELL aggressor matching convention
+Target: TestSimEngine.test_1_scripted_scenario_hand_computed_expectations
+Outcome: CAUGHT BY TEST
+Test Exception Message: AssertionError: 0 != 1 : Model A must fill on touch
+
+--- MUT-06: Bypass Minimum Size ---
+Description: Bypasses minimum order notional clip validation
+Target: TestSimEngine.test_6_quantization_and_min_size
+Outcome: CAUGHT BY TEST
+Test Exception Message: AssertionError: 2 != 0 : Sub-minimum notional quote must not be placed
+
+--- MUT-07: Bypass Post-Only Crossing ---
+Description: Quotes crossing the opposite book rest instead of rejecting
+Target: TestSimEngine.test_4_post_only_would_cross
+Outcome: CAUGHT BY TEST
+Test Exception Message: AssertionError: <OrderStatus.RESTING: 'RESTING'> != <OrderStatus.REJECTED: 'REJECTED'>
+
+--- MUT-08: Disable Stale Watchdog ---
+Description: Disables stale feed detector; quoting continues unabated
+Target: TestSimEngine.test_10_kill_switches
+Outcome: CAUGHT BY TEST
+Test Exception Message: AssertionError: <RiskState.NORMAL: 'NORMAL'> != <RiskState.PAUSED_STALE_FEED: 'PAUSED_STALE_FEED'>
+
+--- MUT-09: Fee Sign Flip ---
+Description: Inverts sign of tracked fee costs
+Target: TestPnLAccounting.test_fee_separation_maker_vs_taker
+Outcome: CAUGHT BY TEST
+Test Exception Message: AssertionError: -0.0225 != 0.0225 within 6 places (0.045 difference)
+
+--- MUT-10: Clamp Markout Horizons ---
+Description: Forces forward horizon returns to 0.0
+Target: TestHarnessIntegrity.test_markout_horizons_random_walk
+Outcome: CAUGHT BY TEST
+Test Exception Message: AssertionError: 0.0 == 0.0

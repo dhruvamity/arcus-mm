@@ -15,6 +15,31 @@ Fulfills Section 4.1 & 4.3 of prompt.md:
 from typing import Dict, Any, Optional
 
 
+class TimeAwareFundingModel:
+    """Accrues funding continuously or at hourly/periodic intervals based on holding duration and rate."""
+
+    def __init__(self, epoch_interval_seconds: float = 3600.0):
+        self.epoch_interval_seconds = epoch_interval_seconds
+        self.last_accrual_ts_ns: Optional[int] = None
+        self.total_funding_accrued: float = 0.0
+
+    def compute_accrual(
+        self,
+        position: float,
+        mid_price: float,
+        funding_rate: float,
+        delta_seconds: float,
+    ) -> float:
+        """Computes funding accrual for delta_seconds:
+        payment = - position * mid_price * funding_rate * (delta_seconds / self.epoch_interval_seconds)
+        """
+        if abs(position) < 1e-9 or abs(funding_rate) < 1e-12:
+            return 0.0
+        accrual = - (position * mid_price * funding_rate * (delta_seconds / self.epoch_interval_seconds))
+        self.total_funding_accrued += accrual
+        return accrual
+
+
 class PnLAttributionEngine:
     """Tracks cash balance, inventory position, and 5-way PnL attribution."""
 

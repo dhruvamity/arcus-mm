@@ -26,14 +26,26 @@ class LatencyConfig:
         cancel_latency_ms: float = 25.0,
         modify_latency_ms: float = 30.0,
         additional_stress_latency_ms: float = 0.0,
+        order_entry_latency_ms: Optional[float] = None,
+        **kwargs: Any,
     ):
-        self.feed_latency_ms = feed_latency_ms
-        self.decision_latency_ms = decision_latency_ms
-        self.send_latency_ms = send_latency_ms
-        self.ack_latency_ms = ack_latency_ms
-        self.cancel_latency_ms = cancel_latency_ms
-        self.modify_latency_ms = modify_latency_ms
-        self.additional_stress_latency_ms = additional_stress_latency_ms
+        if order_entry_latency_ms is not None:
+            self.send_latency_ms = float(order_entry_latency_ms)
+            self.feed_latency_ms = 0.0
+            self.decision_latency_ms = 0.0
+            self.ack_latency_ms = 0.0
+        else:
+            self.send_latency_ms = float(send_latency_ms)
+            self.feed_latency_ms = float(feed_latency_ms)
+            self.decision_latency_ms = float(decision_latency_ms)
+            self.ack_latency_ms = float(ack_latency_ms)
+        self.cancel_latency_ms = float(cancel_latency_ms)
+        self.modify_latency_ms = float(modify_latency_ms)
+        self.additional_stress_latency_ms = float(additional_stress_latency_ms)
+
+    @property
+    def order_entry_latency_ms(self) -> float:
+        return self.total_place_latency_ms
 
     @property
     def total_place_latency_ms(self) -> float:

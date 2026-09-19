@@ -20,6 +20,7 @@ from typing import Optional, Dict, Any
 
 class FillModelType(str, Enum):
     MODEL_A_OPTIMISTIC = "MODEL_A_OPTIMISTIC"
+    MODEL_A_TOUCH = "MODEL_A_OPTIMISTIC"
     MODEL_B_MODERATE = "MODEL_B_MODERATE"
     MODEL_C_CONSERVATIVE = "MODEL_C_CONSERVATIVE"
 
