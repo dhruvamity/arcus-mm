@@ -257,7 +257,51 @@ class TestHarnessIntegrity(unittest.TestCase):
         hash2 = hashlib.sha256(run_sim().encode()).hexdigest()
         self.assertEqual(hash1, hash2)
 
+    def test_as_of_join_sparse_bbo(self):
+        """Verify as-of join picks last BBO <= target_ts, drops on staleness, and evaluates 3-way decomposition (R-09)."""
+        import numpy as np
+        # Scenario 1: BBO at 0, 4s, 10s. Fill at 0.
+        # At h=0.1s (100ms), last BBO is at 0ms -> staleness 100ms > tolerance min(1s, 50ms)=50ms -> DROPPED
+        # At h=5.0s (5000ms), last BBO is at 4000ms -> staleness 1000ms <= tolerance min(1s, 2500ms)=1000ms -> KEPT
+        bbo_ts = np.array([0, 4_000_000_000, 10_000_000_000], dtype=np.int64)
+        bbo_mids = np.array([100.0, 101.0, 102.0], dtype=np.float64)
+
+        fill_ts = np.array([0], dtype=np.int64)
+        fill_prices = np.array([99.90], dtype=np.float64)
+        fill_sides = np.array(["BUY"], dtype=object)
+        fill_notionals = np.array([10.0], dtype=np.float64)
+
+        res = compute_markouts(
+            fill_timestamps_ns=fill_ts,
+            fill_prices=fill_prices,
+            fill_sides=fill_sides,
+            fill_notionals=fill_notionals,
+            bbo_timestamps_ns=bbo_ts,
+            bbo_mids=bbo_mids,
+            horizons_sec=[0.1, 5.0],
+        )
+        self.assertEqual(res["horizons"]["0.1s"]["N"], 0, "Sparse BBO exceeding tolerance must be dropped")
+        self.assertEqual(res["horizons"]["5.0s"]["N"], 1, "BBO within staleness tolerance must be kept")
+        self.assertIn("drift_mean_bps", res["horizons"]["5.0s"])
+        self.assertIn("spread_capture_mean_bps", res["horizons"]["5.0s"])
+        self.assertIn("total_return_mean_bps", res["horizons"]["5.0s"])
+
+        # Scenario 2: Dense BBO near 100ms (at 80ms) -> staleness 20ms <= 50ms -> KEPT
+        bbo_ts2 = np.array([0, 80_000_000, 4_000_000_000], dtype=np.int64)
+        bbo_mids2 = np.array([100.0, 100.05, 101.0], dtype=np.float64)
+        res2 = compute_markouts(
+            fill_timestamps_ns=fill_ts,
+            fill_prices=fill_prices,
+            fill_sides=fill_sides,
+            fill_notionals=fill_notionals,
+            bbo_timestamps_ns=bbo_ts2,
+            bbo_mids=bbo_mids2,
+            horizons_sec=[0.1],
+        )
+        self.assertEqual(res2["horizons"]["0.1s"]["N"], 1)
+
 
 if __name__ == "__main__":
     import datetime
     unittest.main()
+

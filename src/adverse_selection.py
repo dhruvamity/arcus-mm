@@ -44,6 +44,8 @@ def compute_markouts(
     max_bbo_ts = bbo_ts[-1]
 
     markouts_by_horizon: Dict[str, List[float]] = {f"{h}s": [] for h in horizons}
+    drifts_by_horizon: Dict[str, List[float]] = {f"{h}s": [] for h in horizons}
+    spread_caps_by_horizon: Dict[str, List[float]] = {f"{h}s": [] for h in horizons}
     markouts_buy: Dict[str, List[float]] = {f"{h}s": [] for h in horizons}
     markouts_sell: Dict[str, List[float]] = {f"{h}s": [] for h in horizons}
     dollar_buckets = {"small_under_15": [], "medium_15_to_50": [], "large_over_50": []}
@@ -54,35 +56,47 @@ def compute_markouts(
         side = fill_sides[i]
         notional = fill_notionals[i]
 
+        # Contemporaneous mid at fill time (as-of join: last BBO <= t_fill)
+        idx_fill = int(np.searchsorted(bbo_ts, t_fill, side="right")) - 1
+        mid_fill = bbo_m[idx_fill] if idx_fill >= 0 else p_fill
+        ref_p = mid_fill if mid_fill > 0 else p_fill
+        side_sign = 1.0 if side == "BUY" else -1.0
+
         for h in horizons:
             target_ts = t_fill + int(h * 1e9)
             # If target exceeds the end of the recording, DROP (never clamp)
             if target_ts > max_bbo_ts:
                 continue
 
-            idx = np.searchsorted(bbo_ts, target_ts)
-            if idx >= len(bbo_ts):
+            # As-of join per R-09: last BBO <= target_ts
+            idx = int(np.searchsorted(bbo_ts, target_ts, side="right")) - 1
+            if idx < 0 or idx >= len(bbo_ts):
                 continue
 
-            # Verify that found mid is within acceptable tolerance window of target
-            actual_gap_sec = abs(bbo_ts[idx] - target_ts) / 1e9
-            if actual_gap_sec > MAX_TOLERANCE_WINDOW_SEC:
+            # Verify that found mid is within acceptable staleness tolerance
+            staleness_sec = (target_ts - bbo_ts[idx]) / 1e9
+            max_staleness = min(1.0, 0.5 * h)
+            if staleness_sec > max_staleness:
                 continue
 
             future_mid = bbo_m[idx]
-            if p_fill <= 0:
+            if p_fill <= 0 or ref_p <= 0:
                 continue
 
-            # Adverse selection for passive maker:
-            # - Passive BUY fill: mid falling is adverse (price dropped after buying)
-            # - Passive SELL fill: mid rising is adverse (price rose after selling)
-            if side == "BUY":
-                as_bps = ((p_fill - future_mid) / p_fill) * 10_000.0
-            else:
-                as_bps = ((future_mid - p_fill) / p_fill) * 10_000.0
+            # 3-Component Decomposition per R-09:
+            # 1. spread_capture = side_sign * (mid_fill - p_fill) / ref_p
+            # 2. drift = side_sign * (future_mid - mid_fill) / ref_p
+            # 3. total = side_sign * (future_mid - p_fill) / ref_p
+            # 4. adverse_selection = - drift
+            spread_cap_bps = side_sign * ((mid_fill - p_fill) / ref_p) * 10_000.0
+            drift_bps = side_sign * ((future_mid - mid_fill) / ref_p) * 10_000.0
+            as_bps = - drift_bps
 
             h_key = f"{h}s"
             markouts_by_horizon[h_key].append(as_bps)
+            drifts_by_horizon[h_key].append(drift_bps)
+            spread_caps_by_horizon[h_key].append(spread_cap_bps)
+
             if side == "BUY":
                 markouts_buy[h_key].append(as_bps)
             else:
@@ -96,7 +110,7 @@ def compute_markouts(
                 else:
                     dollar_buckets["large_over_50"].append(as_bps)
 
-    def _calc_stats(arr: List[float]) -> Dict[str, Any]:
+    def _calc_stats(arr: List[float], drift_arr: Optional[List[float]] = None, sc_arr: Optional[List[float]] = None) -> Dict[str, Any]:
         n_obs = len(arr)
         if n_obs == 0:
             return {
@@ -110,11 +124,17 @@ def compute_markouts(
                 "std_bps": 0.0,
                 "ci_90_lower_bps": 0.0,
                 "ci_90_upper_bps": 0.0,
+                "drift_mean_bps": 0.0,
+                "spread_capture_mean_bps": 0.0,
+                "total_return_mean_bps": 0.0,
             }
         a = np.array(arr)
         mean_val = float(np.mean(a))
         std_val = float(np.std(a))
         se = std_val / math.sqrt(n_obs) if n_obs > 1 else 0.0
+        d_mean = float(np.mean(drift_arr)) if drift_arr else 0.0
+        sc_mean = float(np.mean(sc_arr)) if sc_arr else 0.0
+        tot_mean = sc_mean + d_mean
         return {
             "N": n_obs,
             "mean_bps": round(mean_val, 2),
@@ -126,10 +146,20 @@ def compute_markouts(
             "std_bps": round(std_val, 2),
             "ci_90_lower_bps": round(mean_val - 1.645 * se, 2),
             "ci_90_upper_bps": round(mean_val + 1.645 * se, 2),
+            "drift_mean_bps": round(d_mean, 2),
+            "spread_capture_mean_bps": round(sc_mean, 2),
+            "total_return_mean_bps": round(tot_mean, 2),
         }
 
     # Compute statistics per horizon
-    horizon_stats = {f"{h}s": _calc_stats(markouts_by_horizon[f"{h}s"]) for h in horizons}
+    horizon_stats = {
+        f"{h}s": _calc_stats(
+            markouts_by_horizon[f"{h}s"],
+            drifts_by_horizon[f"{h}s"],
+            spread_caps_by_horizon[f"{h}s"],
+        )
+        for h in horizons
+    }
     buy_stats = {f"{h}s": _calc_stats(markouts_buy[f"{h}s"]) for h in horizons}
     sell_stats = {f"{h}s": _calc_stats(markouts_sell[f"{h}s"]) for h in horizons}
 
