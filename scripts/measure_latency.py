@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """Continuous Empirical Latency Measurement for Arcus Perpetuals.
 
-Fulfills Section 4.6 of prompt.md and corrective pass requirements:
+Fulfills Mandate v2 Section 7 (Workstream 4 / R-13):
 - Measures real RTT from the local machine:
   1. REST /v1/markets round-trip time.
   2. WebSocket ping/pong round-trip time.
   3. WebSocket subscribe-ack round-trip time.
-- Measures clock skew against venue timestamps.
-- Records every raw sample with UTC timestamp in reports/latency_raw_samples.jsonl.
+- Drops pseudo 'clock skew' metric (which measured BBO book staleness rather than network skew).
+- Records every raw sample with UTC timestamp in latency/latency_raw_samples.jsonl and reports/latency_raw_samples.jsonl.
 - Computes empirical p50, p95, p99 latency distributions.
-- Emits results to reports/latency_benchmarks.json and reports/latency_summary.md.
+- Emits canonical results to latency/empirical_samples.json, reports/latency_benchmarks.json, and reports/latency_summary.md.
+- Supports continuous 24h background sampling every 10–30 seconds.
 """
 
 import argparse
@@ -70,14 +71,24 @@ async def measure_ws_subscribe_ack_rtt(ws_client: ArcusWsClient, market: str = "
         return -1.0
 
 
-async def run_benchmark(samples: int = 50, output_dir: str = "reports") -> Dict[str, Any]:
+async def run_benchmark(
+    samples: int = 50,
+    interval_sec: float = 0.1,
+    output_dir: str = "reports",
+    canonical_dir: str = "latency",
+) -> Dict[str, Any]:
     run_start_utc = datetime.datetime.now(datetime.timezone.utc).isoformat()
-    logger.info(f"Starting Arcus latency benchmark with {samples} samples at {run_start_utc}...")
+    logger.info(f"Starting Arcus empirical latency benchmark ({samples} samples, interval {interval_sec}s)...")
+
     out_path = Path(output_dir)
     out_path.mkdir(parents=True, exist_ok=True)
+    canon_path = Path(canonical_dir)
+    canon_path.mkdir(parents=True, exist_ok=True)
 
     raw_samples_file = out_path / "latency_raw_samples.jsonl"
-    raw_samples_f = open(raw_samples_file, "a", encoding="utf-8")
+    canon_raw_file = canon_path / "latency_raw_samples.jsonl"
+    raw_f = open(raw_samples_file, "a", encoding="utf-8")
+    canon_raw_f = open(canon_raw_file, "a", encoding="utf-8")
 
     rest_client = ArcusRestClient()
     ws_client = ArcusWsClient()
@@ -85,7 +96,6 @@ async def run_benchmark(samples: int = 50, output_dir: str = "reports") -> Dict[
 
     rest_rtts = []
     ws_ping_rtts = []
-    clock_skews_ms = []
 
     try:
         for i in range(samples):
@@ -95,78 +105,66 @@ async def run_benchmark(samples: int = 50, output_dir: str = "reports") -> Dict[
             try:
                 r_rtt = await measure_rest_rtt(rest_client)
                 rest_rtts.append(r_rtt)
-                raw_samples_f.write(json.dumps({
+                record = {
                     "sample_idx": i,
                     "timestamp_utc": ts_sample,
                     "channel": "REST",
                     "endpoint": "/v1/markets",
                     "rtt_ms": round(r_rtt, 3),
-                    "status": "ok"
-                }) + "\n")
+                    "status": "ok",
+                }
+                raw_f.write(json.dumps(record) + "\n")
+                canon_raw_f.write(json.dumps(record) + "\n")
             except Exception as e:
                 logger.warning(f"REST ping failed: {e}")
-                raw_samples_f.write(json.dumps({
+                err_record = {
                     "sample_idx": i,
                     "timestamp_utc": ts_sample,
                     "channel": "REST",
                     "endpoint": "/v1/markets",
                     "error": str(e),
-                    "status": "error"
-                }) + "\n")
+                    "status": "error",
+                }
+                raw_f.write(json.dumps(err_record) + "\n")
+                canon_raw_f.write(json.dumps(err_record) + "\n")
 
             # 2. WS Ping RTT
             try:
                 w_rtt = await measure_ws_ping_rtt(ws_client)
                 if w_rtt > 0:
                     ws_ping_rtts.append(w_rtt)
-                    raw_samples_f.write(json.dumps({
+                    w_record = {
                         "sample_idx": i,
                         "timestamp_utc": ts_sample,
                         "channel": "WS_PING",
                         "rtt_ms": round(w_rtt, 3),
-                        "status": "ok"
-                    }) + "\n")
+                        "status": "ok",
+                    }
+                    raw_f.write(json.dumps(w_record) + "\n")
+                    canon_raw_f.write(json.dumps(w_record) + "\n")
             except Exception as e:
                 logger.warning(f"WS ping failed: {e}")
 
-            # 3. Clock skew measurement against REST timestamp
-            try:
-                t_local_before = time.time() * 1000.0
-                bbo_res = await rest_client._request("GET", "/v1/bbo/BTC-USD", "bbo")
-                t_local_after = time.time() * 1000.0
-                venue_ts_us = bbo_res.get("timestamp")
-                if venue_ts_us:
-                    venue_ts_ms = venue_ts_us / 1000.0
-                    local_mid_ms = (t_local_before + t_local_after) / 2.0
-                    skew = venue_ts_ms - local_mid_ms
-                    clock_skews_ms.append(skew)
-                    raw_samples_f.write(json.dumps({
-                        "sample_idx": i,
-                        "timestamp_utc": ts_sample,
-                        "channel": "CLOCK_SKEW",
-                        "skew_ms": round(skew, 3),
-                        "venue_ts_ms": round(venue_ts_ms, 3),
-                        "local_mid_ms": round(local_mid_ms, 3),
-                        "status": "ok"
-                    }) + "\n")
-            except Exception as e:
-                pass
+            raw_f.flush()
+            canon_raw_f.flush()
+            if interval_sec > 0:
+                await asyncio.sleep(interval_sec)
 
-            raw_samples_f.flush()
-            await asyncio.sleep(0.08)
-
-        # 4. Single subscribe-ack test
+        # 3. Single subscribe-ack test
         sub_ack_rtt = await measure_ws_subscribe_ack_rtt(ws_client, "BTC-USD")
-        raw_samples_f.write(json.dumps({
+        sub_record = {
             "timestamp_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             "channel": "WS_SUBSCRIBE_ACK",
             "market": "BTC-USD",
             "rtt_ms": round(sub_ack_rtt, 3),
-            "status": "ok" if sub_ack_rtt > 0 else "timeout"
-        }) + "\n")
+            "status": "ok" if sub_ack_rtt > 0 else "timeout",
+        }
+        raw_f.write(json.dumps(sub_record) + "\n")
+        canon_raw_f.write(json.dumps(sub_record) + "\n")
 
     finally:
-        raw_samples_f.close()
+        raw_f.close()
+        canon_raw_f.close()
         await ws_client.disconnect()
         await rest_client.close()
 
@@ -174,7 +172,7 @@ async def run_benchmark(samples: int = 50, output_dir: str = "reports") -> Dict[
 
     def calc_stats(arr: List[float]) -> Dict[str, float]:
         if not arr:
-            return {"count": 0, "p50": 0.0, "p95": 0.0, "p99": 0.0, "mean": 0.0, "min": 0.0, "max": 0.0}
+            return {"count": 0, "p50": 0.0, "p95": 0.0, "p99": 0.0, "mean": 0.0, "min": 0.0, "max": 0.0, "std": 0.0}
         a = np.array(arr)
         return {
             "count": len(a),
@@ -188,19 +186,23 @@ async def run_benchmark(samples: int = 50, output_dir: str = "reports") -> Dict[
         }
 
     results = {
+        "version": "2.0.0",
+        "description": "Canonical Empirical Latency Distribution for Arcus MM",
         "run_start_utc": run_start_utc,
         "run_end_utc": run_end_utc,
         "total_samples": samples,
         "rest_rtt_ms": calc_stats(rest_rtts),
         "ws_ping_rtt_ms": calc_stats(ws_ping_rtts),
         "ws_subscribe_ack_ms": round(sub_ack_rtt, 2),
-        "clock_skew_ms": calc_stats(clock_skews_ms),
-        "raw_samples_log": str(raw_samples_file),
+        "raw_samples_log": str(canon_raw_file),
     }
 
-    # Save JSON
-    json_path = out_path / "latency_benchmarks.json"
-    json_path.write_text(json.dumps(results, indent=2), encoding="utf-8")
+    # Save to canonical directory and reports directory
+    canon_json = canon_path / "empirical_samples.json"
+    canon_json.write_text(json.dumps(results, indent=2), encoding="utf-8")
+
+    report_json = out_path / "latency_benchmarks.json"
+    report_json.write_text(json.dumps(results, indent=2), encoding="utf-8")
 
     # Generate Markdown Summary
     md_lines = [
@@ -209,7 +211,7 @@ async def run_benchmark(samples: int = 50, output_dir: str = "reports") -> Dict[
         f"**Run Start:** {run_start_utc}  ",
         f"**Run End:** {run_end_utc}  ",
         f"**Samples:** {samples}  ",
-        f"**Raw Samples Log:** `{raw_samples_file}`  ",
+        f"**Raw Samples Log:** `{canon_raw_file}`  ",
         "",
         "## Measured RTT Distribution (ms)",
         "",
@@ -219,38 +221,39 @@ async def run_benchmark(samples: int = 50, output_dir: str = "reports") -> Dict[
         f"| **WebSocket Ping/Pong** | {results['ws_ping_rtt_ms']['p50']} | {results['ws_ping_rtt_ms']['p95']} | {results['ws_ping_rtt_ms']['p99']} | {results['ws_ping_rtt_ms']['mean']} | {results['ws_ping_rtt_ms']['min']} | {results['ws_ping_rtt_ms']['max']} |",
         f"| **WebSocket Subscribe-Ack** | {results['ws_subscribe_ack_ms']} | - | - | - | - | - |",
         "",
-        "## Clock Skew vs Venue",
+        "## Engine Latency Pipeline Parameterization",
         "",
-        f"- **Median Skew:** {results['clock_skew_ms']['p50']:.2f} ms",
-        f"- **p95 Skew:** {results['clock_skew_ms']['p95']:.2f} ms",
-        "",
-        "## Backtester Latency Pipeline Parameterization",
-        "",
-        f"- **Empirical p50 Latency:** {results['ws_ping_rtt_ms']['p50'] / 2.0 + results['rest_rtt_ms']['p50'] / 2.0:.2f} ms",
+        f"- **Empirical One-Way Feed Latency:** {results['ws_ping_rtt_ms']['p50'] / 2.0:.2f} ms",
+        f"- **Empirical Order Entry Latency:** {results['rest_rtt_ms']['p50'] / 2.0:.2f} ms",
         f"- **Empirical p95 Latency:** {results['rest_rtt_ms']['p95']:.2f} ms",
         f"- **Stress Latency (+500ms):** {results['rest_rtt_ms']['p95'] + 500.0:.2f} ms",
     ]
 
     summary_path = out_path / "latency_summary.md"
     summary_path.write_text("\n".join(md_lines) + "\n", encoding="utf-8")
-    logger.info(f"Latency benchmark complete. Saved to {json_path} and {summary_path}")
+    logger.info(f"Latency benchmark complete. Saved to {canon_json} and {summary_path}")
     return results
 
 
+async def continuous_sampler(interval_sec: float = 15.0):
+    """Runs continuous background latency sampling across all hours."""
+    logger.info(f"Starting continuous latency sampler with {interval_sec}s interval...")
+    while True:
+        try:
+            await run_benchmark(samples=10, interval_sec=interval_sec)
+        except Exception as e:
+            logger.error(f"Error in continuous latency sampler: {e}")
+        await asyncio.sleep(interval_sec)
+
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run Arcus Latency Benchmark")
+    parser = argparse.ArgumentParser(description="Run Arcus Empirical Latency Benchmark")
     parser.add_argument("--samples", type=int, default=50, help="Number of ping samples")
-    parser.add_argument("--continuous", action="store_true", help="Run continuously every hour")
+    parser.add_argument("--interval", type=float, default=0.1, help="Interval between samples in seconds")
+    parser.add_argument("--continuous", action="store_true", help="Run continuously in background (every 15s)")
     args = parser.parse_args()
 
     if args.continuous:
-        async def continuous_loop():
-            while True:
-                try:
-                    await run_benchmark(samples=args.samples)
-                except Exception as err:
-                    logger.error(f"Benchmark error: {err}")
-                await asyncio.sleep(3600.0)
-        asyncio.run(continuous_loop())
+        asyncio.run(continuous_sampler(interval_sec=args.interval if args.interval > 0.1 else 15.0))
     else:
-        asyncio.run(run_benchmark(samples=args.samples))
+        asyncio.run(run_benchmark(samples=args.samples, interval_sec=args.interval))

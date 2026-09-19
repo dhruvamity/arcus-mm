@@ -1,0 +1,11 @@
+{"sample_idx": 0, "timestamp_utc": "2026-09-19T19:59:03.637282+00:00", "channel": "REST", "endpoint": "/v1/markets", "rtt_ms": 982.769, "status": "ok"}
+{"sample_idx": 0, "timestamp_utc": "2026-09-19T19:59:03.637282+00:00", "channel": "WS_PING", "rtt_ms": 139.661, "status": "ok"}
+{"sample_idx": 1, "timestamp_utc": "2026-09-19T19:59:04.811240+00:00", "channel": "REST", "endpoint": "/v1/markets", "rtt_ms": 279.414, "status": "ok"}
+{"sample_idx": 1, "timestamp_utc": "2026-09-19T19:59:04.811240+00:00", "channel": "WS_PING", "rtt_ms": 139.38, "status": "ok"}
+{"sample_idx": 2, "timestamp_utc": "2026-09-19T19:59:05.280469+00:00", "channel": "REST", "endpoint": "/v1/markets", "rtt_ms": 376.065, "status": "ok"}
+{"sample_idx": 2, "timestamp_utc": "2026-09-19T19:59:05.280469+00:00", "channel": "WS_PING", "rtt_ms": 139.185, "status": "ok"}
+{"sample_idx": 3, "timestamp_utc": "2026-09-19T19:59:05.847027+00:00", "channel": "REST", "endpoint": "/v1/markets", "rtt_ms": 388.62, "status": "ok"}
+{"sample_idx": 3, "timestamp_utc": "2026-09-19T19:59:05.847027+00:00", "channel": "WS_PING", "rtt_ms": 140.143, "status": "ok"}
+{"sample_idx": 4, "timestamp_utc": "2026-09-19T19:59:06.427172+00:00", "channel": "REST", "endpoint": "/v1/markets", "rtt_ms": 194.248, "status": "ok"}
+{"sample_idx": 4, "timestamp_utc": "2026-09-19T19:59:06.427172+00:00", "channel": "WS_PING", "rtt_ms": 139.445, "status": "ok"}
+{"timestamp_utc": "2026-09-19T19:59:06.952882+00:00", "channel": "WS_SUBSCRIBE_ACK", "market": "BTC-USD", "rtt_ms": 141.091, "status": "ok"}
