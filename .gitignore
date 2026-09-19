@@ -52,3 +52,8 @@ recorder_heartbeat.json
 .vscode/
 *.swp
 *.swo
+
+# Local repo bundle (never commit or push)
+FULL_REPO_BUNDLE.md
+repo_bundle.md
+*.bundle.md
