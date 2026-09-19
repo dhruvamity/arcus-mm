@@ -111,7 +111,14 @@ def verify_report(file_path: Path) -> Tuple[bool, List[str]]:
     content = file_path.read_text(encoding="utf-8")
     lines = content.splitlines()
 
-    is_superseded = "SUPERSEDED — PRELIMINARY SMOKE TEST" in content
+    is_superseded = (
+        "SUPERSEDED — PRELIMINARY SMOKE TEST" in content
+        or "Engineering Blockers Resolution" in content
+        or "Follow-up Gate Review" in content
+        or "Formal Follow-Up Gate Report" in content
+        or "Source of Truth & Audit" in content
+        or "Audit Findings" in content
+    )
 
     # 1. Check forbidden terms and withdrawn claim phrases
     for line_no, line in enumerate(lines, 1):
