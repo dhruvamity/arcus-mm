@@ -1,5 +1,5 @@
 commit c86984e01d2ca561c1c316602f5aab91d51edc4a
-Author: dhruvamity <dhruvrajeshnar@amityonline.com>
+Author: dhruvamity <dev@arcus-mm.local>
 Date:   Sun Sep 20 01:00:48 2026 +0530
 
     feat(mandate): complete all 47 follow-up mandate requirements and deliverable suite
@@ -51,7 +51,7 @@ Date:   Sun Sep 20 01:00:48 2026 +0530
  44 files changed, 4252 insertions(+), 446 deletions(-)
 
 commit 0905008c5e847c19cc25daf4a2ab4898000f7717
-Author: dhruvamity <dhruvrajeshnar@amityonline.com>
+Author: dhruvamity <dev@arcus-mm.local>
 Date:   Sun Sep 20 00:39:04 2026 +0530
 
     docs: update prompt.md with source-audited follow-up engineering & quant research prompt
@@ -60,7 +60,7 @@ Date:   Sun Sep 20 00:39:04 2026 +0530
  1 file changed, 1934 insertions(+)
 
 commit b621c4eb046816db8be8fd1b3dfa136f6b1975af
-Author: dhruvamity <dhruvrajeshnar@amityonline.com>
+Author: dhruvamity <dev@arcus-mm.local>
 Date:   Sun Sep 20 00:27:07 2026 +0530
 
     feat(scripts): add generate_repo_bundle.py and update recorder health
@@ -71,7 +71,7 @@ Date:   Sun Sep 20 00:27:07 2026 +0530
  3 files changed, 389 insertions(+), 34 deletions(-)
 
 commit 6fbed70dcaf52f6e66cb56f392e463b57d27730c
-Author: dhruvamity <dhruvrajeshnar@amityonline.com>
+Author: dhruvamity <dev@arcus-mm.local>
 Date:   Sun Sep 20 00:26:38 2026 +0530
 
     chore(git): ignore local repository bundle markdown files
@@ -80,7 +80,7 @@ Date:   Sun Sep 20 00:26:38 2026 +0530
  1 file changed, 5 insertions(+)
 
 commit 90364c8b8897f8c06f5eb24a56bc927b7674d4dc
-Author: dhruvamity <dhruvrajeshnar@amityonline.com>
+Author: dhruvamity <dev@arcus-mm.local>
 Date:   Sun Sep 20 00:16:32 2026 +0530
 
     chore(recorder): update health stats (3.84M messages, 0 gaps)
@@ -89,7 +89,7 @@ Date:   Sun Sep 20 00:16:32 2026 +0530
  1 file changed, 28 insertions(+), 28 deletions(-)
 
 commit 0d377f15a1da17ea99c5962f10c4d8b0da00f0be
-Author: dhruvamity <dhruvrajeshnar@amityonline.com>
+Author: dhruvamity <dev@arcus-mm.local>
 Date:   Sun Sep 20 00:16:20 2026 +0530
 
     docs: sync prompt.md with master research and build plan
@@ -98,7 +98,7 @@ Date:   Sun Sep 20 00:16:20 2026 +0530
  1 file changed, 194 insertions(+), 35 deletions(-)
 
 commit f4b2932f6d998a24e1d548d4f8894ff0cd345cc3
-Author: dhruvamity <dhruvrajeshnar@amityonline.com>
+Author: dhruvamity <dev@arcus-mm.local>
 Date:   Sat Sep 19 23:58:20 2026 +0530
 
     feat(corrective): complete evidence pack, protocol revisions, claims ledger, and assumptions
@@ -111,7 +111,7 @@ Date:   Sat Sep 19 23:58:20 2026 +0530
  5 files changed, 518 insertions(+), 101 deletions(-)
 
 commit 23a03f3e594ee9a9a842f271248550c56ab4c8f3
-Author: dhruvamity <dhruvrajeshnar@amityonline.com>
+Author: dhruvamity <dev@arcus-mm.local>
 Date:   Sat Sep 19 23:55:23 2026 +0530
 
     feat(corrective): update final report, latency measurement, and verifier rules
@@ -129,7 +129,7 @@ Date:   Sat Sep 19 23:55:23 2026 +0530
  10 files changed, 782 insertions(+), 389 deletions(-)
 
 commit 2d00550b6f3337422165b7b7d724d383ef7ff312
-Author: dhruvamity <dhruvrajeshnar@amityonline.com>
+Author: dhruvamity <dev@arcus-mm.local>
 Date:   Sat Sep 19 21:52:57 2026 +0530
 
     first commit: initialize Arcus MM quantitative research and market-making platform
