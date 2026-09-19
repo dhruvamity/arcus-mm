@@ -384,6 +384,8 @@ class SimEngine:
         fills_generated: List[Dict[str, Any]] = []
 
         for ctx in self.contexts.values():
+            if hasattr(ctx.strategy, "market") and ctx.strategy.market != venue.market:
+                continue
             for fm in ctx.fill_models:
                 pnl_eng = ctx.pnl_engines[fm]
 
@@ -513,6 +515,8 @@ class SimEngine:
         spread_bps = ((venue.best_ask - venue.best_bid) / venue.current_mid) * 10_000.0
 
         for ctx in self.contexts.values():
+            if hasattr(ctx.strategy, "market") and ctx.strategy.market != venue.market:
+                continue
             # Check risk state
             if ctx.risk_state in (RiskState.PAUSED_GAP, RiskState.PAUSED_STALE_FEED, RiskState.FLATTENED_CROSSED_BOOK):
                 continue
@@ -622,6 +626,8 @@ class SimEngine:
         rate = float(data.get("funding_rate") or data.get("rate") or 0.0)
         ref_mid = venue.current_mid if venue.current_mid > 0 else 1.0
         for ctx in self.contexts.values():
+            if hasattr(ctx.strategy, "market") and ctx.strategy.market != venue.market:
+                continue
             for fm, pnl_eng in ctx.pnl_engines.items():
                 pnl_eng.apply_funding(rate, ref_mid)
 
@@ -630,6 +636,8 @@ class SimEngine:
         if venue.last_bbo_ts_ns > 0 and (ts_ns - venue.last_bbo_ts_ns) > 3_000_000_000:
             # Stale BBO (> 3 seconds)
             for ctx in self.contexts.values():
+                if hasattr(ctx.strategy, "market") and ctx.strategy.market != venue.market:
+                    continue
                 ctx.risk_state = RiskState.PAUSED_STALE_FEED
                 # Cancel all resting orders
                 for fm in ctx.fill_models:

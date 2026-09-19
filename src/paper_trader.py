@@ -1,345 +1,428 @@
-"""Enhanced Live Mainnet Paper Trading Engine for Arcus Perpetuals.
+"""Live Mainnet Paper Trading Engine for Arcus Perpetuals Rebuilt on Unified SimEngine.
 
-Fulfills Section 7 (Workstream 4) of prompt.md:
-- Reads live public mainnet WebSocket feeds; ZERO real orders submitted.
-- Dual fill logging in the same session: Model C (gating) and Model B (shadow).
-- Persists all raw WS messages for post-session Replay Parity Testing.
-- 60-second telemetry reporting: quotes, actions used, pool levels, inventory, PnL attribution, spread, stale ms.
-- Simulated kill switches: stale BBO > 3s, crossed book, inventory limit, paper daily-loss limit.
-- Equity-open protocol: pause/widen during OPEN_30 window for equity/commodity/index perps.
+Fulfills Mandate v2 Section 5 & 9 (Closing Defect R-08):
+- Single-path execution: Feeds live public mainnet WebSocket frames into canonical SimEngine.on_event().
+- ZERO real orders placed (read-only mainnet data stream).
+- Single shared WebSocket connection across all subscribed markets (eliminating duplicate sockets).
+- Dynamic metadata loading: Queries GET /v1/markets at initialization for live tick/step/minOrder sizes.
+- Real state-machine kill switches checked on every clock tick (<= 250ms):
+  - Stale feed > 3s triggers PAUSED_STALE_FEED and order cancellation.
+  - Crossed book triggers FLATTENED_CROSSED_BOOK.
+  - Drawdown limit triggers emergency flattening.
+- Asset-class gating: OPEN_30 / CLOSE_30 pauses apply strictly to equities/commodities/indices (crypto pause default off).
+- Concurrent paired evaluation: Evaluates Model B (central estimate) and Model C (robustness floor) independently.
+- Rule 11 Session Outcomes: Judged only with >= 30 fills, labeled SESSION: POSITIVE / NEGATIVE / INSUFFICIENT.
+- Replay parity logging: Persists raw JSONL messages and computes SHA-256 session manifest.
 """
 
 import asyncio
 import datetime
+import hashlib
 import json
 import logging
-import time
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+import time
+from typing import Dict, List, Optional, Any, Union
 
 from src.config import ArcusConfig, settings
 from src.ws_client import ArcusWsClient
-from src.strategies.adaptive_mm import AdaptiveMicrostructureStrategy
-from src.models.fill import FillEngine, FillModelType, SimulatedQueueOrder
-from src.models.rate_limit import ArcusRateLimitSimulator
-from src.models.pnl import PnLAttributionEngine
+from src.rest_client import ArcusRestClient
+from src.sim.engine import (
+    SimEngine,
+    SimEvent,
+    SimEventType,
+    RiskState,
+)
+from src.models.fill import FillModelType
 from src.models.latency import LatencyConfig
+from src.strategies.adaptive_mm import AdaptiveMicrostructureStrategy
+from src.strategies.fixed_spread import FixedSpreadStrategy
+from src.strategies.volatility_clock import VolatilityClockStrategy
+from src.strategies.avellaneda_stoikov import AvellanedaStoikovStrategy
+from src.strategies.baselines import DoNothingStrategy, RandomSideQuotingStrategy
 from src.calendar import classify_regime
 from src.utils import now_ns
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("paper_trader")
+
+
+DEFAULT_MARKET_SPECS: Dict[str, Dict[str, Any]] = {
+    "BTC-USD": {"tick_size": 0.1, "step_size": 0.00000001, "min_notional": 5.0, "min_order_size": 0.0001},
+    "ETH-USD": {"tick_size": 0.01, "step_size": 0.000001, "min_notional": 5.0, "min_order_size": 0.001},
+    "SOL-USD": {"tick_size": 0.01, "step_size": 0.0001, "min_notional": 5.0, "min_order_size": 0.01},
+    "HYPE-USD": {"tick_size": 0.001, "step_size": 0.0001, "min_notional": 5.0, "min_order_size": 0.01},
+    "ZEC-USD": {"tick_size": 0.001, "step_size": 0.00001, "min_notional": 5.0, "min_order_size": 0.001},
+    "NEAR-USD": {"tick_size": 0.001, "step_size": 0.0001, "min_notional": 5.0, "min_order_size": 0.01},
+    "UNI-USD": {"tick_size": 0.001, "step_size": 0.001, "min_notional": 5.0, "min_order_size": 0.1},
+    "LIT-USD": {"tick_size": 0.0001, "step_size": 0.001, "min_notional": 5.0, "min_order_size": 0.1},
+    "SPCX-USD": {"tick_size": 0.01, "step_size": 0.001, "min_notional": 5.0, "min_order_size": 0.01},
+    "SLV-USD": {"tick_size": 0.01, "step_size": 0.001, "min_notional": 5.0, "min_order_size": 0.01},
+}
 
 
 class ArcusLivePaperTrader:
-    """Streams live mainnet market data with dual Model C/B logging and replay logging."""
+    """Streams live mainnet market data into a canonical SimEngine instance for paper trading."""
 
     def __init__(
         self,
-        market: str,
-        tick_size: float,
-        step_size: float,
-        asset_class: str = "crypto",
-        initial_capital: float = 100.0,
-        clip_notional: float = 8.0,
-        enable_open_protocol: bool = True,
+        markets: Union[str, List[str]],
         session_id: Optional[str] = None,
         output_dir: str = "data/live_paper",
+        initial_capital: float = 100.0,
+        capital_scenarios: Optional[List[float]] = None,
+        strategy_types: Optional[List[str]] = None,
+        enable_crypto_pause: bool = False,
+        enable_equity_pause: bool = True,
+        latency_config: Optional[LatencyConfig] = None,
         config: Optional[ArcusConfig] = None,
     ):
-        self.market = market
-        self.asset_class = asset_class
-        self.tick_size = tick_size
-        self.step_size = step_size
+        self.markets = [markets] if isinstance(markets, str) else list(markets)
         self.initial_capital = initial_capital
-        self.clip_notional = clip_notional
-        self.enable_open_protocol = enable_open_protocol
-        self.session_id = session_id or f"paper_{datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d_%H%M%S')}"
-        self.output_dir = Path(output_dir) / self.session_id
-        self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.capital_scenarios = capital_scenarios or [initial_capital]
+        self.strategy_types = strategy_types or ["adaptive", "fixed_spread", "vol_clock", "donothing", "random_side"]
+        self.enable_crypto_pause = enable_crypto_pause
+        self.enable_equity_pause = enable_equity_pause
+        self.latency_config = latency_config or LatencyConfig()
         self.config = config or settings
 
-        self.strategy = AdaptiveMicrostructureStrategy(
-            market=market,
-            tick_size=tick_size,
-            step_size=step_size,
-            base_spread_bps=4.0,
-            clip_notional=clip_notional,
-        )
-
-        # Dual Fill Engines: Model C (gating) and Model B (shadow)
-        self.fill_engine_c = FillEngine(model_type=FillModelType.MODEL_C_CONSERVATIVE)
-        self.fill_engine_b = FillEngine(model_type=FillModelType.MODEL_B_MODERATE)
-
-        # Dual PnL Engines
-        self.pnl_engine_c = PnLAttributionEngine(initial_capital=initial_capital, maker_fee_bps=0.0)
-        self.pnl_engine_b = PnLAttributionEngine(initial_capital=initial_capital, maker_fee_bps=0.0)
-
-        self.rate_limiter = ArcusRateLimitSimulator(requote_threshold_ticks=2)
-        self.latency = LatencyConfig()
+        self.session_id = session_id or f"paper_{datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d_%H%M%S')}"
+        self.session_dir = Path(output_dir) / self.session_id
+        self.session_dir.mkdir(parents=True, exist_ok=True)
 
         self.ws_client = ArcusWsClient(config=self.config)
+        self.rest_client = ArcusRestClient(config=self.config)
+
+        self.market_specs: Dict[str, Dict[str, Any]] = {}
+        self.engine: Optional[SimEngine] = None
         self._running = False
 
-        # Simulated Resting Orders (shared quote path)
-        self.active_bid_c: Optional[SimulatedQueueOrder] = None
-        self.active_ask_c: Optional[SimulatedQueueOrder] = None
-        self.active_bid_b: Optional[SimulatedQueueOrder] = None
-        self.active_ask_b: Optional[SimulatedQueueOrder] = None
+        # Raw logging & Telemetry
+        self.raw_stream_path = self.session_dir / "raw_stream.jsonl"
+        self.telemetry_path = self.session_dir / "telemetry.jsonl"
+        self.fills_path = self.session_dir / "fills.jsonl"
+        self._raw_file = None
+        self._telemetry_file = None
+        self._fills_file = None
 
-        self.last_bid_p: Optional[float] = None
-        self.last_ask_p: Optional[float] = None
-
-        # State & Microstructure
-        self.current_mid: float = 0.0
-        self.current_spread_bps: float = 4.0
-        self.current_volatility: float = 0.35
-        self.current_microprice_dev: float = 0.0
-        self.last_bbo_time: float = time.time()
-        self.is_kill_switch_active: bool = False
-        self.kill_switch_reason: Optional[str] = None
-
-        # Telemetry & Recording
-        self.raw_ws_file = open(self.output_dir / f"{market}_raw_ws.jsonl", "a", encoding="utf-8")
-        self.telemetry_file = open(self.output_dir / f"{market}_telemetry.jsonl", "a", encoding="utf-8")
-        self.fills_log: List[Dict[str, Any]] = []
-
+        self._clock_task: Optional[asyncio.Task] = None
         self._telemetry_task: Optional[asyncio.Task] = None
-        self.order_counter = 0
+        self.session_start_utc: Optional[str] = None
+        self.session_fills_count = 0
 
-    def _persist_raw_ws(self, channel: str, msg: Dict[str, Any]) -> None:
-        """Persists raw WS message for post-session replay parity test."""
-        record = {
-            "recv_ts_ns": now_ns(),
-            "market": self.market,
-            "channel": channel,
-            "data": msg,
-        }
-        self.raw_ws_file.write(json.dumps(record, separators=(",", ":")) + "\n")
-        self.raw_ws_file.flush()
+    async def initialize_engine(self) -> None:
+        """Dynamically loads live venue specs from REST /v1/markets and initializes SimEngine."""
+        logger.info("Querying live market metadata from GET /v1/markets...")
+        try:
+            markets_res = await self.rest_client._request("GET", "/v1/markets", "markets")
+            items = markets_res.get("markets") or markets_res if isinstance(markets_res, list) else []
+            for item in items:
+                m_name = item.get("market") or item.get("name")
+                if m_name in self.markets:
+                    self.market_specs[m_name] = {
+                        "tick_size": float(item.get("tickSize", 0.001)),
+                        "step_size": float(item.get("stepSize", 0.0001)),
+                        "min_notional": float(item.get("minOrderNotional", 5.0)),
+                        "min_order_size": float(item.get("minOrderSize", 0.0)),
+                        "max_order_size": float(item.get("maxOrderSize", 1_000_000.0)),
+                    }
+                    logger.info(f"Loaded live metadata for {m_name}: {self.market_specs[m_name]}")
+        except Exception as e:
+            logger.warning(f"Could not load live /v1/markets ({e}). Falling back to conservative venue metadata.")
+
+        # Ensure all markets have specs
+        for m in self.markets:
+            if m not in self.market_specs:
+                self.market_specs[m] = DEFAULT_MARKET_SPECS.get(
+                    m, {"tick_size": 0.01, "step_size": 0.0001, "min_notional": 5.0, "min_order_size": 0.001}
+                )
+
+        # Build strategy instances per market and capital scenario
+        strategies: Dict[str, Any] = {}
+        for m in self.markets:
+            spec = self.market_specs[m]
+            tick_sz = spec["tick_size"]
+            step_sz = spec["step_size"]
+            min_notional = spec["min_notional"]
+
+            for cap in self.capital_scenarios:
+                cap_tag = f"c{int(cap)}"
+                clip = max(min_notional, 8.0)
+
+                if "adaptive" in self.strategy_types:
+                    sid = f"{m}_adaptive_{cap_tag}"
+                    strategies[sid] = AdaptiveMicrostructureStrategy(
+                        market=m, tick_size=tick_sz, step_size=step_sz, clip_notional=clip, base_spread_bps=4.0
+                    )
+
+                if "fixed_spread" in self.strategy_types:
+                    sid = f"{m}_fixed_{cap_tag}"
+                    strategies[sid] = FixedSpreadStrategy(
+                        market=m, tick_size=tick_sz, step_size=step_sz, clip_notional=clip, spread_bps=4.5
+                    )
+
+                if "vol_clock" in self.strategy_types:
+                    sid = f"{m}_volclock_{cap_tag}"
+                    strategies[sid] = VolatilityClockStrategy(
+                        market=m, tick_size=tick_sz, step_size=step_sz, clip_notional=clip
+                    )
+
+                if "donothing" in self.strategy_types:
+                    sid = f"{m}_donothing_{cap_tag}"
+                    strategies[sid] = DoNothingStrategy(market=m, tick_size=tick_sz, step_size=step_sz)
+
+                if "random_side" in self.strategy_types:
+                    sid = f"{m}_randomside_{cap_tag}"
+                    strategies[sid] = RandomSideQuotingStrategy(
+                        market=m, tick_size=tick_sz, step_size=step_sz, clip_notional=clip
+                    )
+
+        fill_models = [
+            FillModelType.MODEL_B_MODERATE,
+            FillModelType.MODEL_C_CONSERVATIVE,
+            FillModelType.MODEL_A_TOUCH,
+        ]
+
+        self.engine = SimEngine(
+            markets=self.markets,
+            market_specs=self.market_specs,
+            strategies=strategies,
+            fill_models=fill_models,
+            latency_config=self.latency_config,
+            initial_capital=self.initial_capital,
+        )
+        logger.info(f"SimEngine initialized with {len(self.markets)} markets and {len(strategies)} strategy instances.")
+
+    def _persist_raw_ws(self, channel: str, market: str, msg: Dict[str, Any], recv_ts: int) -> None:
+        """Persists raw incoming WebSocket message for exact replay parity verification."""
+        if self._raw_file:
+            row = {
+                "recv_ts_ns": recv_ts,
+                "channel": channel,
+                "market": market,
+                "data": msg,
+            }
+            self._raw_file.write(json.dumps(row, separators=(",", ":")) + "\n")
 
     async def _on_bbo_update(self, msg: Dict[str, Any]) -> None:
-        self._persist_raw_ws("bbo", msg)
-        self.last_bbo_time = time.time()
+        """Handles incoming BBO WebSocket frame."""
+        t_recv = now_ns()
+        market = msg.get("market") or self.markets[0]
+        self._persist_raw_ws("bbo", market, msg, t_recv)
 
         contents = msg.get("contents", {})
-        if not isinstance(contents, dict):
+        if not isinstance(contents, dict) or not contents:
             return
 
-        best_bid = contents.get("bestBid") or {}
-        best_ask = contents.get("bestAsk") or {}
-        bp_str = best_bid.get("price")
-        ap_str = best_ask.get("price")
-        if not bp_str or not ap_str:
+        # Check regime-specific pause
+        is_equity = any(eq in market for eq in ["SPCX", "NVDA", "TSLA", "GOOGL", "AMD", "SLV", "GLD", "SPY", "QQQ"])
+        regime = classify_regime(t_recv, "equities" if is_equity else "crypto")
+
+        if is_equity and self.enable_equity_pause and regime.event_window in ("OPEN_30", "CLOSE_30"):
+            # Equities pause during volatile open/close
+            return
+        if not is_equity and self.enable_crypto_pause and regime.event_window in ("OPEN_30", "CLOSE_30"):
             return
 
-        bid_p = float(bp_str)
-        ask_p = float(ap_str)
-        bid_s = float(best_bid.get("size") or 0.0)
-        ask_s = float(best_ask.get("size") or 0.0)
-
-        # Kill Switch 1: Crossed Book
-        if bid_p >= ask_p:
-            self.is_kill_switch_active = True
-            self.kill_switch_reason = "Crossed order book"
-            self._cancel_all_orders()
-            return
-
-        self.current_mid = (bid_p + ask_p) / 2.0
-        self.current_spread_bps = ((ask_p - bid_p) / self.current_mid) * 10_000.0
-
-        tot_s = bid_s + ask_s
-        if tot_s > 0:
-            micro = (bid_s * ask_p + ask_s * bid_p) / tot_s
-            self.current_microprice_dev = ((micro - self.current_mid) / self.current_mid) * 10_000.0
-
-        # Regime Tag & Equity Open Protocol
-        regime = classify_regime(now_ns(), self.asset_class)
-        if self.enable_open_protocol and regime.event_window == "OPEN_30":
-            # During OPEN_30 on equities/commodities: widen quotes or pause
-            logger.debug(f"[{self.market}] Pausing quotes during OPEN_30 event window.")
-            self._cancel_all_orders()
-            return
-
-        # Kill Switch 2: Max Drawdown Loss Limit (5% of capital)
-        if self.pnl_engine_c.max_drawdown > 0.05:
-            self.is_kill_switch_active = True
-            self.kill_switch_reason = "Daily loss limit (5%) breached"
-            self.pnl_engine_c.force_flatten(self.current_mid)
-            self._cancel_all_orders()
-            return
-
-        # Generate Strategy Quotes based on Model C inventory
-        quotes = self.strategy.generate_quotes(
-            mid_price=self.current_mid,
-            inventory_units=self.pnl_engine_c.position,
-            volatility=self.current_volatility,
-            market_spread_bps=self.current_spread_bps,
-            microprice_dev_bps=self.current_microprice_dev,
-        )
-
-        if quotes:
-            bid_q, ask_q = quotes
-            ts_now = now_ns()
-
-            # Process Bid Quote
-            if bid_q:
-                needs_bid_requote = True
-                if self.last_bid_p is not None:
-                    ticks_diff = abs(bid_q.price - self.last_bid_p) / self.tick_size
-                    if ticks_diff < 2:
-                        needs_bid_requote = False
-
-                if needs_bid_requote and self.rate_limiter.can_modify_order():
-                    self.rate_limiter.record_order_modification()
-                    self.order_counter += 1
-                    q_ahead = bid_s if bid_q.price == bid_p else 0.0
-                    order_id = f"b_{self.order_counter}"
-                    rest_ts = ts_now + int(self.latency.total_place_latency_ms * 1e6)
-
-                    # Instantiate for both Model C and Model B
-                    self.active_bid_c = SimulatedQueueOrder(order_id, "BUY", bid_q.price, bid_q.size, rest_ts, q_ahead)
-                    self.active_bid_b = SimulatedQueueOrder(order_id, "BUY", bid_q.price, bid_q.size, rest_ts, q_ahead)
-                    self.last_bid_p = bid_q.price
-
-            # Process Ask Quote
-            if ask_q:
-                needs_ask_requote = True
-                if self.last_ask_p is not None:
-                    ticks_diff = abs(ask_q.price - self.last_ask_p) / self.tick_size
-                    if ticks_diff < 2:
-                        needs_ask_requote = False
-
-                if needs_ask_requote and self.rate_limiter.can_modify_order():
-                    self.rate_limiter.record_order_modification()
-                    self.order_counter += 1
-                    q_ahead = ask_s if ask_q.price == ask_p else 0.0
-                    order_id = f"a_{self.order_counter}"
-                    rest_ts = ts_now + int(self.latency.total_place_latency_ms * 1e6)
-
-                    self.active_ask_c = SimulatedQueueOrder(order_id, "SELL", ask_q.price, ask_q.size, rest_ts, q_ahead)
-                    self.active_ask_b = SimulatedQueueOrder(order_id, "SELL", ask_q.price, ask_q.size, rest_ts, q_ahead)
-                    self.last_ask_p = ask_q.price
+        event = SimEvent(SimEventType.BBO, t_recv, market, contents)
+        self.engine.on_event(event)
 
     async def _on_trades_update(self, msg: Dict[str, Any]) -> None:
-        self._persist_raw_ws("trades", msg)
+        """Handles incoming Trades WebSocket frame."""
+        t_recv = now_ns()
+        market = msg.get("market") or self.markets[0]
+        self._persist_raw_ws("trades", market, msg, t_recv)
+
         contents = msg.get("contents")
         if not isinstance(contents, list) or not contents:
             return
 
-        ts_now = now_ns()
+        for trade_data in contents:
+            event = SimEvent(SimEventType.TRADE, t_recv, market, trade_data)
+            fills = self.engine.on_event(event)
+            if fills:
+                self._record_fills(fills)
 
-        for t in contents:
-            trade_p = float(t.get("price", 0.0))
-            trade_s = float(t.get("size", 0.0))
-            trade_side = t.get("side", "").upper()
+    def _record_fills(self, fills: List[Dict[str, Any]]) -> None:
+        """Logs simulated fills to disk."""
+        self.session_fills_count += len(fills)
+        if self._fills_file:
+            for f in fills:
+                self._fills_file.write(json.dumps(f, separators=(",", ":")) + "\n")
+            self._fills_file.flush()
 
-            # Evaluate Model C Bid Fill
-            if self.active_bid_c and self.active_bid_c.is_active and ts_now >= self.active_bid_c.created_ts_ns:
-                f_c = self.fill_engine_c.process_trade(self.active_bid_c, trade_side, trade_p, trade_s)
-                if f_c > 0:
-                    self.pnl_engine_c.record_fill("BUY", self.active_bid_c.price, f_c, self.current_mid)
-                    self.rate_limiter.record_fill(f_c * self.active_bid_c.price)
-                    self.fills_log.append({"ts_ns": ts_now, "model": "C", "side": "BUY", "price": self.active_bid_c.price, "size": f_c})
-
-            # Evaluate Model B Bid Fill (Shadow)
-            if self.active_bid_b and self.active_bid_b.is_active and ts_now >= self.active_bid_b.created_ts_ns:
-                f_b = self.fill_engine_b.process_trade(self.active_bid_b, trade_side, trade_p, trade_s)
-                if f_b > 0:
-                    self.pnl_engine_b.record_fill("BUY", self.active_bid_b.price, f_b, self.current_mid)
-                    self.fills_log.append({"ts_ns": ts_now, "model": "B", "side": "BUY", "price": self.active_bid_b.price, "size": f_b})
-
-            # Evaluate Model C Ask Fill
-            if self.active_ask_c and self.active_ask_c.is_active and ts_now >= self.active_ask_c.created_ts_ns:
-                f_c = self.fill_engine_c.process_trade(self.active_ask_c, trade_side, trade_p, trade_s)
-                if f_c > 0:
-                    self.pnl_engine_c.record_fill("SELL", self.active_ask_c.price, f_c, self.current_mid)
-                    self.rate_limiter.record_fill(f_c * self.active_ask_c.price)
-                    self.fills_log.append({"ts_ns": ts_now, "model": "C", "side": "SELL", "price": self.active_ask_c.price, "size": f_c})
-
-            # Evaluate Model B Ask Fill (Shadow)
-            if self.active_ask_b and self.active_ask_b.is_active and ts_now >= self.active_ask_b.created_ts_ns:
-                f_b = self.fill_engine_b.process_trade(self.active_ask_b, trade_side, trade_p, trade_s)
-                if f_b > 0:
-                    self.pnl_engine_b.record_fill("SELL", self.active_ask_b.price, f_b, self.current_mid)
-                    self.fills_log.append({"ts_ns": ts_now, "model": "B", "side": "SELL", "price": self.active_ask_b.price, "size": f_b})
-
-    def _cancel_all_orders(self) -> None:
-        self.active_bid_c = None
-        self.active_ask_c = None
-        self.active_bid_b = None
-        self.active_ask_b = None
-        self.last_bid_p = None
-        self.last_ask_p = None
+    async def _clock_loop(self) -> None:
+        """Ticks engine clock every 100ms to enforce watchdogs, latency arrivals, and rate limits."""
+        while self._running:
+            try:
+                t_now = now_ns()
+                for m in self.markets:
+                    event = SimEvent(SimEventType.CLOCK_TICK, t_now, m, {})
+                    self.engine.on_event(event)
+                await asyncio.sleep(0.10)
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Error in paper trader clock loop: {e}")
+                await asyncio.sleep(0.10)
 
     async def _telemetry_loop(self) -> None:
-        """Emits telemetry every 60 seconds."""
+        """Emits telemetry every 60 seconds formatted with Rule 11 outcome labels."""
         while self._running:
-            await asyncio.sleep(60.0)
-            if not self._running:
+            try:
+                await asyncio.sleep(60.0)
+                if not self._running:
+                    break
+
+                ts_utc = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                for m in self.markets:
+                    venue = self.engine.venues.get(m)
+                    if not venue:
+                        continue
+
+                    stale_ms = (now_ns() - venue.last_bbo_ts_ns) / 1e6 if venue.last_bbo_ts_ns > 0 else 999999.0
+                    spread_bps = ((venue.best_ask - venue.best_bid) / venue.current_mid * 10_000.0) if venue.current_mid > 0 else 0.0
+
+                    for sid, ctx in self.engine.contexts.items():
+                        if hasattr(ctx.strategy, "market") and ctx.strategy.market != m:
+                            continue
+
+                        sum_b = ctx.pnl_engines[FillModelType.MODEL_B_MODERATE].get_summary(venue.current_mid)
+                        sum_c = ctx.pnl_engines[FillModelType.MODEL_C_CONSERVATIVE].get_summary(venue.current_mid)
+                        pool = ctx.rate_limiter.get_pool_status()
+
+                        # Rule 11 Outcome Labeling
+                        fills_c = sum_c["total_trades_count"]
+                        if fills_c < 30:
+                            session_label = "SESSION: INSUFFICIENT"
+                        elif sum_c["net_pnl"] > 0:
+                            session_label = "SESSION: POSITIVE"
+                        else:
+                            session_label = "SESSION: NEGATIVE"
+
+                        telemetry_record = {
+                            "timestamp_utc": ts_utc,
+                            "market": m,
+                            "strategy_id": sid,
+                            "mid": round(venue.current_mid, 4),
+                            "spread_bps": round(spread_bps, 2),
+                            "volatility": round(venue.current_volatility, 4),
+                            "stale_ms": round(stale_ms, 1),
+                            "risk_state": ctx.risk_state.value,
+                            "model_b": {
+                                "equity": round(sum_b["current_equity"], 4),
+                                "net_pnl": round(sum_b["net_pnl"], 4),
+                                "fills": sum_b["total_trades_count"],
+                                "position": round(sum_b["open_position_units"], 6),
+                            },
+                            "model_c": {
+                                "equity": round(sum_c["current_equity"], 4),
+                                "net_pnl": round(sum_c["net_pnl"], 4),
+                                "fills": fills_c,
+                                "position": round(sum_c["open_position_units"], 6),
+                            },
+                            "rate_limit_pools": {
+                                "order_units_avail": round(pool["order_units_available"], 1),
+                                "cancel_units_avail": round(pool["cancel_units_available"], 1),
+                                "actions_used": pool["total_actions_used"],
+                            },
+                            "outcome_label": session_label,
+                        }
+
+                        if self._telemetry_file:
+                            self._telemetry_file.write(json.dumps(telemetry_record, separators=(",", ":")) + "\n")
+
+                if self._telemetry_file:
+                    self._telemetry_file.flush()
+
+            except asyncio.CancelledError:
                 break
-
-            # Kill switch check: stale feed > 3s
-            stale_ms = (time.time() - self.last_bbo_time) * 1000.0
-            if stale_ms > 3000.0:
-                self.is_kill_switch_active = True
-                self.kill_switch_reason = f"Stale BBO feed ({stale_ms:.0f} ms > 3000 ms)"
-                self._cancel_all_orders()
-
-            sum_c = self.pnl_engine_c.get_summary(self.current_mid)
-            sum_b = self.pnl_engine_b.get_summary(self.current_mid)
-            pool_state = self.rate_limiter.get_pool_status()
-
-            telemetry_row = {
-                "timestamp_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                "market": self.market,
-                "mid": self.current_mid,
-                "spread_bps": round(self.current_spread_bps, 2),
-                "stale_ms": round(stale_ms, 1),
-                "model_c": {
-                    "equity": sum_c["current_equity"],
-                    "net_pnl": sum_c["net_pnl"],
-                    "fills": sum_c["total_trades_count"],
-                    "pos_units": sum_c["open_position_units"],
-                },
-                "model_b_shadow": {
-                    "equity": sum_b["current_equity"],
-                    "net_pnl": sum_b["net_pnl"],
-                    "fills": sum_b["total_trades_count"],
-                    "pos_units": sum_b["open_position_units"],
-                },
-                "pools": {
-                    "orders_avail": round(pool_state["order_units_available"], 1),
-                    "cancels_avail": round(pool_state["cancel_units_available"], 1),
-                    "actions_used": pool_state["total_actions_used"],
-                },
-                "kill_switch_active": self.is_kill_switch_active,
-                "kill_switch_reason": self.kill_switch_reason,
-            }
-
-            self.telemetry_file.write(json.dumps(telemetry_row, separators=(",", ":")) + "\n")
-            self.telemetry_file.flush()
+            except Exception as e:
+                logger.error(f"Error in paper trader telemetry loop: {e}")
 
     async def start(self) -> None:
-        """Starts the paper trader."""
+        """Starts the live paper trader."""
         self._running = True
-        logger.info(f"Starting ArcusLivePaperTrader for {self.market} (Dual Model C/B logging)...")
+        self.session_start_utc = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        logger.info(f"Starting ArcusLivePaperTrader session {self.session_id} on markets {self.markets}...")
+
+        self._raw_file = open(self.raw_stream_path, "a", encoding="utf-8")
+        self._telemetry_file = open(self.telemetry_path, "a", encoding="utf-8")
+        self._fills_file = open(self.fills_path, "a", encoding="utf-8")
+
+        await self.initialize_engine()
         await self.ws_client.connect()
 
-        # Subscribe to feeds
-        await self.ws_client.subscribe("bbo", self.market, self._on_bbo_update)
-        await self.ws_client.subscribe("trades", self.market, self._on_trades_update)
+        # Subscribe across all designated markets on the shared connection
+        for m in self.markets:
+            await self.ws_client.subscribe("bbo", m, self._on_bbo_update)
+            await self.ws_client.subscribe("trades", m, self._on_trades_update)
 
+        self._clock_task = asyncio.create_task(self._clock_loop())
         self._telemetry_task = asyncio.create_task(self._telemetry_loop())
+        logger.info(f"Live paper trader fully operational. Persisting to {self.session_dir}")
 
     async def stop(self) -> None:
-        """Stops the paper trader and flushes logs."""
+        """Stops live paper trader, cancels tasks, and generates SHA-256 session manifest."""
         self._running = False
+        logger.info(f"Stopping live paper trader session {self.session_id}...")
+
+        if self._clock_task:
+            self._clock_task.cancel()
         if self._telemetry_task:
             self._telemetry_task.cancel()
 
         await self.ws_client.disconnect()
-        self._cancel_all_orders()
+        await self.rest_client.close()
 
-        self.raw_ws_file.close()
-        self.telemetry_file.close()
-        logger.info(f"ArcusLivePaperTrader stopped for {self.market}.")
+        if self._raw_file:
+            self._raw_file.close()
+        if self._telemetry_file:
+            self._telemetry_file.close()
+        if self._fills_file:
+            self._fills_file.close()
+
+        # Generate SHA-256 Session Manifest for Replay Parity
+        manifest_path = self.session_dir / "MANIFEST.sha256"
+        manifest_lines = []
+        for p in sorted(self.session_dir.glob("*.*")):
+            if p.name == "MANIFEST.sha256":
+                continue
+            h = hashlib.sha256(p.read_bytes()).hexdigest()
+            manifest_lines.append(f"{h}  {p.name}")
+        manifest_path.write_text("\n".join(manifest_lines) + "\n", encoding="utf-8")
+        logger.info(f"Session {self.session_id} finalized with SHA-256 manifest: {manifest_path}")
+
+    def get_session_summary(self) -> Dict[str, Any]:
+        """Returns consolidated session summary across all evaluated strategies."""
+        summary = {
+            "session_id": self.session_id,
+            "session_start_utc": self.session_start_utc,
+            "session_end_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "markets": self.markets,
+            "total_fills_logged": self.session_fills_count,
+            "engine_fill_hash": self.engine.get_fill_log_hash() if self.engine else None,
+            "strategies": {},
+        }
+        if self.engine:
+            for sid, ctx in self.engine.contexts.items():
+                m = ctx.strategy.market
+                venue = self.engine.venues.get(m)
+                mid = venue.current_mid if venue else 0.0
+                sum_b = ctx.pnl_engines[FillModelType.MODEL_B_MODERATE].get_summary(mid)
+                sum_c = ctx.pnl_engines[FillModelType.MODEL_C_CONSERVATIVE].get_summary(mid)
+                fills_c = sum_c["total_trades_count"]
+                if fills_c < 30:
+                    outcome = "SESSION: INSUFFICIENT"
+                elif sum_c["net_pnl"] > 0:
+                    outcome = "SESSION: POSITIVE"
+                else:
+                    outcome = "SESSION: NEGATIVE"
+
+                summary["strategies"][sid] = {
+                    "market": m,
+                    "model_b": sum_b,
+                    "model_c": sum_c,
+                    "risk_state": ctx.risk_state.value,
+                    "outcome": outcome,
+                }
+        return summary
