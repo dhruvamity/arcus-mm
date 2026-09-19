@@ -8,6 +8,7 @@ Fulfills Section 4.1, 4.4, and 6.5 of prompt.md:
 - Fixed dollar size buckets ($0-$15, $15-$50, >$50) to evaluate sweep asymmetry.
 """
 
+import math
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Any, Optional
@@ -32,7 +33,8 @@ def compute_markouts(
         return {
             "total_fills": 0,
             "horizons": {f"{h}s": {"N": 0, "mean_bps": 0.0, "median_bps": 0.0, "p5_bps": 0.0, "p95_bps": 0.0} for h in horizons},
-            "by_size_bucket": {},
+            "by_side": {"BUY": {}, "SELL": {}},
+            "by_size_bucket_5s": {},
         }
 
     # Ensure sorted BBO
@@ -42,6 +44,8 @@ def compute_markouts(
     max_bbo_ts = bbo_ts[-1]
 
     markouts_by_horizon: Dict[str, List[float]] = {f"{h}s": [] for h in horizons}
+    markouts_buy: Dict[str, List[float]] = {f"{h}s": [] for h in horizons}
+    markouts_sell: Dict[str, List[float]] = {f"{h}s": [] for h in horizons}
     dollar_buckets = {"small_under_15": [], "medium_15_to_50": [], "large_over_50": []}
 
     for i in range(n_fills):
@@ -79,6 +83,10 @@ def compute_markouts(
 
             h_key = f"{h}s"
             markouts_by_horizon[h_key].append(as_bps)
+            if side == "BUY":
+                markouts_buy[h_key].append(as_bps)
+            else:
+                markouts_sell[h_key].append(as_bps)
 
             if h == 5.0:  # 5s benchmark horizon for size analysis
                 if notional < 15.0:
@@ -88,31 +96,42 @@ def compute_markouts(
                 else:
                     dollar_buckets["large_over_50"].append(as_bps)
 
-    # Compute statistics per horizon
-    horizon_stats = {}
-    for h in horizons:
-        h_key = f"{h}s"
-        arr = markouts_by_horizon[h_key]
+    def _calc_stats(arr: List[float]) -> Dict[str, Any]:
         n_obs = len(arr)
-        if n_obs > 0:
-            a = np.array(arr)
-            horizon_stats[h_key] = {
-                "N": n_obs,
-                "mean_bps": round(float(np.mean(a)), 2),
-                "median_bps": round(float(np.median(a)), 2),
-                "p5_bps": round(float(np.percentile(a, 5)), 2),
-                "p95_bps": round(float(np.percentile(a, 95)), 2),
-                "std_bps": round(float(np.std(a)), 2),
-            }
-        else:
-            horizon_stats[h_key] = {
+        if n_obs == 0:
+            return {
                 "N": 0,
                 "mean_bps": 0.0,
                 "median_bps": 0.0,
+                "p25_bps": 0.0,
+                "p75_bps": 0.0,
                 "p5_bps": 0.0,
                 "p95_bps": 0.0,
                 "std_bps": 0.0,
+                "ci_90_lower_bps": 0.0,
+                "ci_90_upper_bps": 0.0,
             }
+        a = np.array(arr)
+        mean_val = float(np.mean(a))
+        std_val = float(np.std(a))
+        se = std_val / math.sqrt(n_obs) if n_obs > 1 else 0.0
+        return {
+            "N": n_obs,
+            "mean_bps": round(mean_val, 2),
+            "median_bps": round(float(np.median(a)), 2),
+            "p25_bps": round(float(np.percentile(a, 25)), 2),
+            "p75_bps": round(float(np.percentile(a, 75)), 2),
+            "p5_bps": round(float(np.percentile(a, 5)), 2),
+            "p95_bps": round(float(np.percentile(a, 95)), 2),
+            "std_bps": round(std_val, 2),
+            "ci_90_lower_bps": round(mean_val - 1.645 * se, 2),
+            "ci_90_upper_bps": round(mean_val + 1.645 * se, 2),
+        }
+
+    # Compute statistics per horizon
+    horizon_stats = {f"{h}s": _calc_stats(markouts_by_horizon[f"{h}s"]) for h in horizons}
+    buy_stats = {f"{h}s": _calc_stats(markouts_buy[f"{h}s"]) for h in horizons}
+    sell_stats = {f"{h}s": _calc_stats(markouts_sell[f"{h}s"]) for h in horizons}
 
     # Size bucket stats at 5s
     size_stats = {}
@@ -130,6 +149,10 @@ def compute_markouts(
     return {
         "total_fills": n_fills,
         "horizons": horizon_stats,
+        "by_side": {
+            "BUY": buy_stats,
+            "SELL": sell_stats,
+        },
         "by_size_bucket_5s": size_stats,
     }
 

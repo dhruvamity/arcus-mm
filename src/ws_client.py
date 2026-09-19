@@ -171,6 +171,27 @@ class ArcusWsClient:
         finally:
             self._pending_requests.pop(req_id, None)
 
+    MUTATING_WS_METHODS = {
+        "placeOrder",
+        "modifyOrder",
+        "cancelOrder",
+        "cancelAllOrders",
+        "scheduleCancel",
+    }
+
+    def _assert_trading_allowed(self, method: str) -> None:
+        """Enforces Mandate Section 26: Mainnet WebSocket Order-Write Safety Lock.
+
+        Hard-blocks mutating WebSocket RPCs when mainnet_order_lock is active.
+        """
+        if method in self.MUTATING_WS_METHODS:
+            if self.config.environment == "mainnet" and self.config.mainnet_order_lock:
+                raise PermissionError(
+                    f"WEBSOCKET {method} ON MAINNET IS HARD-BLOCKED by prompt.md Section 26 safety lock!"
+                )
+        if not self.signer:
+            raise ValueError("Signer required for authenticated WebSocket trading RPC")
+
     async def rpc_post(
         self,
         method: str,
@@ -179,8 +200,7 @@ class ArcusWsClient:
         timeout: float = 10.0,
     ) -> Dict[str, Any]:
         """Sends an authenticated 'post' trading request and awaits correlated response."""
-        if not self.signer:
-            raise ValueError("Signer required for WebSocket post RPC")
+        self._assert_trading_allowed(method)
 
         req_id = self._next_request_id
         self._next_request_id += 1
@@ -208,6 +228,26 @@ class ArcusWsClient:
             return await asyncio.wait_for(fut, timeout=timeout)
         finally:
             self._pending_requests.pop(req_id, None)
+
+    async def place_order(self, canonical_payload: str, body_payload: Dict[str, Any], timeout: float = 10.0) -> Dict[str, Any]:
+        """Places order via WebSocket RPC, guarded by Section 26 lock."""
+        return await self.rpc_post("placeOrder", canonical_payload, body_payload, timeout=timeout)
+
+    async def modify_order(self, canonical_payload: str, body_payload: Dict[str, Any], timeout: float = 10.0) -> Dict[str, Any]:
+        """Modifies order via WebSocket RPC, guarded by Section 26 lock."""
+        return await self.rpc_post("modifyOrder", canonical_payload, body_payload, timeout=timeout)
+
+    async def cancel_order(self, canonical_payload: str, body_payload: Dict[str, Any], timeout: float = 10.0) -> Dict[str, Any]:
+        """Cancels order via WebSocket RPC, guarded by Section 26 lock."""
+        return await self.rpc_post("cancelOrder", canonical_payload, body_payload, timeout=timeout)
+
+    async def cancel_all_orders(self, canonical_payload: str, body_payload: Dict[str, Any], timeout: float = 10.0) -> Dict[str, Any]:
+        """Cancels all orders via WebSocket RPC, guarded by Section 26 lock."""
+        return await self.rpc_post("cancelAllOrders", canonical_payload, body_payload, timeout=timeout)
+
+    async def schedule_cancel(self, canonical_payload: str, body_payload: Dict[str, Any], timeout: float = 10.0) -> Dict[str, Any]:
+        """Schedules cancel via WebSocket RPC, guarded by Section 26 lock."""
+        return await self.rpc_post("scheduleCancel", canonical_payload, body_payload, timeout=timeout)
 
     async def _listen_loop(self) -> None:
         """Background listener reading messages and dispatching to callbacks or futures."""

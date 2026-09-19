@@ -1,9 +1,10 @@
 """Strategy 3: Volatility-Clock Spread Sizing.
 
 Fulfills Section 22 of prompt.md:
-- Spread proportional to k * sigma from short EWMA / realized volatility estimator.
+- Spread proportional to k * sigma from dynamic realized volatility estimator.
 - Dynamic spread adaptation to volatility bursts.
-- Inventory lean: shifts mid-point to induce rebalancing fills.
+- Inventory lean: shifts reservation price to induce rebalancing fills.
+- Exact Decimal quantization and runtime per-market clip sizing.
 """
 
 from typing import Optional, Tuple
@@ -24,6 +25,7 @@ class VolatilityClockStrategy(BaseMarketMakingStrategy):
         inventory_skew_factor: float = 0.5,  # Leaning factor per clip of inventory
         clip_notional: float = 8.0,
         min_notional: float = 5.0,
+        min_order_size: float = 0.0,
         max_capital_envelope: float = 100.0,
     ):
         super().__init__(
@@ -31,6 +33,7 @@ class VolatilityClockStrategy(BaseMarketMakingStrategy):
             tick_size=tick_size,
             step_size=step_size,
             min_notional=min_notional,
+            min_order_size=min_order_size,
             max_capital_envelope=max_capital_envelope,
         )
         self.k_factor = k_factor
@@ -46,28 +49,37 @@ class VolatilityClockStrategy(BaseMarketMakingStrategy):
         volatility: float,
         market_spread_bps: float,
         microprice_dev_bps: float = 0.0,
-    ) -> Optional[Tuple[Quote, Quote]]:
+    ) -> Optional[Tuple[Optional[Quote], Optional[Quote]]]:
         if mid_price <= 0:
             return None
 
         # Check capital envelope limit
         current_inv_notional = abs(inventory_units) * mid_price
+        clip_size = self.calculate_clip_size(self.clip_notional, mid_price)
+        if clip_size <= 0:
+            clip_size = self.step_size
+
         if current_inv_notional >= self.max_capital_envelope:
-            return None
+            # Soft stop: quote only to reduce inventory
+            half_sp = (market_spread_bps / 20_000.0) * mid_price
+            if inventory_units > 0:
+                ask = self.round_to_tick(mid_price + half_sp)
+                return (None, Quote(side="SELL", price=ask, size=clip_size))
+            else:
+                bid = self.round_to_tick(mid_price - half_sp)
+                return (Quote(side="BUY", price=bid, size=clip_size), None)
 
         # 1. Compute dynamic spread bps = max(min_spread, k * sigma_bps)
         # Volatility is annualized float (e.g. 0.30 for 30%); convert to intraday bps
         daily_vol_bps = (volatility / (365.25 ** 0.5)) * 10_000.0
-        # Intraday 1-hour equivalent
         hourly_vol_bps = daily_vol_bps / (24.0 ** 0.5)
         raw_spread_bps = self.k_factor * (hourly_vol_bps / 5.0)
         clamped_spread_bps = max(self.min_spread_bps, min(self.max_spread_bps, raw_spread_bps))
 
         # 2. Inventory skew: shift reference price opposite to position
-        clip_qty = self.clip_notional / mid_price
-        q_clips = inventory_units / clip_qty if clip_qty > 0 else 0.0
-        # Skew shifts reference price down when long (to discourage buys & encourage sells)
+        q_clips = inventory_units / clip_size if clip_size > 0 else 0.0
         skew_bps = q_clips * self.inventory_skew_factor * (clamped_spread_bps / 4.0)
+        skew_bps = max(-clamped_spread_bps * 0.8, min(clamped_spread_bps * 0.8, skew_bps))
 
         ref_price = mid_price * (1.0 - (skew_bps / 10_000.0))
 
@@ -77,10 +89,6 @@ class VolatilityClockStrategy(BaseMarketMakingStrategy):
 
         if ask_price <= bid_price:
             ask_price = self.round_to_tick(bid_price + self.tick_size)
-
-        clip_size = self.round_to_step(clip_qty)
-        if clip_size <= 0:
-            clip_size = self.step_size
 
         return (
             Quote(side="BUY", price=bid_price, size=clip_size),

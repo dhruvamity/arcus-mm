@@ -34,15 +34,18 @@ class PnLAttributionEngine:
 
         # Attribution components
         self.realized_spread_pnl = 0.0
+        self.maker_fee_costs = 0.0
+        self.taker_fee_costs = 0.0
         self.total_fee_costs = 0.0
         self.total_funding_pnl = 0.0
         self.adverse_selection_cost = 0.0
 
-        # Stats
+        # Stats & fill records
         self.total_trades_count = 0
         self.total_traded_notional = 0.0
         self.peak_equity = float(initial_capital)
         self.max_drawdown = 0.0
+        self.fills: list[Dict[str, Any]] = []
 
     def compute_equity(self, current_mid: float) -> float:
         """Computes current mark-to-market equity: Cash + Position * Mid."""
@@ -55,6 +58,7 @@ class PnLAttributionEngine:
         size: float,
         mid_at_fill: float,
         is_taker: bool = False,
+        ts_ns: Optional[int] = None,
     ) -> float:
         """Executes a fill, updates cash and inventory, and applies exact fee."""
         if size <= 0:
@@ -66,7 +70,23 @@ class PnLAttributionEngine:
 
         self.total_trades_count += 1
         self.total_traded_notional += notional
+        if is_taker:
+            self.taker_fee_costs += fee
+        else:
+            self.maker_fee_costs += fee
         self.total_fee_costs += fee
+
+        # Record fill event with timestamp for research markout attribution
+        self.fills.append({
+            "fill_id": self.total_trades_count,
+            "ts_ns": ts_ns or 0,
+            "side": side,
+            "price": price,
+            "size": size,
+            "notional": notional,
+            "mid_at_fill": mid_at_fill,
+            "is_taker": is_taker,
+        })
 
         # Adverse selection metric at fill: maker buy above mid, maker sell below mid
         if side == "BUY":
@@ -135,18 +155,44 @@ class PnLAttributionEngine:
         self.cash += payment
         return payment
 
-    def force_flatten(self, current_mid: float) -> float:
-        """Forces immediate taker liquidation of entire open inventory."""
+    def force_flatten(
+        self,
+        current_bid: Optional[float] = None,
+        current_ask: Optional[float] = None,
+        current_mid: Optional[float] = None,
+        slippage_bps: float = 2.0,
+        ts_ns: Optional[int] = None,
+    ) -> float:
+        """Forces immediate taker liquidation of open inventory at executable market side with slippage.
+
+        Fulfills Mandate Section 13:
+        - Long sells against BID minus slippage.
+        - Short buys against ASK plus slippage.
+        - 2.25 bps taker fee charged. Never fills at mid price by default.
+        """
         if abs(self.position) < 1e-9:
             return 0.0
-        side = "SELL" if self.position > 0 else "BUY"
+
+        if self.position > 0:
+            # Long must exit by selling against the BID
+            base_p = current_bid if (current_bid is not None and current_bid > 0) else (current_mid or 0.0)
+            exec_price = base_p * (1.0 - slippage_bps / 10_000.0)
+            side = "SELL"
+        else:
+            # Short must exit by buying against the ASK
+            base_p = current_ask if (current_ask is not None and current_ask > 0) else (current_mid or 0.0)
+            exec_price = base_p * (1.0 + slippage_bps / 10_000.0)
+            side = "BUY"
+
         qty = abs(self.position)
+        mid_ref = current_mid if (current_mid is not None and current_mid > 0) else base_p
         fee = self.record_fill(
             side=side,
-            price=current_mid,
+            price=exec_price,
             size=qty,
-            mid_at_fill=current_mid,
+            mid_at_fill=mid_ref,
             is_taker=True,  # 2.25 bps taker fee charged
+            ts_ns=ts_ns,
         )
         return fee
 
@@ -199,10 +245,48 @@ class PnLAttributionEngine:
             "inventory_mtm_pnl": round(mtm_pnl, 4),
             "adverse_selection_cost": round(self.adverse_selection_cost, 4),
             "funding_pnl": round(self.total_funding_pnl, 6),
+            "maker_fee_costs": round(self.maker_fee_costs, 4),
+            "taker_fee_costs": round(self.taker_fee_costs, 4),
             "fee_costs": round(self.total_fee_costs, 4),
+            "identity_verified": self.verify_accounting_identity(current_mid),
             "open_position_units": round(self.position, 6),
             "open_position_notional": round(abs(self.position) * current_mid, 4),
             "total_trades_count": self.total_trades_count,
             "total_traded_notional": round(self.total_traded_notional, 4),
             "max_drawdown_pct": round(self.max_drawdown * 100.0, 2),
         }
+
+    def get_fill_markouts(
+        self,
+        bbo_timestamps_ns: Any,
+        bbo_mids: Any,
+    ) -> Dict[str, Any]:
+        """Computes empirical forward markouts for all recorded fills.
+
+        Fulfills Mandate Section 14:
+        - Research diagnostic kept separate from accounting identity.
+        - Discards unresolvable post-sample horizons.
+        """
+        from src.adverse_selection import compute_markouts
+        import numpy as np
+
+        if not self.fills or len(bbo_timestamps_ns) == 0:
+            return {"total_fills": 0, "horizons": {}, "by_size_bucket_5s": {}}
+
+        fill_ts = np.array([f["ts_ns"] for f in self.fills], dtype=np.int64)
+        fill_prices = np.array([f["price"] for f in self.fills], dtype=np.float64)
+        fill_sides = np.array([f["side"] for f in self.fills], dtype=object)
+        fill_notionals = np.array([f["notional"] for f in self.fills], dtype=np.float64)
+
+        bbo_ts = np.asarray(bbo_timestamps_ns, dtype=np.int64)
+        bbo_m = np.asarray(bbo_mids, dtype=np.float64)
+
+        return compute_markouts(
+            fill_timestamps_ns=fill_ts,
+            fill_prices=fill_prices,
+            fill_sides=fill_sides,
+            fill_notionals=fill_notionals,
+            bbo_timestamps_ns=bbo_ts,
+            bbo_mids=bbo_m,
+        )
+

@@ -85,9 +85,11 @@ class ArcusStreamRecorder:
         self._seen_keys_order: List[str] = []
         self._max_seen_cache: int = 100_000
 
-        # Sequence tracking: (market, channel) -> last_sequence_id
+        # Sequence tracking & book validity: (market, channel) -> state
         self._last_sequences: Dict[str, int] = {}
         self._first_delta_received: Dict[str, bool] = {}
+        self._book_valid: Dict[str, bool] = {}
+        self._invalid_intervals: List[Dict[str, Any]] = []
 
         # Hourly market/channel message counters for integrity reports
         self._hourly_message_counts: Dict[str, Dict[str, int]] = {
@@ -149,25 +151,35 @@ class ArcusStreamRecorder:
 
             await asyncio.sleep(self.flush_interval_secs)
 
+    def _is_seen_trade(self, market: str, tr: Dict[str, Any]) -> bool:
+        """Deduplicates every trade in a multi-trade frame by strongest available identifier.
+
+        Fulfills Mandate Section 25:
+        - Deduplicate every trade event individually (never just the first).
+        - Key on tradeId, or composite (sequenceNumber, timestamp, price, size).
+        """
+        t_id = tr.get("tradeId")
+        if not t_id:
+            seq = tr.get("sequenceNumber", "")
+            ts = tr.get("timestamp", "")
+            p = tr.get("price", "")
+            s = tr.get("size", "")
+            t_id = f"{seq}_{ts}_{p}_{s}"
+
+        dedup_key = f"trade:{market}:{t_id}"
+        if dedup_key in self._seen_keys:
+            return True
+        self._seen_keys.add(dedup_key)
+        self._seen_keys_order.append(dedup_key)
+        if len(self._seen_keys_order) > self._max_seen_cache:
+            evict = self._seen_keys_order.pop(0)
+            self._seen_keys.discard(evict)
+        return False
+
     def _is_duplicate_or_update_sequence(
-        self, channel: str, market: str, msg_type: str, contents: Any
+        self, channel: str, market: str, msg_type: str, contents: Any, session_id: str, recv_ts: int
     ) -> bool:
         """Checks for duplicate trades or out-of-order sequence frames using the Arcus splice rule."""
-        if channel == "trades":
-            if isinstance(contents, list) and len(contents) > 0:
-                first_trade = contents[0]
-                trade_id = first_trade.get("tradeId") or first_trade.get("sequenceNumber")
-                if trade_id:
-                    dedup_key = f"trade:{market}:{trade_id}"
-                    if dedup_key in self._seen_keys:
-                        return True
-                    self._seen_keys.add(dedup_key)
-                    self._seen_keys_order.append(dedup_key)
-                    if len(self._seen_keys_order) > self._max_seen_cache:
-                        evict = self._seen_keys_order.pop(0)
-                        self._seen_keys.discard(evict)
-            return False
-
         if channel in ("l2OrderbookUpdates", "bbo"):
             if isinstance(contents, dict):
                 seq_id = contents.get("lastSequenceId") or contents.get("globalSequenceId")
@@ -176,6 +188,7 @@ class ArcusStreamRecorder:
                     if msg_type == "subscribed":
                         self._last_sequences[key] = seq_id
                         self._first_delta_received[key] = False
+                        self._book_valid[key] = True
                         return False
 
                     last_seq = self._last_sequences.get(key)
@@ -187,11 +200,34 @@ class ArcusStreamRecorder:
                             # First delta after snapshot: allow boundary sequence offset per Arcus splice rule
                             self._first_delta_received[key] = True
                         elif last_seq is not None and seq_id > last_seq + 1:
-                            # Genuine mid-stream gap
+                            # Mandate §24: Genuine mid-stream gap detected!
                             self._metrics["sequence_gaps"] += 1
-                            logger.warning(
-                                f"[{market}] Genuine mid-stream sequence gap in {channel}: expected {last_seq + 1}, got {seq_id}"
+                            self._book_valid[key] = False
+                            gap_info = {
+                                "market": market,
+                                "channel": channel,
+                                "expected_seq": last_seq + 1,
+                                "received_seq": seq_id,
+                                "gap_size": seq_id - (last_seq + 1),
+                                "ts_ns": recv_ts,
+                            }
+                            self._invalid_intervals.append(gap_info)
+                            logger.error(
+                                f"[{market}] Sequence gap in {channel}: expected {last_seq + 1}, got {seq_id}. "
+                                f"Marking book INVALID and emitting INVALID_BOOK_INTERVAL."
                             )
+                            # Queue INVALID_BOOK_INTERVAL marker so persistence records it
+                            file_key = self._get_channel_file_key(market, channel)
+                            if file_key not in self._write_queues:
+                                self._write_queues[file_key] = asyncio.Queue()
+                            self._write_queues[file_key].put_nowait({
+                                "session_id": session_id,
+                                "recv_ts_ns": recv_ts,
+                                "market": market,
+                                "channel": channel,
+                                "type": "INVALID_BOOK_INTERVAL",
+                                "gap_info": gap_info,
+                            })
 
                     self._last_sequences[key] = seq_id
         return False
@@ -203,14 +239,22 @@ class ArcusStreamRecorder:
         market: str,
         raw_msg: Dict[str, Any],
     ) -> None:
-        """Processes and queues raw streaming message."""
+        """Processes and queues raw streaming message with frame-wide dedup and gap marking."""
         recv_ts = now_ns()
         msg_type = raw_msg.get("type")
         contents = raw_msg.get("contents")
 
-        if self._is_duplicate_or_update_sequence(channel, market, msg_type or "", contents):
-            self._metrics["duplicates_dropped"] += 1
-            return
+        # Mandate §25: Multi-trade frame deduplication
+        if channel == "trades" and isinstance(contents, list):
+            new_trades = [tr for tr in contents if not self._is_seen_trade(market, tr)]
+            if not new_trades:
+                self._metrics["duplicates_dropped"] += 1
+                return
+            raw_msg["contents"] = new_trades
+        else:
+            if self._is_duplicate_or_update_sequence(channel, market, msg_type or "", contents, session_id, recv_ts):
+                self._metrics["duplicates_dropped"] += 1
+                return
 
         file_key = self._get_channel_file_key(market, channel)
         if file_key not in self._write_queues:

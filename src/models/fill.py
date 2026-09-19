@@ -24,8 +24,22 @@ class FillModelType(str, Enum):
     MODEL_C_CONSERVATIVE = "MODEL_C_CONSERVATIVE"
 
 
+class OrderStatus(str, Enum):
+    """Explicit order lifecycle state machine per Mandate Section 6."""
+    CREATED = "CREATED"
+    SUBMITTING = "SUBMITTING"
+    RESTING = "RESTING"
+    PARTIALLY_FILLED = "PARTIALLY_FILLED"
+    FILLED = "FILLED"
+    CANCEL_REQUESTED = "CANCEL_REQUESTED"
+    CANCELLED = "CANCELLED"
+    REPLACE_REQUESTED = "REPLACE_REQUESTED"
+    EXPIRED = "EXPIRED"
+    REJECTED = "REJECTED"
+
+
 class SimulatedQueueOrder:
-    """Represents a resting simulated limit order in the simulated order book queue."""
+    """Represents a resting simulated limit order with explicit lifecycle state."""
 
     def __init__(
         self,
@@ -35,19 +49,54 @@ class SimulatedQueueOrder:
         size: float,
         created_ts_ns: int,
         queue_ahead_volume: float = 0.0,
+        status: OrderStatus = OrderStatus.RESTING,
     ):
         self.order_id = order_id
         self.side = side
         self.price = price
         self.size = size
         self.created_ts_ns = created_ts_ns
+        self.effective_ts_ns = created_ts_ns
+        self.cancel_effective_ts_ns: Optional[int] = None
         self.queue_ahead_volume = max(0.0, queue_ahead_volume)
         self.filled_size = 0.0
+        self.status = status
         self.is_active = True
 
     @property
     def remaining_size(self) -> float:
         return max(0.0, self.size - self.filled_size)
+
+    def is_resting(self, ts_ns: Optional[int] = None) -> bool:
+        """Evaluates whether order is actively resting on the venue book.
+
+        If in CANCEL_REQUESTED, order remains resting until cancellation latency passes.
+        """
+        if not self.is_active or self.remaining_size <= 0:
+            return False
+        if ts_ns is not None:
+            if ts_ns < self.effective_ts_ns:
+                return False  # Still in submitting transit latency
+            if self.cancel_effective_ts_ns is not None and ts_ns >= self.cancel_effective_ts_ns:
+                self.status = OrderStatus.CANCELLED
+                self.is_active = False
+                return False
+        return self.status in (OrderStatus.RESTING, OrderStatus.PARTIALLY_FILLED, OrderStatus.CANCEL_REQUESTED)
+
+    def request_cancel(self, request_ts_ns: int, cancel_latency_ns: int) -> None:
+        """Transitions order to CANCEL_REQUESTED; remains live during cancel transit latency."""
+        if self.is_active and self.status in (OrderStatus.RESTING, OrderStatus.PARTIALLY_FILLED, OrderStatus.SUBMITTING):
+            self.status = OrderStatus.CANCEL_REQUESTED
+            self.cancel_effective_ts_ns = request_ts_ns + cancel_latency_ns
+
+    def update_lifecycle(self, ts_ns: int) -> None:
+        """Updates lifecycle states against current timestamp."""
+        if self.status == OrderStatus.SUBMITTING and ts_ns >= self.effective_ts_ns:
+            self.status = OrderStatus.RESTING
+        elif self.status == OrderStatus.CANCEL_REQUESTED and self.cancel_effective_ts_ns is not None:
+            if ts_ns >= self.cancel_effective_ts_ns:
+                self.status = OrderStatus.CANCELLED
+                self.is_active = False
 
     def modify(self, new_price: float, new_size: float, current_queue_at_price: float) -> bool:
         """Modifies order following Arcus queue priority contract.

@@ -23,6 +23,7 @@ class FixedSpreadStrategy(BaseMarketMakingStrategy):
         spread_bps: float = 4.0,  # 4 bps total spread (2 bps per side)
         clip_notional: float = 8.0,  # $8 per quote clip
         min_notional: float = 5.0,
+        min_order_size: float = 0.0,
         max_capital_envelope: float = 100.0,
     ):
         super().__init__(
@@ -30,6 +31,7 @@ class FixedSpreadStrategy(BaseMarketMakingStrategy):
             tick_size=tick_size,
             step_size=step_size,
             min_notional=min_notional,
+            min_order_size=min_order_size,
             max_capital_envelope=max_capital_envelope,
         )
         self.spread_bps = spread_bps
@@ -42,7 +44,7 @@ class FixedSpreadStrategy(BaseMarketMakingStrategy):
         volatility: float,
         market_spread_bps: float,
         microprice_dev_bps: float = 0.0,
-    ) -> Optional[Tuple[Quote, Quote]]:
+    ) -> Optional[Tuple[Optional[Quote], Optional[Quote]]]:
         if mid_price <= 0:
             return None
 
@@ -59,7 +61,7 @@ class FixedSpreadStrategy(BaseMarketMakingStrategy):
         if ask_price <= bid_price:
             ask_price = self.round_to_tick(bid_price + self.tick_size)
 
-        clip_size = self.round_to_step(self.clip_notional / mid_price)
+        clip_size = self.calculate_clip_size(self.clip_notional, mid_price)
         if clip_size <= 0:
             clip_size = self.step_size
 
@@ -67,3 +69,4 @@ class FixedSpreadStrategy(BaseMarketMakingStrategy):
             Quote(side="BUY", price=bid_price, size=clip_size),
             Quote(side="SELL", price=ask_price, size=clip_size),
         )
+

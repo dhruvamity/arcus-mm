@@ -136,6 +136,22 @@ class LocalOrderBook:
             return to_decimal(item["price"]), to_decimal(item["size"])
         raise ValueError(f"Unknown level format: {item}")
 
+    def get_cumulative_bid_depth(self, price: Decimal) -> float:
+        """Returns cumulative volume of all resting bids at or strictly above price."""
+        vol = Decimal(0)
+        for p, s in self.bids.items():
+            if p >= price:
+                vol += s
+        return float(vol)
+
+    def get_cumulative_ask_depth(self, price: Decimal) -> float:
+        """Returns cumulative volume of all resting asks at or strictly below price."""
+        vol = Decimal(0)
+        for p, s in self.asks.items():
+            if p <= price:
+                vol += s
+        return float(vol)
+
     def best_bid(self) -> Optional[Tuple[Decimal, Decimal]]:
         """Returns (price, size) for the best bid, or None if book is empty."""
         if not self.bids:

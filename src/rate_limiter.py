@@ -122,6 +122,20 @@ class RateLimiter:
         self.order_pool.cap += replenishment
         self.cancel_pool.cap += replenishment
 
+    def get_pool_status(self) -> Dict[str, Any]:
+        """Returns dictionary representation of current pool capacities and usage."""
+        orders_avail = max(0, self.order_pool.cap - self.order_pool.used)
+        cancels_avail = max(0, self.cancel_pool.cap - self.cancel_pool.used)
+        return {
+            "order_units_available": float(orders_avail),
+            "cancel_units_available": float(cancels_avail),
+            "order_pool_cap": self.order_pool.cap,
+            "cancel_pool_cap": self.cancel_pool.cap,
+            "orders_used": self.order_pool.used,
+            "cancels_used": self.cancel_pool.used,
+            "total_actions_used": self.order_pool.used + self.cancel_pool.used,
+        }
+
     def get_snapshot(self, address: str = "", account_index: int = 0) -> RateLimitSnapshot:
         """Returns snapshot of current limiter state."""
         self._refill_ip_tokens()

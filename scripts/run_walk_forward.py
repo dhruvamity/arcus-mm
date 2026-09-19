@@ -9,8 +9,12 @@ import argparse
 import datetime
 import json
 import logging
+import sys
 from pathlib import Path
 import pandas as pd
+
+# Add project root to sys.path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.walk_forward import WalkForwardValidator
 from scripts.run_backtest_matrix import MARKET_SPECS

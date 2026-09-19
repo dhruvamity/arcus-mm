@@ -90,9 +90,9 @@ def generate_paper_report(
         if fills_c < 30:
             verdict = "INSUFFICIENT DATA (<30 fills)"
         elif pnl_c > 0:
-            verdict = "VALIDATED (Positive Net Edge)"
+            verdict = "PAPER OBSERVATION (Positive Net, Pending 5-Day OOS Protocol)"
         else:
-            verdict = "NOT VALIDATED (Negative Net PnL)"
+            verdict = "PAPER OBSERVATION (Non-Positive Net)"
 
         md_lines.append(
             f"| **{m}** | {r_c['asset_class']} | {fills_c} | ${pnl_c:+.2f} | {pct_c:+.2f}% | "

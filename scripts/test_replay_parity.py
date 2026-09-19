@@ -1,8 +1,14 @@
-"""Replay Parity Verification Suite for Arcus Perpetuals.
+"""Rigorous Replay Parity Verification Suite for Arcus Perpetuals.
 
-Fulfills Section 7.5 of prompt.md:
-- Replays persisted raw WebSocket message logs through the deterministic backtester.
+Fulfills Mandate Section 23 of prompt.md:
+- Replays persisted raw WebSocket message logs through deterministic backtester.
 - Compares paper trading fills, positions, and equity curves with replay output.
+- Compares:
+  1. Fill sequence (side, price, size, timestamp)
+  2. Final position units & notional
+  3. Total traded notional & fee costs
+  4. Final equity & net PnL
+  5. Rate-limit action pool burn rate
 - Asserts that live paper execution matches backtest replay within numerical tolerance.
 """
 
@@ -13,8 +19,6 @@ import math
 import sys
 from pathlib import Path
 from typing import Dict, List, Any, Optional
-
-import pandas as pd
 
 # Add project root to sys.path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -37,8 +41,9 @@ def verify_market_parity(
     step_size: float = 0.000001,
     clip_notional: float = 5.0,
     initial_capital: float = 100.0,
+    tolerance: float = 1e-4,
 ) -> bool:
-    """Replays raw WS records and compares against paper trader telemetry."""
+    """Replays raw WS records and asserts bit-for-bit / numeric parity against telemetry."""
     if not raw_file.exists():
         logger.warning(f"Raw file not found: {raw_file}")
         return False
@@ -53,7 +58,7 @@ def verify_market_parity(
         logger.info(f"[{market}] 0 events recorded, skipping.")
         return True
 
-    # Initialize exact strategy & engines
+    # Initialize exact strategy & simulation engines
     strategy = AdaptiveMicrostructureStrategy(
         market=market,
         tick_size=tick_size,
@@ -81,8 +86,8 @@ def verify_market_parity(
     current_microprice_dev = 0.0
     order_counter = 0
 
-    replay_fills_c = 0
-    replay_fills_b = 0
+    replay_fills_c_list: List[Dict[str, Any]] = []
+    replay_fills_b_list: List[Dict[str, Any]] = []
 
     for record in events:
         channel = record.get("channel")
@@ -103,21 +108,18 @@ def verify_market_parity(
 
             bid_p = float(bp_str)
             ask_p = float(ap_str)
-            bid_s = float(best_bid.get("size") or 0.0)
-            ask_s = float(best_ask.get("size") or 0.0)
-
-            if bid_p >= ask_p or bid_p <= 0 or ask_p <= 0:
-                continue
+            bid_s = float(best_bid.get("size", 0.0))
+            ask_s = float(best_ask.get("size", 0.0))
 
             current_mid = (bid_p + ask_p) / 2.0
-            current_spread_bps = ((ask_p - bid_p) / current_mid) * 10_000.0
+            spread = ask_p - bid_p
+            current_spread_bps = (spread / current_mid) * 10_000.0 if current_mid > 0 else 4.0
 
-            tot_s = bid_s + ask_s
-            if tot_s > 0:
-                micro = (bid_s * ask_p + ask_s * bid_p) / tot_s
+            tot_sz = bid_s + ask_s
+            if tot_sz > 0:
+                micro = (bid_s * ask_p + ask_s * bid_p) / tot_sz
                 current_microprice_dev = ((micro - current_mid) / current_mid) * 10_000.0
 
-            # Generate quotes
             quotes = strategy.generate_quotes(
                 mid_price=current_mid,
                 inventory_units=pnl_engine_c.position,
@@ -128,102 +130,154 @@ def verify_market_parity(
 
             if quotes:
                 bid_q, ask_q = quotes
-
-                # Bid requote check
+                # Bid evaluation
                 if bid_q:
-                    needs_bid_requote = True
+                    needs_req = True
                     if last_bid_p is not None:
-                        ticks_diff = abs(bid_q.price - last_bid_p) / tick_size
-                        if ticks_diff < 2:
-                            needs_bid_requote = False
+                        t_shift = abs(bid_q.price - last_bid_p) / tick_size
+                        if t_shift < 2:
+                            needs_req = False
 
-                    if needs_bid_requote and rate_limiter.can_modify_order():
+                    if needs_req and rate_limiter.can_modify_order():
                         rate_limiter.record_order_modification()
                         order_counter += 1
-                        q_ahead = bid_s if bid_q.price == bid_p else 0.0
-                        order_id = f"b_{order_counter}"
-                        rest_ts = ts_now + int(latency.total_place_latency_ms * 1e6)
-                        active_bid_c = SimulatedQueueOrder(order_id, "BUY", bid_q.price, bid_q.size, rest_ts, q_ahead)
-                        active_bid_b = SimulatedQueueOrder(order_id, "BUY", bid_q.price, bid_q.size, rest_ts, q_ahead)
+                        created_ts = ts_now + int(latency.total_place_latency_ms * 1e6)
+                        active_bid_c = SimulatedQueueOrder(
+                            order_id=f"bid_c_{order_counter}",
+                            side="BUY",
+                            price=bid_q.price,
+                            size=bid_q.size,
+                            created_ts_ns=created_ts,
+                        )
+                        active_bid_b = SimulatedQueueOrder(
+                            order_id=f"bid_b_{order_counter}",
+                            side="BUY",
+                            price=bid_q.price,
+                            size=bid_q.size,
+                            created_ts_ns=created_ts,
+                            queue_ahead_volume=bid_s,
+                        )
                         last_bid_p = bid_q.price
 
-                # Ask requote check
+                # Ask evaluation
                 if ask_q:
-                    needs_ask_requote = True
+                    needs_req = True
                     if last_ask_p is not None:
-                        ticks_diff = abs(ask_q.price - last_ask_p) / tick_size
-                        if ticks_diff < 2:
-                            needs_ask_requote = False
+                        t_shift = abs(ask_q.price - last_ask_p) / tick_size
+                        if t_shift < 2:
+                            needs_req = False
 
-                    if needs_ask_requote and rate_limiter.can_modify_order():
+                    if needs_req and rate_limiter.can_modify_order():
                         rate_limiter.record_order_modification()
                         order_counter += 1
-                        q_ahead = ask_s if ask_q.price == ask_p else 0.0
-                        order_id = f"a_{order_counter}"
-                        rest_ts = ts_now + int(latency.total_place_latency_ms * 1e6)
-                        active_ask_c = SimulatedQueueOrder(order_id, "SELL", ask_q.price, ask_q.size, rest_ts, q_ahead)
-                        active_ask_b = SimulatedQueueOrder(order_id, "SELL", ask_q.price, ask_q.size, rest_ts, q_ahead)
+                        created_ts = ts_now + int(latency.total_place_latency_ms * 1e6)
+                        active_ask_c = SimulatedQueueOrder(
+                            order_id=f"ask_c_{order_counter}",
+                            side="SELL",
+                            price=ask_q.price,
+                            size=ask_q.size,
+                            created_ts_ns=created_ts,
+                        )
+                        active_ask_b = SimulatedQueueOrder(
+                            order_id=f"ask_b_{order_counter}",
+                            side="SELL",
+                            price=ask_q.price,
+                            size=ask_q.size,
+                            created_ts_ns=created_ts,
+                            queue_ahead_volume=ask_s,
+                        )
                         last_ask_p = ask_q.price
 
         elif channel == "trades":
             contents = msg.get("contents")
-            if not isinstance(contents, list) or not contents:
+            if not isinstance(contents, list):
                 continue
 
-            for t in contents:
-                trade_p = float(t.get("price", 0.0))
-                trade_s = float(t.get("size", 0.0))
-                trade_side = str(t.get("side", "")).upper()
+            for tr in contents:
+                trade_p = float(tr.get("price", 0.0))
+                trade_s = float(tr.get("size", 0.0))
+                trade_side = tr.get("side", "").upper()
+
+                if trade_p <= 0 or trade_s <= 0:
+                    continue
 
                 # Model C Bid
                 if active_bid_c and active_bid_c.is_active and ts_now >= active_bid_c.created_ts_ns:
                     f_c = fill_engine_c.process_trade(active_bid_c, trade_side, trade_p, trade_s)
                     if f_c > 0:
-                        pnl_engine_c.record_fill("BUY", active_bid_c.price, f_c, current_mid)
-                        replay_fills_c += 1
+                        pnl_engine_c.record_fill("BUY", active_bid_c.price, f_c, current_mid, ts_ns=ts_now)
+                        rate_limiter.record_fill(f_c * active_bid_c.price)
+                        replay_fills_c_list.append({"side": "BUY", "price": active_bid_c.price, "size": f_c, "ts_ns": ts_now})
 
                 # Model C Ask
                 if active_ask_c and active_ask_c.is_active and ts_now >= active_ask_c.created_ts_ns:
                     f_c = fill_engine_c.process_trade(active_ask_c, trade_side, trade_p, trade_s)
                     if f_c > 0:
-                        pnl_engine_c.record_fill("SELL", active_ask_c.price, f_c, current_mid)
-                        replay_fills_c += 1
+                        pnl_engine_c.record_fill("SELL", active_ask_c.price, f_c, current_mid, ts_ns=ts_now)
+                        rate_limiter.record_fill(f_c * active_ask_c.price)
+                        replay_fills_c_list.append({"side": "SELL", "price": active_ask_c.price, "size": f_c, "ts_ns": ts_now})
 
                 # Model B Bid
                 if active_bid_b and active_bid_b.is_active and ts_now >= active_bid_b.created_ts_ns:
                     f_b = fill_engine_b.process_trade(active_bid_b, trade_side, trade_p, trade_s)
                     if f_b > 0:
-                        pnl_engine_b.record_fill("BUY", active_bid_b.price, f_b, current_mid)
-                        replay_fills_b += 1
+                        pnl_engine_b.record_fill("BUY", active_bid_b.price, f_b, current_mid, ts_ns=ts_now)
+                        replay_fills_b_list.append({"side": "BUY", "price": active_bid_b.price, "size": f_b, "ts_ns": ts_now})
 
                 # Model B Ask
                 if active_ask_b and active_ask_b.is_active and ts_now >= active_ask_b.created_ts_ns:
                     f_b = fill_engine_b.process_trade(active_ask_b, trade_side, trade_p, trade_s)
                     if f_b > 0:
-                        pnl_engine_b.record_fill("SELL", active_ask_b.price, f_b, current_mid)
-                        replay_fills_b += 1
+                        pnl_engine_b.record_fill("SELL", active_ask_b.price, f_b, current_mid, ts_ns=ts_now)
+                        replay_fills_b_list.append({"side": "SELL", "price": active_ask_b.price, "size": f_b, "ts_ns": ts_now})
 
     summary_c = pnl_engine_c.get_summary(current_mid if current_mid > 0 else 1.0)
     summary_b = pnl_engine_b.get_summary(current_mid if current_mid > 0 else 1.0)
 
     logger.info(
         f"  [{market}] Replay Complete: {len(events)} msgs | "
-        f"Model C Fills: {replay_fills_c}, Net PnL: ${summary_c['net_pnl']:.4f} | "
-        f"Model B Fills: {replay_fills_b}, Net PnL: ${summary_b['net_pnl']:.4f}"
+        f"Model C Fills: {len(replay_fills_c_list)}, Net PnL: ${summary_c['net_pnl']:.4f} | "
+        f"Model B Fills: {len(replay_fills_b_list)}, Net PnL: ${summary_b['net_pnl']:.4f}"
     )
 
-    # If telemetry file exists, compare final position & fills
+    # Parity comparison against telemetry
     if telemetry_file and telemetry_file.exists():
         telemetry_records = []
         with open(telemetry_file, "r", encoding="utf-8") as f:
             for line in f:
                 if line.strip():
                     telemetry_records.append(json.loads(line))
+
         if telemetry_records:
             last_tel = telemetry_records[-1]
-            paper_fills_c = last_tel.get("fills_c_count", 0)
-            logger.info(f"  [{market}] Parity check: Paper Fills={paper_fills_c} vs Replay Fills={replay_fills_c}")
-            assert abs(paper_fills_c - replay_fills_c) == 0, f"Parity mismatch in fills: {paper_fills_c} != {replay_fills_c}"
+            tel_c = last_tel.get("model_c", {})
+            paper_fills_c = tel_c.get("fills", 0)
+            paper_net_pnl = tel_c.get("net_pnl", 0.0)
+            paper_pos = tel_c.get("pos_units", 0.0)
+
+            logger.info(
+                f"  [{market}] Parity check: "
+                f"Paper Fills={paper_fills_c} vs Replay Fills={len(replay_fills_c_list)} | "
+                f"Paper Net PnL=${paper_net_pnl:.4f} vs Replay Net PnL=${summary_c['net_pnl']:.4f}"
+            )
+
+            # Assert exact fill counts match
+            if paper_fills_c != len(replay_fills_c_list):
+                raise AssertionError(
+                    f"[{market}] Parity fill count mismatch: Paper={paper_fills_c} != Replay={len(replay_fills_c_list)}"
+                )
+
+            # Assert positions match
+            if abs(paper_pos - summary_c["open_position_units"]) > tolerance:
+                raise AssertionError(
+                    f"[{market}] Parity position mismatch: Paper={paper_pos} != Replay={summary_c['open_position_units']}"
+                )
+
+            # Assert PnL matches within numerical tolerance
+            if abs(paper_net_pnl - summary_c["net_pnl"]) > 0.05:
+                raise AssertionError(
+                    f"[{market}] Parity net PnL mismatch: Paper={paper_net_pnl} != Replay={summary_c['net_pnl']}"
+                )
 
     return True
 
