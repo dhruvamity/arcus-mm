@@ -1,0 +1,95 @@
+# Arcus Verified Venue Configuration
+# Updated during Phase 14+ via arcus-docs MCP and local empirical benchmarks
+version: 2.0.0
+venue_name: "Arcus"
+environment: "mainnet"
+
+endpoints:
+  mainnet:
+    rest: "https://api.arcus.xyz" # [VERIFIED_API]
+    ws: "wss://api.arcus.xyz/v1/ws" # [VERIFIED_WS]
+  testnet:
+    rest: "https://api.testnet.arcus.xyz" # [DOCS_ONLY]
+    ws: "wss://api.testnet.arcus.xyz/v1/ws" # [DOCS_ONLY]
+
+fees:
+  base_tier: # Tier 0
+    maker_fee_bps: 0.0 # [VERIFIED_API: /v1/feeTiers] maker_fee_ppm=0
+    taker_fee_bps: 2.25 # [VERIFIED_API: /v1/feeTiers] taker_fee_ppm=225
+    volume_threshold: 0
+  rebates_available: false
+  rebate_threshold_volume_usd: 1000000000.0 # VIP tier only
+
+empirical_latency: # Measured from test host via scripts/measure_latency.py (2026-09-19)
+  p50_rtt_ms: 158.50 # [VERIFIED_MEASURED]
+  p95_rtt_ms: 640.26 # [VERIFIED_MEASURED]
+  p99_rtt_ms: 836.74 # [VERIFIED_MEASURED]
+  stress_p95_plus_500ms: 1140.26 # [VERIFIED_MEASURED]
+  clock_skew_p50_ms: -73.60 # [VERIFIED_MEASURED]
+
+rate_limits:
+  ip_weight_bucket:
+    capacity: 1500 # [DOCS_ONLY: /api-reference/rate-limits]
+    refill_rate_per_sec: 25.0 # [DOCS_ONLY: /api-reference/rate-limits]
+    endpoint_weights:
+      health: 0
+      bbo: 2
+      markets: 20
+      candles: 20 # plus floor(items/60)
+      trades: 20
+      fundingRates: 20
+      order_writes_single: 0 # free on IP layer, billed to trading pool
+      order_writes_batch: 0 # up to 39 orders costs 0 IP weight, floor(N/40) for N >= 40
+  subaccount_pools:
+    starting_order_units: 20000 # [DOCS_ONLY]
+    starting_cancel_units: 40000 # [DOCS_ONLY]
+    replenishment_units_per_usd: 10.0 # +1 unit per $0.10 traded notional [DOCS_ONLY]
+    drip_seconds_per_action: 10.0 # 1 unit per 10s idle [DOCS_ONLY]
+    cancel_all_cost_units: 1000 # [DOCS_ONLY]
+    modify_cost_units: 1 # [DOCS_ONLY]
+
+execution_and_speed_bumps:
+  taker_speed_bump_ms: 50 # [DOCS_ONLY: /guides/latency] Held 50ms before sequencing
+  alo_skips_speed_bump: true # [DOCS_ONLY: /guides/latency] ALO is maker-only, goes straight to engine
+  cancels_skip_speed_bump: true # [DOCS_ONLY: /guides/latency] Prioritized lane ahead of placements
+  alo_modifies_skip_speed_bump: true # [DOCS_ONLY: /guides/latency] Prioritized like cancels
+  non_alo_modifies_subject_to_speed_bump: true # [DOCS_ONLY: /api-reference/exchange/modify-order]
+  queue_priority_contract: # [DOCS_ONLY: /api-reference/exchange/modify-order]
+    size_decrease_same_price: "In-place modify preserves queue priority"
+    size_increase: "Cancel-replace loses queue priority"
+    price_change: "Cancel-replace loses queue priority"
+  min_order_notional_usd: 5.0 # [VERIFIED_API: /v1/markets]
+  good_til_time:
+    required_on_all_orders: true # [DOCS_ONLY] Required even for IOC/FOK as replay protection
+    min_lead_time_days: 30 # [DOCS_ONLY] Must be >= 1 month in future
+  dead_mans_switch:
+    endpoint: "POST /v1/scheduleCancel" # [DOCS_ONLY]
+    lead_time_sec_range: [5, 300]
+    daily_auto_fire_cap: 10
+
+off_hours_and_regimes: # [DOCS_ONLY: /concepts/perpetuals/real-world-assets]
+  equities_commodities_indices:
+    trading_hours: "24/7 continuous trading"
+    regular_trading_hours_et: "09:30 - 16:00 ET (Mon-Fri)"
+    extended_hours_et: "04:00 - 09:30 ET (Pre) and 16:00 - 20:00 ET (After)"
+    off_hours_dark_window_et: "20:00 - 04:00 ET, plus weekends and market holidays"
+    funding_regime_off_hours: "Locked to fixed base rate: SOFR + 0.5%"
+    initial_margin_off_hours: "Raised via offHoursInitialMarginFraction"
+    maintenance_margin_off_hours: "Unchanged"
+    price_protection: "Dynamic trading bands (currentTradingBound, nextTradingBound)"
+    mark_price_off_hours: "2.5-minute EWMA of order book impact mid, clamped to bands"
+  crypto:
+    regime: "Always open 24/7/365; no off-hours funding lock or margin hike"
+
+historical_data_constraints: # [VERIFIED_API & DOCS]
+  rest_candles_max_limit: 1500 # [DOCS_ONLY: /api-reference/rate-limits]
+  rest_trades_max_limit: 1000 # [DOCS_ONLY: /api-reference/rate-limits]
+  rest_funding_rates_requires_market: true # [VERIFIED_API: /v1/fundingRates returns 400 without market]
+  orderbook_l2_history_backfillable: false # [CONFIRMED: Venue does not provide historical L2 ticks; forward recording required]
+
+testnet_and_funding: # [DOCS_ONLY: /guides/fund-testnet-account]
+  settlement_asset: "USDG" # 1:1 USD stablecoin
+  testnet_faucet_ui: "Testnet Deposit button credits ~$1,000 paper collateral"
+  testnet_onchain_flow: "Robinhood Chain testnet (mint open USDG -> approve deposit proxy -> initiateDeposit)"
+  active_account_balance: 0.0 # [VERIFIED_API: $0.00 unfunded]
+  trading_mode: "Paper execution against live public WebSocket feeds (ZERO real orders)"

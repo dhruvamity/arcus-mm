@@ -1,0 +1,93 @@
+{
+  "venue": "Arcus",
+  "generatedAt": "2026-09-19T19:07:00Z",
+  "environment": "mainnet",
+  "urls": {
+    "mainnet": {
+      "rest": "https://api.arcus.xyz",
+      "ws": "wss://api.arcus.xyz/v1/ws"
+    },
+    "testnet": {
+      "rest": "https://api.testnet.arcus.xyz",
+      "ws": "wss://api.testnet.arcus.xyz/v1/ws"
+    }
+  },
+  "authentication": {
+    "scheme": "Ed25519",
+    "keyRegistration": "EIP-712 (eth_signTypedData_v4) via POST /v1/createApiKey",
+    "headers": {
+      "apiKey": "X-API-Key (64 hex / 32 bytes)",
+      "timestamp": "X-Timestamp (Unix nanoseconds)",
+      "signature": "X-Signature (128 hex / 64 bytes)"
+    },
+    "signingSchemes": {
+      "scheme1TypedPayload": ["placeOrder", "cancelOrder", "modifyOrder", "batchPlaceOrders", "batchCancelOrders"],
+      "scheme2LegacyMessage": ["cancelAllOrders", "setLeverage", "scheduleCancel", "authenticate"]
+    },
+    "goodTilTimeRequirement": "Must be >= 30 days in the future (epoch microseconds in body, nanoseconds in payload)"
+  },
+  "fees": {
+    "makerFeeBpsBase": 0.0,
+    "takerFeeBpsBase": 2.25,
+    "makerRebateEligible": false,
+    "makerRebateTiers": "VIP tier (>= 1B vol) gives -0.2 bps; Max gives -0.3 bps",
+    "verificationSource": "GET /v1/feeTiers (verified live on mainnet & testnet)"
+  },
+  "rateLimits": {
+    "perIpWeight": {
+      "bucketCapacity": 1500,
+      "refillRatePerSec": 25.0,
+      "weights": {
+        "orderWrites": 0,
+        "health": 0,
+        "time": 1,
+        "bbo": 2,
+        "mids": 2,
+        "account": 2,
+        "positions": 2,
+        "order": 2,
+        "feeTiers": 2,
+        "rateLimit": 2,
+        "markets": 20,
+        "trades": 20,
+        "candles": 20,
+        "openOrders": 20,
+        "setLeverage": 125,
+        "withdraw": 125
+      }
+    },
+    "perSubaccountPools": {
+      "startingOrderUnits": 20000,
+      "startingCancelUnits": 40000,
+      "dripRate": "1 action per 10 seconds when pool depleted",
+      "replenishment": "+1 unit per $0.10 of filled notional (+10 units per $1)",
+      "cancelAllOrdersCost": 1000,
+      "modifyOrderCost": 1,
+      "verificationSource": "GET /v1/rateLimit (verified live)"
+    },
+    "websocket": {
+      "maxSubscriptionsPerSocket": 100,
+      "maxSubscriptionsPerIp": 1000,
+      "maxConnectionsPerIp": 50,
+      "connectionLifetimeHours": 24
+    }
+  },
+  "deadMansSwitch": {
+    "endpoint": "POST /v1/scheduleCancel",
+    "minLeadSeconds": 5,
+    "maxLeadSeconds": 300,
+    "autoFireDailyCap": 10,
+    "disarmPayload": "time: null"
+  },
+  "orderBookMechanics": {
+    "initialSnapshot": "Delivered as 'subscribed' frame upon subscription",
+    "initialSequenceJump": "Snapshot lags delta head; initial delta seq > snapshot.lastSequenceId is normal and expected",
+    "midStreamGaps": "Strictly disallowed; delta.lastSequenceId > prev + 1 indicates packet loss and requires resync",
+    "repeatedPriceInFrame": "Applied strictly in frame order",
+    "queuePriority": {
+      "modifyPriceChange": "Loses queue priority (behaves as cancel + place)",
+      "modifySizeIncrease": "Loses queue priority",
+      "modifySizeDecrease": "Preserves queue priority at same price"
+    }
+  }
+}
