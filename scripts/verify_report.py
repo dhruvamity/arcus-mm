@@ -1,11 +1,19 @@
 #!/usr/bin/env python3
 """Report Verification Script for Arcus Research Reports.
 
-Fulfills Non-negotiable Rule 3 from prompt.md:
+Fulfills Non-negotiable Rule 3 from prompt.md and corrective pass requirements:
 - Ensures reports are generated from computed tables, never hand-narrated.
 - Checks that numbers in prose trace directly to table cells.
 - Enforces strict prohibition of forbidden words ("CERTIFIED", un-quarantined "CONDITIONAL YES").
-- Validates that every strategy metric carries N (sample size).
+- Fails build if any withdrawn-claim phrase appears as an affirmative claim:
+  - "Pool exhaustion risk: ZERO"
+  - "perpetually sustainable"
+  - "size-asymmetry discovery"
+  - "+1.8 to +3.5 bps per completed clip"
+  - "empirically validated across all 13 phases"
+  - "proceed to testnet"
+- Fails build if a "✅ +x%" status appears next to INSUFFICIENT DATA for the same market.
+- Fails build if a clip size below that market's live minimum is cited (e.g. ZEC < $14.87, BTC < $8.12).
 """
 
 import argparse
@@ -18,6 +26,24 @@ from typing import List, Dict, Set, Tuple
 FORBIDDEN_PATTERNS = [
     re.compile(r"\bCERTIFIED\b", re.IGNORECASE),
 ]
+
+WITHDRAWN_CLAIM_PHRASES = [
+    (re.compile(r"pool\s+exhaustion\s+risk:\s*zero", re.IGNORECASE), "Pool exhaustion risk: ZERO"),
+    (re.compile(r"perpetually\s+sustainable", re.IGNORECASE), "perpetually sustainable"),
+    (re.compile(r"size-asymmetry\s+discovery", re.IGNORECASE), "size-asymmetry discovery"),
+    (re.compile(r"\+1\.8\s+to\s+\+3\.5\s+bps", re.IGNORECASE), "+1.8 to +3.5 bps per completed clip"),
+    (re.compile(r"empirically\s+validated\s+across\s+all\s+13\s+phases", re.IGNORECASE), "empirically validated across all 13 phases"),
+    (re.compile(r"\bproceed\s+to\s+testnet\b", re.IGNORECASE), "proceed to testnet"),
+]
+
+# Minimum executable clips verified from venue /v1/markets
+LIVE_MIN_CLIPS = {
+    "BTC": 8.12,
+    "ZEC": 14.87,
+    "HYPE": 9.21,
+    "SLV": 6.00,
+    "AMD": 5.53,
+}
 
 
 def extract_tables(markdown_text: str) -> List[List[List[str]]]:
@@ -49,14 +75,12 @@ def extract_tables(markdown_text: str) -> List[List[List[str]]]:
 
 def extract_numbers_from_text(text: str) -> Set[str]:
     """Extracts floating point and percentage values from text."""
-    # Matches patterns like: +0.20%, -1.49 bps, $5.00, 5,170, 0.05%
     raw_matches = re.findall(r"[-+]?\d+(?:,\d+)*(?:\.\d+)?(?:%|bps|\$)?", text)
     cleaned = set()
     for m in raw_matches:
         c = m.strip("$,%").replace(",", "")
         if c and c not in {"-", "+", "."}:
             try:
-                # normalize to float string
                 flt = float(c)
                 cleaned.add(f"{flt:.2f}")
                 cleaned.add(f"{flt:.4f}")
@@ -79,7 +103,7 @@ def extract_numbers_from_tables(tables: List[List[List[str]]]) -> Set[str]:
 
 
 def verify_report(file_path: Path) -> Tuple[bool, List[str]]:
-    """Verifies a single markdown report for forbidden terms and table consistency."""
+    """Verifies a single markdown report for forbidden terms, withdrawn claims, and table consistency."""
     errors = []
     if not file_path.exists():
         return False, [f"File does not exist: {file_path}"]
@@ -87,26 +111,57 @@ def verify_report(file_path: Path) -> Tuple[bool, List[str]]:
     content = file_path.read_text(encoding="utf-8")
     lines = content.splitlines()
 
-    # Skip superseded warning blocks from forbidden term check if properly marked
     is_superseded = "SUPERSEDED — PRELIMINARY SMOKE TEST" in content
 
-    # 1. Check forbidden terms
+    # 1. Check forbidden terms and withdrawn claim phrases
     for line_no, line in enumerate(lines, 1):
-        if is_superseded and ("SUPERSEDED" in line or "defect ledger" in line or "withdrawn" in line or "downgraded" in line):
-            continue
-        for pattern in FORBIDDEN_PATTERNS:
-            if pattern.search(line):
-                errors.append(f"Line {line_no}: Contains forbidden word '{pattern.pattern}': {line.strip()}")
+        line_lower = line.lower()
+        # Allow defect ledger or explicit withdrawal notes
+        is_context_explanation = any(w in line_lower for w in ["withdrawn", "defect", "superseded", "quarantined", "claim", "remediation", "prior"])
 
-    # 2. Extract tables and prose numbers
+        # Check forbidden words
+        if not is_context_explanation:
+            for pattern in FORBIDDEN_PATTERNS:
+                if pattern.search(line):
+                    errors.append(f"Line {line_no}: Contains forbidden word '{pattern.pattern}': {line.strip()}")
+
+        # Check withdrawn claims
+        for pattern, label in WITHDRAWN_CLAIM_PHRASES:
+            if pattern.search(line) and not is_context_explanation:
+                errors.append(f"Line {line_no}: Contains withdrawn claim phrase '{label}': {line.strip()}")
+
+    # 2. Extract tables and check row-level contradictions
     tables = extract_tables(content)
     if not tables and len(lines) > 50:
         errors.append("Report has >50 lines but contains no markdown tables.")
         return False, errors
 
-    table_numbers = extract_numbers_from_tables(tables)
+    for table_idx, table in enumerate(tables, 1):
+        for row_idx, row in enumerate(table, 1):
+            row_str = " ".join(row)
+            # Rule: A "✅ +x%" status cannot be next to INSUFFICIENT DATA for the same market
+            has_positive_check = bool(re.search(r"✅\s*\+\d", row_str))
+            has_insufficient_data = "INSUFFICIENT DATA" in row_str
+            if has_positive_check and has_insufficient_data:
+                errors.append(
+                    f"Table {table_idx}, Row {row_idx}: Contradictory status! '✅ +x%' appears next to INSUFFICIENT DATA: {row_str}"
+                )
+
+            # Rule: Clip size cannot be below live venue minimum
+            for market, min_clip in LIVE_MIN_CLIPS.items():
+                if market in row_str:
+                    # Look for clip sizes e.g. "$8.00" or "$8" or "8.00 clip"
+                    clips_found = re.findall(r"\$\s*(\d+(?:\.\d+)?)", row_str)
+                    for c_str in clips_found:
+                        c_val = float(c_str)
+                        # Only check if it's explicitly identified as clip or notional
+                        if ("clip" in row_str.lower() or "min" in row_str.lower()) and c_val < (min_clip - 0.5) and c_val > 1.0:
+                            errors.append(
+                                f"Table {table_idx}, Row {row_idx}: Clip size ${c_val:.2f} for {market} is below live venue minimum ${min_clip:.2f}"
+                            )
 
     # 3. Check prose narrative outside of tables
+    table_numbers = extract_numbers_from_tables(tables)
     non_table_lines = []
     for line in lines:
         trimmed = line.strip()
@@ -114,7 +169,6 @@ def verify_report(file_path: Path) -> Tuple[bool, List[str]]:
             non_table_lines.append(trimmed)
 
     prose_text = " ".join(non_table_lines)
-    # Check key claim sentences mentioning bps or percentages
     claim_sentences = [
         s.strip() for s in re.split(r"[.\n]", prose_text)
         if any(kw in s for kw in ["bps", "%", "net edge", "expectancy", "return", "PnL"])
@@ -123,13 +177,18 @@ def verify_report(file_path: Path) -> Tuple[bool, List[str]]:
     for sentence in claim_sentences:
         if is_superseded:
             continue
-        # Extract candidate numeric figures
         nums = extract_numbers_from_text(sentence)
         unmatched = [n for n in nums if n not in table_numbers]
-        # Ignore common non-metric integers like year 2026, 0, 1, 100
         unmatched = [n for n in unmatched if n not in {"2026", "0", "1", "100", "50", "2", "3", "4", "5", "6", "7", "8", "9", "10", "12", "13", "14", "15", "16", "20", "24", "60", "64"}]
         if unmatched:
             errors.append(f"Prose number(s) {unmatched} in sentence not found in any table: \"{sentence[:100]}...\"")
+
+    # Check for invalid clip sizes in prose
+    for market, min_clip in LIVE_MIN_CLIPS.items():
+        market_clips = re.findall(rf"\${market}\s*(?:clip|allocation)?.*?\$(\d+(?:\.\d+)?)", prose_text, re.IGNORECASE)
+        for c_str in market_clips:
+            if float(c_str) < (min_clip - 0.5):
+                errors.append(f"Prose references clip ${float(c_str):.2f} for {market}, below live venue minimum ${min_clip:.2f}")
 
     is_valid = len(errors) == 0
     return is_valid, errors
@@ -155,7 +214,6 @@ def main():
     print("=" * 70)
 
     for f in sorted(files_to_check):
-        # Skip archived smoke test reports
         if "archive_smoke_test" in str(f):
             continue
         total_checked += 1

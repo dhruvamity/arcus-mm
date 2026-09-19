@@ -1,0 +1,161 @@
+{
+  "report_timestamp_utc": "2026-09-19T17:49:15.531948+00:00",
+  "uptime_hours": 2.0,
+  "disk_free_gb": 178.67,
+  "overall_metrics": {
+    "messages_recorded": 2602924,
+    "bytes_recorded": 936176778,
+    "trades_recorded": 9138,
+    "book_updates_recorded": 1448866,
+    "bbo_updates_recorded": 315871,
+    "duplicates_dropped": 0,
+    "sequence_gaps": 0,
+    "rotations_completed": 0,
+    "rest_snapshots_saved": 2,
+    "reconnects": 0,
+    "uptime_secs": 7200.07,
+    "active_sockets": 2
+  },
+  "hourly_message_counts": {
+    "HYPE-USD": {
+      "bbo": 15885,
+      "trades": 145,
+      "l2OrderbookUpdates": 84987,
+      "predictedFunding": 66,
+      "oraclePrices": 13472
+    },
+    "ZEC-USD": {
+      "bbo": 21676,
+      "trades": 82,
+      "l2OrderbookUpdates": 54632,
+      "predictedFunding": 63,
+      "oraclePrices": 15349
+    },
+    "NEAR-USD": {
+      "bbo": 19742,
+      "trades": 23,
+      "l2OrderbookUpdates": 50887,
+      "predictedFunding": 63,
+      "oraclePrices": 11145
+    },
+    "LIT-USD": {
+      "bbo": 9716,
+      "trades": 45,
+      "l2OrderbookUpdates": 44494,
+      "predictedFunding": 62,
+      "oraclePrices": 10228
+    },
+    "UNI-USD": {
+      "bbo": 10744,
+      "trades": 12,
+      "l2OrderbookUpdates": 36695,
+      "predictedFunding": 63,
+      "oraclePrices": 11965
+    },
+    "AAVE-USD": {
+      "bbo": 8588,
+      "trades": 11,
+      "l2OrderbookUpdates": 27200,
+      "predictedFunding": 67,
+      "oraclePrices": 10119
+    },
+    "CASHCAT-USD": {
+      "bbo": 613,
+      "trades": 35,
+      "l2OrderbookUpdates": 3864,
+      "predictedFunding": 63,
+      "oraclePrices": 6589
+    },
+    "XRP-USD": {
+      "bbo": 18485,
+      "trades": 29,
+      "l2OrderbookUpdates": 66845,
+      "predictedFunding": 62,
+      "oraclePrices": 11521
+    },
+    "BTC-USD": {
+      "bbo": 22155,
+      "trades": 916,
+      "l2OrderbookUpdates": 108470,
+      "predictedFunding": 63,
+      "oraclePrices": 15196
+    },
+    "ETH-USD": {
+      "bbo": 10365,
+      "trades": 486,
+      "l2OrderbookUpdates": 116796,
+      "predictedFunding": 63,
+      "oraclePrices": 12329
+    },
+    "SOL-USD": {
+      "bbo": 12794,
+      "trades": 648,
+      "l2OrderbookUpdates": 112397,
+      "predictedFunding": 63,
+      "oraclePrices": 13341
+    },
+    "SPCX-USD": {
+      "bbo": 83,
+      "trades": 11,
+      "l2OrderbookUpdates": 362,
+      "predictedFunding": 64,
+      "oraclePrices": 28834
+    },
+    "NVDA-USD": {
+      "bbo": 6997,
+      "trades": 26,
+      "l2OrderbookUpdates": 8419,
+      "predictedFunding": 64,
+      "oraclePrices": 28566
+    },
+    "TSLA-USD": {
+      "bbo": 447,
+      "trades": 11,
+      "l2OrderbookUpdates": 3215,
+      "predictedFunding": 63,
+      "oraclePrices": 28650
+    },
+    "GOOGL-USD": {
+      "bbo": 22,
+      "trades": 11,
+      "l2OrderbookUpdates": 465,
+      "predictedFunding": 63,
+      "oraclePrices": 28559
+    },
+    "AMD-USD": {
+      "bbo": 243,
+      "trades": 13,
+      "l2OrderbookUpdates": 1967,
+      "predictedFunding": 61,
+      "oraclePrices": 28801
+    },
+    "SLV-USD": {
+      "bbo": 174,
+      "trades": 12,
+      "l2OrderbookUpdates": 1853,
+      "predictedFunding": 66,
+      "oraclePrices": 28604
+    },
+    "GLD-USD": {
+      "bbo": 25,
+      "trades": 12,
+      "l2OrderbookUpdates": 133,
+      "predictedFunding": 64,
+      "oraclePrices": 28627
+    },
+    "SPY-USD": {
+      "bbo": 2254,
+      "trades": 26,
+      "l2OrderbookUpdates": 11237,
+      "predictedFunding": 63,
+      "oraclePrices": 28673
+    },
+    "QQQ-USD": {
+      "bbo": 1947,
+      "trades": 41,
+      "l2OrderbookUpdates": 8553,
+      "predictedFunding": 62,
+      "oraclePrices": 28642
+    }
+  }
+}

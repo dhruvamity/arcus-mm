@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Continuous Empirical Latency Measurement for Arcus Perpetuals.
 
-Fulfills Section 4.6 of prompt.md:
+Fulfills Section 4.6 of prompt.md and corrective pass requirements:
 - Measures real RTT from the local machine:
-  1. REST /v1/markets (or /health) round-trip time.
+  1. REST /v1/markets round-trip time.
   2. WebSocket ping/pong round-trip time.
   3. WebSocket subscribe-ack round-trip time.
 - Measures clock skew against venue timestamps.
+- Records every raw sample with UTC timestamp in reports/latency_raw_samples.jsonl.
 - Computes empirical p50, p95, p99 latency distributions.
 - Emits results to reports/latency_benchmarks.json and reports/latency_summary.md.
 """
@@ -70,9 +71,13 @@ async def measure_ws_subscribe_ack_rtt(ws_client: ArcusWsClient, market: str = "
 
 
 async def run_benchmark(samples: int = 50, output_dir: str = "reports") -> Dict[str, Any]:
-    logger.info(f"Starting Arcus latency benchmark with {samples} samples...")
+    run_start_utc = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    logger.info(f"Starting Arcus latency benchmark with {samples} samples at {run_start_utc}...")
     out_path = Path(output_dir)
     out_path.mkdir(parents=True, exist_ok=True)
+
+    raw_samples_file = out_path / "latency_raw_samples.jsonl"
+    raw_samples_f = open(raw_samples_file, "a", encoding="utf-8")
 
     rest_client = ArcusRestClient()
     ws_client = ArcusWsClient()
@@ -84,18 +89,43 @@ async def run_benchmark(samples: int = 50, output_dir: str = "reports") -> Dict[
 
     try:
         for i in range(samples):
+            ts_sample = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
             # 1. REST RTT
             try:
                 r_rtt = await measure_rest_rtt(rest_client)
                 rest_rtts.append(r_rtt)
+                raw_samples_f.write(json.dumps({
+                    "sample_idx": i,
+                    "timestamp_utc": ts_sample,
+                    "channel": "REST",
+                    "endpoint": "/v1/markets",
+                    "rtt_ms": round(r_rtt, 3),
+                    "status": "ok"
+                }) + "\n")
             except Exception as e:
                 logger.warning(f"REST ping failed: {e}")
+                raw_samples_f.write(json.dumps({
+                    "sample_idx": i,
+                    "timestamp_utc": ts_sample,
+                    "channel": "REST",
+                    "endpoint": "/v1/markets",
+                    "error": str(e),
+                    "status": "error"
+                }) + "\n")
 
             # 2. WS Ping RTT
             try:
                 w_rtt = await measure_ws_ping_rtt(ws_client)
                 if w_rtt > 0:
                     ws_ping_rtts.append(w_rtt)
+                    raw_samples_f.write(json.dumps({
+                        "sample_idx": i,
+                        "timestamp_utc": ts_sample,
+                        "channel": "WS_PING",
+                        "rtt_ms": round(w_rtt, 3),
+                        "status": "ok"
+                    }) + "\n")
             except Exception as e:
                 logger.warning(f"WS ping failed: {e}")
 
@@ -110,17 +140,37 @@ async def run_benchmark(samples: int = 50, output_dir: str = "reports") -> Dict[
                     local_mid_ms = (t_local_before + t_local_after) / 2.0
                     skew = venue_ts_ms - local_mid_ms
                     clock_skews_ms.append(skew)
+                    raw_samples_f.write(json.dumps({
+                        "sample_idx": i,
+                        "timestamp_utc": ts_sample,
+                        "channel": "CLOCK_SKEW",
+                        "skew_ms": round(skew, 3),
+                        "venue_ts_ms": round(venue_ts_ms, 3),
+                        "local_mid_ms": round(local_mid_ms, 3),
+                        "status": "ok"
+                    }) + "\n")
             except Exception as e:
                 pass
 
-            await asyncio.sleep(0.1)
+            raw_samples_f.flush()
+            await asyncio.sleep(0.08)
 
         # 4. Single subscribe-ack test
         sub_ack_rtt = await measure_ws_subscribe_ack_rtt(ws_client, "BTC-USD")
+        raw_samples_f.write(json.dumps({
+            "timestamp_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "channel": "WS_SUBSCRIBE_ACK",
+            "market": "BTC-USD",
+            "rtt_ms": round(sub_ack_rtt, 3),
+            "status": "ok" if sub_ack_rtt > 0 else "timeout"
+        }) + "\n")
 
     finally:
+        raw_samples_f.close()
         await ws_client.disconnect()
         await rest_client.close()
+
+    run_end_utc = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
     def calc_stats(arr: List[float]) -> Dict[str, float]:
         if not arr:
@@ -138,12 +188,14 @@ async def run_benchmark(samples: int = 50, output_dir: str = "reports") -> Dict[
         }
 
     results = {
-        "timestamp_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "run_start_utc": run_start_utc,
+        "run_end_utc": run_end_utc,
         "total_samples": samples,
         "rest_rtt_ms": calc_stats(rest_rtts),
         "ws_ping_rtt_ms": calc_stats(ws_ping_rtts),
         "ws_subscribe_ack_ms": round(sub_ack_rtt, 2),
         "clock_skew_ms": calc_stats(clock_skews_ms),
+        "raw_samples_log": str(raw_samples_file),
     }
 
     # Save JSON
@@ -154,8 +206,10 @@ async def run_benchmark(samples: int = 50, output_dir: str = "reports") -> Dict[
     md_lines = [
         "# Empirical Latency Benchmark Summary",
         "",
-        f"**Date:** {results['timestamp_utc']}  ",
+        f"**Run Start:** {run_start_utc}  ",
+        f"**Run End:** {run_end_utc}  ",
         f"**Samples:** {samples}  ",
+        f"**Raw Samples Log:** `{raw_samples_file}`  ",
         "",
         "## Measured RTT Distribution (ms)",
         "",
