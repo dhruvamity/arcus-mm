@@ -50,9 +50,28 @@ LIVE_MIN_CLIPS = {
 }
 
 
-# Canonical reference data
-CANONICAL_TAKER_FEE_BPS = 2.25
-CANONICAL_MAKER_REBATE_BPS = 0.75
+def load_venue_fees() -> Tuple[float, float, float]:
+    """Loads maker_fee_bps, taker_fee_bps, maker_rebate_bps directly from configs/venue_verified.yaml (Rule 6)."""
+    cfg_path = REPO_ROOT / "configs" / "venue_verified.yaml"
+    if cfg_path.exists():
+        try:
+            import yaml
+            with open(cfg_path, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+            fees = data.get("fees", {})
+            base_tier = fees.get("base_tier", {})
+            maker_fee = float(base_tier.get("maker_fee_bps", 0.0))
+            taker_fee = float(base_tier.get("taker_fee_bps", 2.25))
+            rebates_avail = fees.get("rebates_available", False)
+            maker_rebate = float(base_tier.get("maker_rebate_bps", 0.0)) if rebates_avail else 0.0
+            return maker_fee, taker_fee, maker_rebate
+        except Exception:
+            pass
+    return 0.0, 2.25, 0.0
+
+
+# Canonical reference data (Rule 6: dynamically loaded from configs/venue_verified.yaml)
+CANONICAL_MAKER_FEE_BPS, CANONICAL_TAKER_FEE_BPS, CANONICAL_MAKER_REBATE_BPS = load_venue_fees()
 EMPTY_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 
 ALLOWED_PROSE_NUMBERS = {

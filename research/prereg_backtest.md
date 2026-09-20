@@ -88,7 +88,7 @@ Per (market, strategy), the single configuration that maximizes tune-week Model-
 ### 3.1 Formal Hypotheses
 
 - **$H_1$ (Primary Hypothesis: Positive Net Expectancy)**:  
-  For each pre-declared candidate $(M, S)$, the mean net bps per fill under Fill Model C after all exchange fees (2.25 bps taker exit, -0.75 bps maker rebate) and funding drag satisfies:
+  For each pre-declared candidate $(M, S)$, the mean net bps per fill under Fill Model C after all exchange fees (2.25 bps taker exit, 0.0 bps maker rebate per Amendment 2026-09-20 / W-04) and funding drag satisfies:
   $$\mu_{\text{net}} > 0 \quad \text{and} \quad \text{Lower Bound of } 90\% \text{ Bootstrap CI} > 0$$
 - **$H_2$ (Control Dominance over DoNothing)**:  
   Paired daily difference against `DoNothing` ($0\text{ bps}$) has a positive one-sided $90\%$ confidence lower bound.
@@ -144,5 +144,6 @@ For any candidate $(M, S)$ to achieve a verdict of `VALIDATED`, all of the follo
   6. *Avellaneda-Stoikov Deprecation*: Officially labeled `Avellaneda_Stoikov` as `NOT TUNABLE` due to 0 fills across all 20 markets and removed it from active candidate grid (V-24g).
   7. *Canonical Latency Pinning*: Updated latency figures to canonical empirical measurements ($p50 = 173.99\text{ ms}$, $p95 = 386.86\text{ ms}$, stress $= 886.86\text{ ms}$) from `latency/latency_summary.json` (V-27).
   8. *OOS Assurance Statement*: **Zero Out-of-Sample (OOS) data has been collected or evaluated. The OOS test window remains strictly in the future (Sep 28 – Oct 2, 2026).**
+  9. *Maker Rebate Elimination (Mandate v5 §2 W-04)*: Removed +0.75 bps maker rebate assumption. Verified base fee tier charges 0.0 bps maker fee with 0.0 bps rebate. Net fee drag under taker-exit assumptions updated to 2.25 bps (2.25 bps taker fee, 0.0 bps maker rebate). All candidate feasibility evaluations recalculated without maker rebate.
 - **2026-09-20 (Pre-Registration v3)**: Initial v3 draft incorporating pilot analysis.
 - **2026-09-19 (Corrective Pass 2)**: Expanded OOS window to 5 days; corrected multi-day stability criteria.

@@ -100,6 +100,38 @@ class TestPnLAccounting(unittest.TestCase):
         self.assertAlmostEqual(self.engine.total_funding_pnl, -0.02, places=6)
         self.assertTrue(self.engine.verify_accounting_identity(current_mid=100.0))
 
+    def test_w04_no_unsupported_maker_rebate_constants(self):
+        """W-04: Verifies no script contains a maker rebate constant not equal to venue config."""
+        import yaml
+        import re
+        from pathlib import Path
+
+        repo_root = Path(__file__).resolve().parent.parent
+        cfg_path = repo_root / "configs" / "venue_verified.yaml"
+        with open(cfg_path, "r", encoding="utf-8") as f:
+            venue_cfg = yaml.safe_load(f)
+
+        rebates_avail = venue_cfg.get("fees", {}).get("rebates_available", False)
+        base_rebate = venue_cfg.get("fees", {}).get("base_tier", {}).get("maker_rebate_bps", 0.0) if rebates_avail else 0.0
+
+        scripts_to_check = [
+            repo_root / "scripts" / "run_pilot_analysis.py",
+            repo_root / "scripts" / "verify_report.py",
+        ]
+        pattern = re.compile(r"^\s*(?:CANONICAL_)?MAKER_REBATE_BPS\s*=\s*([0-9.]+)", re.MULTILINE)
+
+        mismatches = []
+        for p in scripts_to_check:
+            if not p.exists():
+                continue
+            content = p.read_text(encoding="utf-8")
+            for match in pattern.finditer(content):
+                val = float(match.group(1))
+                if abs(val - base_rebate) > 1e-6:
+                    mismatches.append(f"{p.name}: found MAKER_REBATE_BPS = {val}, expected {base_rebate}")
+
+        self.assertEqual(len(mismatches), 0, f"Maker rebate constants must match venue config ({base_rebate} bps): {mismatches}")
+
 
 if __name__ == "__main__":
     unittest.main()

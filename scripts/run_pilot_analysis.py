@@ -251,10 +251,10 @@ def evaluate_strategies_on_events(
     venue = engine.venues[market]
     ref_mid = venue.current_mid if venue.current_mid > 0 else 1.0
 
-    # Economics constants
-    MAKER_REBATE_BPS = 0.75
+    # Economics constants (W-04: base tier has 0.0 bps maker rebate)
+    MAKER_REBATE_BPS = 0.0
     TAKER_EXIT_FEE_BPS = 2.25
-    NET_FEE_DRAG_BPS = TAKER_EXIT_FEE_BPS - MAKER_REBATE_BPS  # 1.50 bps
+    NET_FEE_DRAG_BPS = TAKER_EXIT_FEE_BPS - MAKER_REBATE_BPS  # 2.25 bps
 
     results: Dict[str, Dict[str, Any]] = {}
     for sid in strategies:

@@ -1,0 +1,21 @@
+=== COMMAND ===
+.venv/bin/python -m unittest tests.test_pnl_accounting.TestPnLAccounting.test_w04_no_unsupported_maker_rebate_constants
+
+=== EXIT CODE ===
+1
+
+=== OUTPUT ===
+F
+======================================================================
+FAIL: test_w04_no_unsupported_maker_rebate_constants (tests.test_pnl_accounting.TestPnLAccounting.test_w04_no_unsupported_maker_rebate_constants)
+W-04: Verifies no script contains a maker rebate constant not equal to venue config.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/dhruv/Desktop/CodeWithD/arcus-mm/tests/test_pnl_accounting.py", line 133, in test_w04_no_unsupported_maker_rebate_constants
+    self.assertEqual(len(mismatches), 0, f"Maker rebate constants must match venue config ({base_rebate} bps): {mismatches}")
+AssertionError: 2 != 0 : Maker rebate constants must match venue config (0.0 bps): ['run_pilot_analysis.py: found MAKER_REBATE_BPS = 0.75, expected 0.0', 'verify_report.py: found MAKER_REBATE_BPS = 0.75, expected 0.0']
+
+----------------------------------------------------------------------
+Ran 1 test in 0.326s
+
+FAILED (failures=1)

@@ -428,7 +428,7 @@
     "remediation_status": "FIXED",
     "evidence_file": "evidence/2026-09-20/W-01_min_size_bid_post_fix_pass.txt",
     "test_file": "tests/test_sim_engine.py",
-    "commit_hash": "HEAD",
+    "commit_hash": "12a78f7",
     "notes": "Validated order sizing against venue rules using order price (size >= min_order_size, price * size >= min_notional). Added test_19_w01 reproducer across BTC, HYPE, ZEC and MUT-18 mid-based clip regression check."
   },
   {
@@ -461,11 +461,11 @@
     "category": "ECONOMICS",
     "summary": "A +0.75 bps maker rebate assumed across pilot, prereg, and verify_report does not exist at base tier",
     "reproduction_status": "CONFIRMED",
-    "remediation_status": "OPEN",
-    "evidence_file": "",
+    "remediation_status": "FIXED",
+    "evidence_file": "evidence/2026-09-20/W-04_maker_rebate_post_fix_pass.txt",
     "test_file": "tests/test_pnl_accounting.py",
-    "commit_hash": "-",
-    "notes": "Base maker fee tier is 0.0 bps (no rebate); +0.75 bps assumption in scripts must be removed to match configs/venue_verified.yaml."
+    "commit_hash": "HEAD",
+    "notes": "Base maker fee tier is 0.0 bps (no rebate); removed 0.75 bps rebate from scripts/run_pilot_analysis.py, dynamically read fees from configs/venue_verified.yaml in verify_report.py, and amended research/prereg_backtest.md."
   },
   {
     "id": "W-05",
