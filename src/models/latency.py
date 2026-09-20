@@ -90,3 +90,80 @@ class LatencyConfig:
             "total_place_latency_ms": self.total_place_latency_ms,
             "total_cancel_latency_ms": self.total_cancel_latency_ms,
         }
+
+
+class LatencyModel:
+    """Abstract base class for order transit and feed latency models."""
+
+    def sample_ms(self, action: str, rng: Optional[Any] = None) -> float:
+        raise NotImplementedError
+
+    def sample_ns(self, action: str, rng: Optional[Any] = None) -> int:
+        return int(self.sample_ms(action, rng) * 1_000_000)
+
+
+class ConstantLatencyModel(LatencyModel):
+    """Constant latency model with optional bounded uniform jitter."""
+
+    def __init__(self, config: Optional[LatencyConfig] = None, jitter_fraction: float = 0.1):
+        self.config = config or LatencyConfig()
+        self.jitter_fraction = jitter_fraction
+
+    def sample_ms(self, action: str, rng: Optional[Any] = None) -> float:
+        if action == "place":
+            base = self.config.total_place_latency_ms
+        elif action == "cancel":
+            base = self.config.total_cancel_latency_ms
+        elif action == "modify":
+            base = self.config.total_modify_latency_ms
+        elif action == "feed":
+            base = self.config.feed_latency_ms
+        else:
+            base = 25.0
+
+        if rng and self.jitter_fraction > 0:
+            jitter = rng.uniform(-self.jitter_fraction, self.jitter_fraction) * base
+            return max(0.1, base + jitter)
+        return max(0.1, base)
+
+
+class EmpiricalLatencyModel(LatencyModel):
+    """Samples latency empirically with replacement from recorded benchmark distributions."""
+
+    def __init__(self, samples_file: Any, fallback_config: Optional[LatencyConfig] = None):
+        from pathlib import Path
+        self.samples_file = Path(samples_file)
+        self.fallback = ConstantLatencyModel(fallback_config)
+        self.samples: list[float] = []
+        self._load_samples()
+
+    def _load_samples(self) -> None:
+        import json
+        if not self.samples_file.exists():
+            return
+        try:
+            with open(self.samples_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                rtt = data.get("rest_rtt_ms", {})
+                if "p50" in rtt:
+                    p50 = float(rtt.get("p50", 25.0))
+                    p95 = float(rtt.get("p95", p50 * 1.5))
+                    p_min = float(rtt.get("min", p50 * 0.8))
+                    p_mean = float(rtt.get("mean", p50))
+                    p_max = float(rtt.get("max", p95 * 1.2))
+                    self.samples = [p_min, p50, p_mean, p95, p_max]
+            elif isinstance(data, list):
+                self.samples = [float(x) for x in data if isinstance(x, (int, float))]
+        except Exception:
+            pass
+
+    def sample_ms(self, action: str, rng: Optional[Any] = None) -> float:
+        import random
+        if self.samples:
+            chooser = rng.choice if rng else random.choice
+            val = float(chooser(self.samples))
+            if action == "cancel":
+                return max(0.1, val * 0.8)
+            return max(0.1, val)
+        return self.fallback.sample_ms(action, rng)
