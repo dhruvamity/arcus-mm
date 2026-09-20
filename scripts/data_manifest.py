@@ -11,6 +11,7 @@ import datetime
 import hashlib
 import sys
 from pathlib import Path
+from typing import Optional, Tuple, List
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = REPO_ROOT / "data"
@@ -26,35 +27,83 @@ def hash_file(filepath: Path) -> str:
     return h.hexdigest()
 
 
-def generate_manifest_for_date(date_str: str) -> Path:
-    """Generates a SHA-256 manifest file for a specific date directory."""
-    target_dir = RAW_DIR / date_str
-    if not target_dir.exists():
-        raise FileNotFoundError(f"Raw data directory not found for date: {target_dir}")
+def get_previous_manifest(date_str: str) -> Tuple[Optional[Path], Optional[str]]:
+    """Finds the chronological manifest immediately preceding date_str and returns (path, hash)."""
+    manifests = sorted(DATA_DIR.glob("MANIFEST_*.sha256"))
+    target_name = f"MANIFEST_{date_str}.sha256"
+    prev_path = None
+    for m in manifests:
+        if m.name < target_name:
+            prev_path = m
+        else:
+            break
+    if prev_path and prev_path.exists():
+        return prev_path, hash_file(prev_path)
+    return None, "0000000000000000000000000000000000000000000000000000000000000000 (GENESIS_ROOT)"
+
+
+def generate_manifest_for_date(date_str: str, source_dirs: Optional[list[Path]] = None) -> Path:
+    """Generates a cryptographically chained SHA-256 manifest file for a specific date."""
+    if source_dirs is None:
+        source_dirs = []
+        raw_target = RAW_DIR / date_str
+        comp_target = DATA_DIR / "compressed" / date_str
+        if raw_target.exists():
+            source_dirs.append(raw_target)
+        if comp_target.exists():
+            source_dirs.append(comp_target)
+
+    if not source_dirs:
+        raise FileNotFoundError(f"No data directories found for date {date_str}")
 
     manifest_path = DATA_DIR / f"MANIFEST_{date_str}.sha256"
-    lines = []
+    prev_manifest, prev_hash = get_previous_manifest(date_str)
 
-    all_files = sorted([p for p in target_dir.glob("**/*") if p.is_file()])
-    print(f"Hashing {len(all_files)} files for date {date_str}...")
+    lines = [
+        f"# ARCUS DATA INTEGRITY MANIFEST: {date_str}",
+        f"# PREV_MANIFEST: {prev_manifest.name if prev_manifest else 'GENESIS'}",
+        f"# PREV_MANIFEST_SHA256: {prev_hash}",
+        f"# CREATED_AT: {datetime.datetime.now(datetime.timezone.utc).isoformat()}",
+        "# FORMAT: <sha256_checksum>  <repo_relative_path>",
+        "",
+    ]
 
+    all_files = []
+    for sdir in source_dirs:
+        all_files.extend([p for p in sdir.glob("**/*") if p.is_file() and not p.name.startswith(".")])
+    all_files = sorted(set(all_files))
+
+    print(f"Hashing {len(all_files)} files for date {date_str} (chain parent: {prev_hash[:16]}...)...")
+
+    file_entries = []
     for fpath in all_files:
         sha256 = hash_file(fpath)
-        rel_path = fpath.relative_to(REPO_ROOT)
-        lines.append(f"{sha256}  {rel_path}")
+        try:
+            rel_path = fpath.resolve().relative_to(REPO_ROOT.resolve())
+        except ValueError:
+            rel_path = fpath.name
+        file_entries.append(f"{sha256}  {rel_path}")
+
+    lines.extend(sorted(file_entries))
+
+    # Compute manifest digest over all file entries
+    content_to_digest = "\n".join(file_entries)
+    manifest_digest = hashlib.sha256(content_to_digest.encode("utf-8")).hexdigest()
+    lines.append("")
+    lines.append(f"# MANIFEST_DIGEST: {manifest_digest}")
 
     manifest_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(f"Generated manifest: {manifest_path} ({len(lines)} files)")
+    print(f"Generated chained manifest: {manifest_path} ({len(file_entries)} files, digest {manifest_digest[:16]}...)")
     return manifest_path
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate SHA-256 data manifest")
+    parser = argparse.ArgumentParser(description="Generate chained SHA-256 data manifest")
     parser.add_argument(
         "--date",
         type=str,
-        default=datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d"),
-        help="Date string YYYY-MM-DD (default: current UTC date)",
+        default=(datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=1)).strftime("%Y-%m-%d"),
+        help="Date string YYYY-MM-DD (default: yesterday UTC for closed days)",
     )
     args = parser.parse_args()
 

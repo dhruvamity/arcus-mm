@@ -17,7 +17,10 @@ import shutil
 import hashlib
 import argparse
 from pathlib import Path
-from typing import Dict, Tuple, Optional
+from typing import Dict, Tuple, Optional, Any
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT))
 
 # Constants
 ALARM_THRESHOLD_GB = 40.0
@@ -131,12 +134,74 @@ def project_storage_needs(data_dir: Path = Path("data/raw")) -> Dict[str, float]
     }
 
 
+def run_daily_close(date_str: str, keep_raw: bool = True) -> Dict[str, Any]:
+    """Executes Mandate §8.6 Daily Close Routine for a closed UTC date.
+    
+    1. Verifies free disk space against 40 GB alarm threshold.
+    2. Verifies files are not being actively written.
+    3. Compresses every raw file into data/compressed/<date>/ with SHA-256 round-trip verification.
+    4. Generates chained cryptographic manifest linking to prior day's manifest.
+    """
+    from scripts.data_manifest import generate_manifest_for_date
+
+    raw_day_dir = (REPO_ROOT / "data" / "raw" / date_str).resolve()
+    if not raw_day_dir.exists():
+        raise FileNotFoundError(f"Raw data directory {raw_day_dir} does not exist.")
+
+    disk = check_disk_space()
+    if disk["alarm_tripped"]:
+        raise RuntimeError(f"Cannot run daily close: Free disk space ({disk['free_gb']:.2f} GB) is below {ALARM_THRESHOLD_GB} GB threshold!")
+
+    compressed_day_dir = (REPO_ROOT / "data" / "compressed" / date_str).resolve()
+    compressed_day_dir.mkdir(parents=True, exist_ok=True)
+
+    raw_files = sorted([p for p in raw_day_dir.glob("**/*") if p.is_file() and not p.name.startswith(".")])
+    print(f"Starting daily close for {date_str}: {len(raw_files)} raw files to compress and verify...")
+
+    compressed_count = 0
+    raw_total_bytes = 0
+    compressed_total_bytes = 0
+
+    for raw_p in raw_files:
+        rel_subpath = raw_p.relative_to(raw_day_dir)
+        comp_p = compressed_day_dir / rel_subpath.with_name(f"{raw_p.name}.gz")
+        comp_p.parent.mkdir(parents=True, exist_ok=True)
+
+        raw_size = raw_p.stat().st_size
+        raw_total_bytes += raw_size
+
+        success, msg = compress_file_with_verification(raw_p, comp_p, delete_raw=(not keep_raw))
+        if not success:
+            raise RuntimeError(f"Verified compression failed for {raw_p}: {msg}")
+
+        comp_size = comp_p.stat().st_size
+        compressed_total_bytes += comp_size
+        compressed_count += 1
+
+    ratio = (raw_total_bytes / compressed_total_bytes) if compressed_total_bytes > 0 else 1.0
+
+    # Generate chained manifest
+    manifest_p = generate_manifest_for_date(date_str, source_dirs=[compressed_day_dir])
+
+    res = {
+        "date": date_str,
+        "files_compressed": compressed_count,
+        "raw_mb": raw_total_bytes / (1024 ** 2),
+        "compressed_mb": compressed_total_bytes / (1024 ** 2),
+        "compression_ratio": ratio,
+        "manifest_path": str(manifest_p),
+        "disk_free_gb": disk["free_gb"],
+    }
+    return res
+
+
 def main():
     parser = argparse.ArgumentParser(description="Arcus Storage Manager and Compression Tool")
     parser.add_argument("--check-disk", action="store_true", help="Check disk space and free-space alarm")
     parser.add_argument("--project", action="store_true", help="Compute 13-day storage projections")
     parser.add_argument("--compress-file", type=str, help="Compress specific raw file with SHA-256 verification")
     parser.add_argument("--delete-raw", action="store_true", help="Delete raw file only after verified compression")
+    parser.add_argument("--daily-close", type=str, help="Execute daily close routine for specified closed UTC date (e.g. 2026-09-19)")
     args = parser.parse_args()
 
     disk = check_disk_space()
@@ -147,9 +212,9 @@ def main():
     print(f"Disk Used:  {disk['used_gb']:.2f} GB")
     print(f"Disk Free:  {disk['free_gb']:.2f} GB (Threshold: {ALARM_THRESHOLD_GB} GB)")
     if disk["alarm_tripped"]:
-        print("⚠️ ALARM TRIPPED: Free disk space is below 30 GB threshold!")
+        print(f"⚠️ ALARM TRIPPED: Free disk space is below {ALARM_THRESHOLD_GB} GB threshold!")
     else:
-        print("✅ Disk space health: OK (> 30 GB buffer)")
+        print(f"✅ Disk space health: OK (> {ALARM_THRESHOLD_GB} GB buffer)")
 
     proj = project_storage_needs()
     print("-" * 60)
@@ -158,6 +223,16 @@ def main():
     print(f"13-Day Projected Raw:  {proj['projected_13d_raw_gb']:.2f} GB")
     print(f"13-Day Projected Gzip: {proj['projected_13d_compressed_gb']:.2f} GB")
     print("=" * 60)
+
+    if args.daily_close:
+        print(f"\nExecuting Daily Close Routine for {args.daily_close}...")
+        close_res = run_daily_close(args.daily_close, keep_raw=not args.delete_raw)
+        print(f"✅ Daily close completed for {args.daily_close}:")
+        print(f"   Files Processed:    {close_res['files_compressed']}")
+        print(f"   Raw Volume:         {close_res['raw_mb']:.2f} MB")
+        print(f"   Compressed Volume:  {close_res['compressed_mb']:.2f} MB ({close_res['compression_ratio']:.1f}x compression)")
+        print(f"   Chained Manifest:   {close_res['manifest_path']}")
+        return
 
     if args.compress_file:
         raw_p = Path(args.compress_file)

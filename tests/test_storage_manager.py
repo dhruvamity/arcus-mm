@@ -96,6 +96,22 @@ class TestStorageManager(unittest.TestCase):
         self.assertGreater(proj["projected_13d_raw_gb"], 0.0)
         self.assertGreater(proj["projected_13d_compressed_gb"], 0.0)
 
+    def test_chained_manifest_generation(self):
+        from scripts.data_manifest import generate_manifest_for_date
+        # Create mock source directory
+        mock_date = "2026-09-18"
+        mock_raw = self.dir_path / "data" / "compressed" / mock_date
+        mock_raw.mkdir(parents=True, exist_ok=True)
+        (mock_raw / "btc.jsonl.gz").write_bytes(b"fake gz content")
+
+        manifest_path = generate_manifest_for_date(mock_date, source_dirs=[mock_raw])
+        self.assertTrue(manifest_path.exists())
+        content = manifest_path.read_text(encoding="utf-8")
+        self.assertIn("PREV_MANIFEST", content)
+        self.assertIn("MANIFEST_DIGEST", content)
+        # Clean up mock manifest
+        manifest_path.unlink(missing_ok=True)
+
 
 if __name__ == "__main__":
     unittest.main()
