@@ -51,7 +51,12 @@ for PY in "${INTERPRETERS[@]}"; do
     $PY -m unittest discover -s tests -p "test_*.py"
 done
 
-# 3. Secret scan on tracked files
+# 3. Mutation check suite (>= 16 mutations caught)
+echo ""
+echo "--- Running mutation verification suite ---"
+$PY312_BIN scripts/mutation_check.py
+
+# 4. Secret scan on tracked files
 echo ""
 echo "--- Running secret scanner on git-tracked files ---"
 $PY312_BIN scripts/secret_scan.py

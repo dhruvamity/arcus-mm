@@ -307,8 +307,210 @@ class TestSimEngine(unittest.TestCase):
         pass_2_hash = execute_pipeline()
         self.assertEqual(pass_1_hash, pass_2_hash, "Two independent passes over the same event stream must have identical fill hash")
 
+    def test_14_l2_snapshot_delta_queue_depth(self):
+        """Test 14: L2 snapshot + delta establishes arrival-time queue depth and tracks FIFO consumption."""
+        strat = FixedSpreadStrategy(
+            market="BTC-USD",
+            tick_size=0.1,
+            step_size=0.0001,
+            spread_bps=20.0,
+            clip_notional=10.0,
+        )
+        eng = SimEngine(
+            markets=[self.market],
+            market_specs=self.specs,
+            strategies={"fixed_spread": strat},
+            latency_config=LatencyConfig(order_entry_latency_ms=20.0, cancel_latency_ms=20.0),
+            paired_common_quotes=True,
+            random_seed=42,
+        )
+        t0 = 1_000_000_000
+        # 1. Apply L2 snapshot: bid 99.90 has 5.0 units ahead
+        snap_data = {
+            "isSnapshot": True,
+            "lastSequenceId": 100,
+            "bids": [["99.90", "5.0"], ["99.80", "10.0"]],
+            "asks": [["100.10", "5.0"], ["100.20", "10.0"]],
+        }
+        eng.on_event(SimEvent(SimEventType.L2_DELTA, t0, self.market, snap_data))
+
+        # 2. Trigger quote scheduling at 99.90
+        eng.on_event(SimEvent(SimEventType.BBO, t0 + int(1e6), self.market, {"bid_price": 99.90, "ask_price": 100.10, "bid_size": 5.0, "ask_size": 5.0}))
+
+        # 3. Advance clock past placement latency (20ms) -> order arrives at 99.90
+        eng.on_event(SimEvent(SimEventType.CLOCK_TICK, t0 + int(30e6), self.market, {}))
+        ctx = eng.contexts["fixed_spread"]
+        bid_b = ctx.active_bid[FillModelType.MODEL_B_MODERATE]
+        self.assertIsNotNone(bid_b)
+        self.assertEqual(bid_b.status, OrderStatus.RESTING)
+        self.assertEqual(bid_b.price, 99.90)
+        self.assertAlmostEqual(bid_b.queue_ahead_size, 5.0, places=4)
+
+        # 4. Trade of 3.0 at 99.90 consumes queue ahead to 2.0; fills 0
+        fills1 = eng.on_event(SimEvent(SimEventType.TRADE, t0 + int(40e6), self.market, {"price": 99.90, "size": 3.0, "side": "SELL"}))
+        fills_b_1 = [f for f in fills1 if f["fill_model"] == FillModelType.MODEL_B_MODERATE.value]
+        self.assertEqual(len(fills_b_1), 0)
+        self.assertAlmostEqual(bid_b.queue_ahead_size, 2.0, places=4)
+
+        # 5. Trade of 2.5 at 99.90 consumes remaining 2.0 queue ahead; fills remaining 0.5 (or order size)!
+        fills2 = eng.on_event(SimEvent(SimEventType.TRADE, t0 + int(50e6), self.market, {"price": 99.90, "size": 2.5, "side": "SELL"}))
+        fills_b_2 = [f for f in fills2 if f["fill_model"] == FillModelType.MODEL_B_MODERATE.value]
+        self.assertEqual(len(fills_b_2), 1)
+        self.assertAlmostEqual(fills_b_2[0]["size"], bid_b.size, places=4)
+        self.assertAlmostEqual(bid_b.queue_ahead_size, 0.0, places=4)
+
+    def test_15_funding_predicted_vs_settlement_regression(self):
+        """Test 15: 60 streaming predictedFunding frames in an hour do NOT charge PnL; only realized settlement charges PnL."""
+        ctx = self.engine.contexts["fixed_spread"]
+        pnl_b = ctx.pnl_engines[FillModelType.MODEL_B_MODERATE]
+        pnl_b.record_fill("BUY", 100.0, 1.0, 100.0, is_taker=False)  # Long 1.0 unit
+        venue = self.engine.venues[self.market]
+        venue.current_mid = 100.0
+
+        t_base = 1_000_000_000
+        # 60 predicted funding messages (1 per minute for 1 hour)
+        for i in range(60):
+            t = t_base + i * 60 * 1_000_000_000
+            ev = SimEvent(SimEventType.FUNDING, t, self.market, {"rate1h": 0.0001, "channel": "predictedFunding", "is_predicted": True})
+            self.engine.on_event(ev)
+
+        # PnL MUST BE UNCHANGED: 0.0 funding PnL (fix V-08)
+        self.assertEqual(pnl_b.total_funding_pnl, 0.0, "Streaming predictedFunding messages must not debit funding PnL")
+
+        # 1 Realized settlement event occurs
+        t_settle = t_base + 3600 * 1_000_000_000
+        ev_settle = SimEvent(SimEventType.FUNDING, t_settle, self.market, {"funding_rate": 0.0001, "is_settlement": True})
+        self.engine.on_event(ev_settle)
+
+        # Exactly 1 hour of funding applied: -100 * 1.0 * 0.0001 = -0.01
+        self.assertAlmostEqual(pnl_b.total_funding_pnl, -0.01, places=5)
+
+    def test_16_risk_state_recovery_mechanisms(self):
+        """Test 16: Risk state recovery: PAUSED_STALE_FEED, PAUSED_GAP, FLATTENED_CROSSED_BOOK, and cross-market isolation."""
+        t0 = 1_000_000_000
+        # Initialize BBO
+        self.engine.on_event(SimEvent(SimEventType.BBO, t0, self.market, {"bid_price": 99.90, "ask_price": 100.10, "bid_size": 1.0, "ask_size": 1.0}))
+        ctx = self.engine.contexts["fixed_spread"]
+        self.assertEqual(ctx.get_risk_state(self.market), RiskState.NORMAL)
+
+        # 1. Stale feed triggers PAUSED_STALE_FEED (>3s)
+        self.engine.on_event(SimEvent(SimEventType.CLOCK_TICK, t0 + int(4e9), self.market, {}))
+        self.assertEqual(ctx.get_risk_state(self.market), RiskState.PAUSED_STALE_FEED)
+
+        # Recovery requires 20 clean BBOs AND >= 5.0 seconds
+        t_stale = t0 + int(4e9)
+        for i in range(19):
+            self.engine.on_event(SimEvent(SimEventType.BBO, t_stale + int(i * 3e8), self.market, {"bid_price": 99.90, "ask_price": 100.10, "bid_size": 1.0, "ask_size": 1.0}))
+        self.assertEqual(ctx.get_risk_state(self.market), RiskState.PAUSED_STALE_FEED)
+
+        # 20th clean BBO after 6 seconds -> recovers to NORMAL!
+        self.engine.on_event(SimEvent(SimEventType.BBO, t_stale + int(6e9), self.market, {"bid_price": 99.90, "ask_price": 100.10, "bid_size": 1.0, "ask_size": 1.0}))
+        self.assertEqual(ctx.get_risk_state(self.market), RiskState.NORMAL)
+
+        # 2. Sequence gap triggers PAUSED_GAP
+        gap_delta = {"isSnapshot": False, "sequence": 999, "bids": [], "asks": []}
+        self.engine.on_event(SimEvent(SimEventType.L2_DELTA, t_stale + int(7e9), self.market, gap_delta))
+        self.engine.venues[self.market].book_valid = False
+        ctx.set_risk_state(self.market, RiskState.PAUSED_GAP)
+        self.assertEqual(ctx.get_risk_state(self.market), RiskState.PAUSED_GAP)
+
+        # Resync via snapshot recovers PAUSED_GAP
+        snap_data = {"isSnapshot": True, "lastSequenceId": 1000, "bids": [["99.90", "1.0"]], "asks": [["100.10", "1.0"]]}
+        self.engine.on_event(SimEvent(SimEventType.L2_DELTA, t_stale + int(8e9), self.market, snap_data))
+        self.assertEqual(ctx.get_risk_state(self.market), RiskState.NORMAL)
+
+        # 3. Crossed book triggers FLATTENED_CROSSED_BOOK
+        crossed_bbo = {"bid_price": 100.50, "ask_price": 100.10, "bid_size": 1.0, "ask_size": 1.0}
+        self.engine.on_event(SimEvent(SimEventType.BBO, t_stale + int(9e9), self.market, crossed_bbo))
+        self.assertEqual(ctx.get_risk_state(self.market), RiskState.FLATTENED_CROSSED_BOOK)
+
+        # 20 clean uncrossed BBOs recover FLATTENED_CROSSED_BOOK
+        t_rec = t_stale + int(10e9)
+        for i in range(20):
+            self.engine.on_event(SimEvent(SimEventType.BBO, t_rec + int(i * 1e8), self.market, {"bid_price": 99.90, "ask_price": 100.10, "bid_size": 1.0, "ask_size": 1.0}))
+        self.assertEqual(ctx.get_risk_state(self.market), RiskState.NORMAL)
+
+    def test_17_independent_fill_worlds_quoting(self):
+        """Test 17: Independent fill model simulation worlds (paired_common_quotes=False) quote from their own inventory."""
+        strat = FixedSpreadStrategy(
+            market="BTC-USD",
+            tick_size=0.1,
+            step_size=0.0001,
+            spread_bps=10.0,
+            clip_notional=10.0,
+        )
+        eng = SimEngine(
+            markets=[self.market],
+            market_specs=self.specs,
+            strategies={"fixed_spread": strat},
+            fill_models=[FillModelType.MODEL_A_TOUCH, FillModelType.MODEL_C_CONSERVATIVE],
+            latency_config=LatencyConfig(order_entry_latency_ms=10.0, cancel_latency_ms=10.0),
+            paired_common_quotes=False,
+            random_seed=42,
+        )
+        t0 = 1_000_000_000
+        # 1. Establish initial quotes
+        eng.on_event(SimEvent(SimEventType.BBO, t0, self.market, {"bid_price": 100.0, "ask_price": 100.2, "bid_size": 1.0, "ask_size": 1.0}))
+        eng.on_event(SimEvent(SimEventType.CLOCK_TICK, t0 + int(20e6), self.market, {}))
+
+        ctx = eng.contexts["fixed_spread"]
+        bid_a = ctx.active_bid[FillModelType.MODEL_A_TOUCH]
+        bid_c = ctx.active_bid[FillModelType.MODEL_C_CONSERVATIVE]
+        self.assertIsNotNone(bid_a)
+        self.assertIsNotNone(bid_c)
+
+        # 2. Trade touches bid price (100.0): Model A fills, Model C DOES NOT fill!
+        eng.on_event(SimEvent(SimEventType.TRADE, t0 + int(30e6), self.market, {"price": 100.0, "size": 0.1, "side": "SELL"}))
+        pnl_a = ctx.pnl_engines[FillModelType.MODEL_A_TOUCH]
+        pnl_c = ctx.pnl_engines[FillModelType.MODEL_C_CONSERVATIVE]
+        self.assertAlmostEqual(pnl_a.position, bid_a.size, places=4)
+        self.assertEqual(pnl_c.position, 0.0)
+
+        # 3. Next BBO update causes requoting: Model A quotes with long inventory skew, Model C quotes flat inventory
+        eng.on_event(SimEvent(SimEventType.BBO, t0 + int(40e6), self.market, {"bid_price": 100.1, "ask_price": 100.3, "bid_size": 1.0, "ask_size": 1.0}))
+        eng.on_event(SimEvent(SimEventType.CLOCK_TICK, t0 + int(60e6), self.market, {}))
+
+        self.assertAlmostEqual(pnl_a.position, bid_a.size, places=4)
+        self.assertEqual(pnl_c.position, 0.0)
+
+    def test_18_subaccount_rate_limit_denial_and_drip(self):
+        """Test 18: Subaccount rate limit pool exhaustion denies quote placement until drip interval."""
+        from src.models.rate_limit import ArcusRateLimitSimulator
+        limiter = ArcusRateLimitSimulator(order_pool_cap=5, drip_interval_seconds=10.0)
+        strat = FixedSpreadStrategy(
+            market="BTC-USD",
+            tick_size=0.1,
+            step_size=0.0001,
+            spread_bps=10.0,
+            clip_notional=10.0,
+        )
+        eng = SimEngine(
+            markets=[self.market],
+            market_specs=self.specs,
+            strategies={"fixed_spread": strat},
+            subaccount_rate_limiter=limiter,
+            latency_config=LatencyConfig(order_entry_latency_ms=10.0, cancel_latency_ms=10.0),
+            paired_common_quotes=True,
+            random_seed=42,
+        )
+        ctx = eng.contexts["fixed_spread"]
+        t0 = 1_000_000_000
+
+        # Drain the order units
+        limiter.order_units_available = 0.0
+
+        # Attempt to quote with 0 available units (within drip window)
+        eng.on_event(SimEvent(SimEventType.BBO, t0, self.market, {"bid_price": 100.0, "ask_price": 100.2, "bid_size": 1.0, "ask_size": 1.0}))
+        self.assertGreater(ctx.rate_limited_actions_count, 0)
+        self.assertEqual(len(ctx.in_flight_orders), 0)
+
+        # Advance time by 11 seconds (exceeding 10s drip interval)
+        t_drip = t0 + int(11e9)
+        eng.on_event(SimEvent(SimEventType.BBO, t_drip, self.market, {"bid_price": 100.0, "ask_price": 100.2, "bid_size": 1.0, "ask_size": 1.0}))
+        self.assertGreater(len(ctx.in_flight_orders), 0)
+
     def test_13_mutation_tests(self):
-        """Test 13: Mutation tests (at least 8 mutations applied to the engine fail test suite)."""
+        """Test 13: Mutation tests (at least 16 mutations applied to the engine fail test suite)."""
         from scripts.mutation_check import (
             test_mutation_1_invert_queue,
             test_mutation_2_lookahead_bias,
@@ -320,6 +522,13 @@ class TestSimEngine(unittest.TestCase):
             test_mutation_8_disable_kill_switch,
             test_mutation_9_fee_sign_flip,
             test_mutation_10_markout_clamping,
+            test_mutation_11_charge_funding_per_message,
+            test_mutation_12_quote_behind_touch_zero_queue,
+            test_mutation_13_never_recover_pause,
+            test_mutation_14_drop_stale_check,
+            test_mutation_15_ignore_rate_limits,
+            test_mutation_16_recv_time_joins,
+            test_mutation_17_c_world_from_b_inventory,
         )
         mutations = [
             test_mutation_1_invert_queue,
@@ -332,10 +541,17 @@ class TestSimEngine(unittest.TestCase):
             test_mutation_8_disable_kill_switch,
             test_mutation_9_fee_sign_flip,
             test_mutation_10_markout_clamping,
+            test_mutation_11_charge_funding_per_message,
+            test_mutation_12_quote_behind_touch_zero_queue,
+            test_mutation_13_never_recover_pause,
+            test_mutation_14_drop_stale_check,
+            test_mutation_15_ignore_rate_limits,
+            test_mutation_16_recv_time_joins,
+            test_mutation_17_c_world_from_b_inventory,
         ]
         results = [m() for m in mutations]
         caught = sum(1 for r in results if r.caught)
-        self.assertGreaterEqual(caught, 8, f"Must catch at least 8 mutations, caught {caught}")
+        self.assertGreaterEqual(caught, 16, f"Must catch at least 16 mutations, caught {caught}")
 
 
 if __name__ == "__main__":

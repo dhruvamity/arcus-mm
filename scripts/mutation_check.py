@@ -29,9 +29,10 @@ from typing import Callable, Any, Tuple, List
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.sim.engine import SimEngine
+from src.sim.engine import SimEngine, StrategyInstanceContext, RiskState, SimEventType
 from src.models.fill import FillModelType, OrderStatus
 from src.models.pnl import PnLAttributionEngine
+from src.models.rate_limit import ArcusRateLimitSimulator
 from tests.test_sim_engine import TestSimEngine
 from tests.test_harness_integrity import TestHarnessIntegrity
 from tests.test_pnl_accounting import TestPnLAccounting
@@ -173,12 +174,12 @@ def test_mutation_6_min_size_bypass() -> MutationResult:
     """Mutation 6: Bypass minimum order clip size enforcement."""
     orig_sched = SimEngine._schedule_quote_update
 
-    def mutated_sched(self, venue, ctx, target_bid, target_ask, ts_ns):
+    def mutated_sched(self, venue, ctx, fill_model, target_bid, target_ask, ts_ns):
         # Temporarily lower min_notional to 0
         old_min = venue.min_notional
         venue.min_notional = 0.0
         try:
-            return orig_sched(self, venue, ctx, target_bid, target_ask, ts_ns)
+            return orig_sched(self, venue, ctx, fill_model, target_bid, target_ask, ts_ns)
         finally:
             venue.min_notional = old_min
 
@@ -274,6 +275,139 @@ def test_mutation_10_markout_clamping() -> MutationResult:
         harness_test_mod.compute_markouts = orig_compute
 
 
+def test_mutation_11_charge_funding_per_message() -> MutationResult:
+    """Mutation 11: Charge funding per streaming message (causes 60x overcharge)."""
+    orig_handle_funding = SimEngine._handle_funding_event
+
+    def mutated_handle_funding(self, venue, data, ts_ns):
+        rate = float(data.get("rate1h") or data.get("rate") or data.get("funding_rate") or 0.0)
+        venue.predicted_funding_rate = rate
+        # BUG: Settle funding on every message without checking is_settlement!
+        ref_price = venue.current_mid if venue.current_mid > 0 else 1.0
+        for ctx in self.contexts.values():
+            for pnl_eng in ctx.pnl_engines.values():
+                pnl_eng.apply_funding(rate, ref_price)
+
+    SimEngine._handle_funding_event = mutated_handle_funding
+    try:
+        failed, msg = run_targeted_test(TestSimEngine, "test_15_funding_predicted_vs_settlement_regression")
+        return MutationResult("MUT-11", "Charge Funding Per Message", "TestSimEngine.test_15_funding_predicted_vs_settlement_regression", "Charges funding on every predictedFunding frame (60x overcharge)", failed, msg)
+    finally:
+        SimEngine._handle_funding_event = orig_handle_funding
+
+
+def test_mutation_12_quote_behind_touch_zero_queue() -> MutationResult:
+    """Mutation 12: Treat resting quote queue depth as 0 regardless of book state."""
+    orig_arrivals = SimEngine._process_in_flight_arrivals
+
+    def mutated_arrivals(self, current_ts_ns):
+        ret = orig_arrivals(self, current_ts_ns)
+        for ctx in self.contexts.values():
+            for fm in ctx.fill_models:
+                if ctx.active_bid[fm]:
+                    ctx.active_bid[fm].queue_ahead_size = 0.0
+                if ctx.active_ask[fm]:
+                    ctx.active_ask[fm].queue_ahead_size = 0.0
+        return ret
+
+    SimEngine._process_in_flight_arrivals = mutated_arrivals
+    try:
+        failed, msg = run_targeted_test(TestSimEngine, "test_14_l2_snapshot_delta_queue_depth")
+        return MutationResult("MUT-12", "Zero Queue Behind Touch", "TestSimEngine.test_14_l2_snapshot_delta_queue_depth", "Treats queue ahead size as 0, ignoring book depth", failed, msg)
+    finally:
+        SimEngine._process_in_flight_arrivals = orig_arrivals
+
+
+def test_mutation_13_never_recover_pause() -> MutationResult:
+    """Mutation 13: Never recover from risk pause state (latch permanent pause)."""
+    orig_set_risk = StrategyInstanceContext.set_risk_state
+
+    def mutated_set_risk(self, market, state):
+        curr = self.get_risk_state(market)
+        # BUG: Once paused, never return to NORMAL
+        if curr != RiskState.NORMAL and state == RiskState.NORMAL:
+            return
+        orig_set_risk(self, market, state)
+
+    StrategyInstanceContext.set_risk_state = mutated_set_risk
+    try:
+        failed, msg = run_targeted_test(TestSimEngine, "test_16_risk_state_recovery_mechanisms")
+        return MutationResult("MUT-13", "Never Recover From Pause", "TestSimEngine.test_16_risk_state_recovery_mechanisms", "Disables state machine transitions from PAUSED back to NORMAL", failed, msg)
+    finally:
+        StrategyInstanceContext.set_risk_state = orig_set_risk
+
+
+def test_mutation_14_drop_stale_check() -> MutationResult:
+    """Mutation 14: Drop stale BBO feed watchdog in clock tick."""
+    orig_tick = SimEngine._handle_clock_tick
+
+    def mutated_tick(self, venue, ts_ns):
+        # BUG: Drop stale feed check; only run funding rollover
+        current_hour = ts_ns // (3600 * 1_000_000_000)
+        venue.last_settled_hour = current_hour
+
+    SimEngine._handle_clock_tick = mutated_tick
+    try:
+        failed, msg = run_targeted_test(TestSimEngine, "test_10_kill_switches")
+        return MutationResult("MUT-14", "Drop Stale Feed Watchdog", "TestSimEngine.test_10_kill_switches", "Omits stale BBO elapsed duration check on clock ticks", failed, msg)
+    finally:
+        SimEngine._handle_clock_tick = orig_tick
+
+
+def test_mutation_15_ignore_rate_limits() -> MutationResult:
+    """Mutation 15: Ignore rate limit pool exhaustion and denials."""
+    orig_can_place = ArcusRateLimitSimulator.can_place_order
+
+    def mutated_can_place(self, now_ts=None):
+        return True  # BUG: Always allow place even if 0 units and in drip window
+
+    ArcusRateLimitSimulator.can_place_order = mutated_can_place
+    try:
+        failed, msg = run_targeted_test(TestSimEngine, "test_18_subaccount_rate_limit_denial_and_drip")
+        return MutationResult("MUT-15", "Ignore Rate Limit Denials", "TestSimEngine.test_18_subaccount_rate_limit_denial_and_drip", "Ignores exhausted rate limit pool and allows orders anyway", failed, msg)
+    finally:
+        ArcusRateLimitSimulator.can_place_order = orig_can_place
+
+
+def test_mutation_16_recv_time_joins() -> MutationResult:
+    """Mutation 16: Use event receive time instead of arrival timestamp for order fill checks."""
+    orig_on_event = SimEngine.on_event
+
+    def mutated_on_event(self, event):
+        # BUG: Advance all in-flight arrivals to event.recv_ts_ns before trade check
+        if event.event_type == SimEventType.TRADE:
+            for ctx in self.contexts.values():
+                for o in ctx.in_flight_orders:
+                    o.arrival_ts_ns = event.recv_ts_ns
+        return orig_on_event(self, event)
+
+    SimEngine.on_event = mutated_on_event
+    try:
+        failed, msg = run_targeted_test(TestSimEngine, "test_8_no_lookahead")
+        return MutationResult("MUT-16", "Recv Time Order Fill (Lookahead)", "TestSimEngine.test_8_no_lookahead", "Fills orders based on event receive time rather than arrival timestamp", failed, msg)
+    finally:
+        SimEngine.on_event = orig_on_event
+
+
+def test_mutation_17_c_world_from_b_inventory() -> MutationResult:
+    """Mutation 17: C-world shares or quotes from Model A/B inventory."""
+    orig_init = SimEngine.__init__
+
+    def mutated_init(self, *args, **kwargs):
+        orig_init(self, *args, **kwargs)
+        for ctx in self.contexts.values():
+            if FillModelType.MODEL_C_CONSERVATIVE in ctx.pnl_engines and FillModelType.MODEL_A_TOUCH in ctx.pnl_engines:
+                # BUG: Model C uses Model A's PnL engine / inventory!
+                ctx.pnl_engines[FillModelType.MODEL_C_CONSERVATIVE] = ctx.pnl_engines[FillModelType.MODEL_A_TOUCH]
+
+    SimEngine.__init__ = mutated_init
+    try:
+        failed, msg = run_targeted_test(TestSimEngine, "test_17_independent_fill_worlds_quoting")
+        return MutationResult("MUT-17", "C-World Shares Inventory", "TestSimEngine.test_17_independent_fill_worlds_quoting", "Model C quotes and tracks from Model A/B inventory instead of independent state", failed, msg)
+    finally:
+        SimEngine.__init__ = orig_init
+
+
 def main():
     mutations: List[Callable[[], MutationResult]] = [
         test_mutation_1_invert_queue,
@@ -286,6 +420,13 @@ def main():
         test_mutation_8_disable_kill_switch,
         test_mutation_9_fee_sign_flip,
         test_mutation_10_markout_clamping,
+        test_mutation_11_charge_funding_per_message,
+        test_mutation_12_quote_behind_touch_zero_queue,
+        test_mutation_13_never_recover_pause,
+        test_mutation_14_drop_stale_check,
+        test_mutation_15_ignore_rate_limits,
+        test_mutation_16_recv_time_joins,
+        test_mutation_17_c_world_from_b_inventory,
     ]
 
     print("=" * 80)
