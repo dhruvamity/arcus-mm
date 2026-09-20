@@ -164,7 +164,7 @@
     "remediation_status": "FIXED",
     "evidence_file": "evidence/2026-09-20/W-05_margin_speed_bump_post_fix_pass.txt",
     "test_file": "tests/test_sim_engine.py",
-    "commit_hash": "PENDING_COMMIT",
+    "commit_hash": "278aa51",
     "notes": "Re-closed per Mandate v5: implemented equity <= maintenance margin check with conservative forced-flatten and FLATTENED_LIQUIDATION state; modeled 50ms taker speed bump giving MM ALO cancels priority; verified with MUT-23."
   },
   {
@@ -476,7 +476,7 @@
     "remediation_status": "FIXED",
     "evidence_file": "evidence/2026-09-20/W-05_margin_speed_bump_post_fix_pass.txt",
     "test_file": "tests/test_sim_engine.py",
-    "commit_hash": "PENDING_COMMIT",
+    "commit_hash": "278aa51",
     "notes": "Implemented equity vs maintenance margin liquidation with conservative forced-flatten and FLATTENED_LIQUIDATION state; implemented 50ms taker speed bump with MM ALO cancel priority and evaluated sensitivity grid [0ms, 25ms, 50ms, 100ms]; verified with MUT-23."
   },
   {
