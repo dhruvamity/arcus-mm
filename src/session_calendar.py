@@ -128,3 +128,24 @@ def classify_regime(ts_ns: int, asset_class: str = "crypto") -> MarketRegimeTag:
         underlying_open=underlying_open,
         event_window=event_window,
     )
+
+
+def classify_rth_capture_tag(ts_ns: int) -> str:
+    """Tags fills captured during paper and simulation sessions per Mandate v5 §2 (W-11):
+    - PRE: 13:00-13:30 UTC (pre-market capture buffer)
+    - RTH: 13:30-20:00 UTC (NYSE regular cash market hours)
+    - POST: 20:00-20:30 UTC (post-market capture buffer)
+    - OTHER: Outside the 13:00-20:30 UTC capture window (e.g. overnight / weekend)
+    Fills tagged PRE or POST must never be mixed into the RTH statistic.
+    """
+    dt_utc = datetime.datetime.fromtimestamp(ts_ns / 1e9, tz=UTC_TZ)
+    total_minutes = dt_utc.hour * 60 + dt_utc.minute
+
+    if 780 <= total_minutes < 810:      # 13:00 <= t < 13:30
+        return "PRE"
+    elif 810 <= total_minutes < 1200:   # 13:30 <= t < 20:00
+        return "RTH"
+    elif 1200 <= total_minutes < 1230:  # 20:00 <= t < 20:30
+        return "POST"
+    else:
+        return "OTHER"

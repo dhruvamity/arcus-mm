@@ -33,6 +33,7 @@ from src.strategies.base import BaseMarketMakingStrategy, Quote
 from src.utils import snap_to_tick, snap_to_step
 from src.venue import get_market_spec
 from src.volatility import RealizedVolatilityEstimator
+from src.session_calendar import classify_rth_capture_tag
 
 logger = logging.getLogger("sim_engine")
 
@@ -639,6 +640,7 @@ class SimEngine:
                                 "was_in_flight_cancel": was_in_flight,
                                 "observation_key": obs_key,
                                 "quote_hash": quote_hash,
+                                "rth_tag": classify_rth_capture_tag(ts_ns),
                             }
                             fills_generated.append(fill_rec)
                             ctx.fill_records.append(fill_rec)
@@ -687,6 +689,7 @@ class SimEngine:
                                 "was_in_flight_cancel": was_in_flight,
                                 "quote_hash": quote_hash,
                                 "observation_key": obs_key,
+                                "rth_tag": classify_rth_capture_tag(ts_ns),
                             }
                             fills_generated.append(fill_rec)
                             ctx.fill_records.append(fill_rec)

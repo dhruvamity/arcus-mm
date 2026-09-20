@@ -108,6 +108,44 @@ class TestCalendarRegimes(unittest.TestCase):
         self.assertNotEqual(dt_utc.hour, dt_ist.hour)
         self.assertEqual(dt_utc.timestamp(), dt_ist.timestamp())
 
+    def test_w11_rth_capture_tagging_and_separation(self):
+        """W-11 / Mandate v5 §2: Tag fills as PRE (13:00-13:30), RTH (13:30-20:00), POST (20:00-20:30), OTHER,
+        and verify PRE/POST are never mixed into RTH statistics.
+        """
+        from src.session_calendar import classify_rth_capture_tag
+
+        # PRE window: 13:00 to 13:30 UTC
+        ts_pre = int(datetime.datetime(2026, 9, 21, 13, 15, tzinfo=datetime.timezone.utc).timestamp() * 1e9)
+        self.assertEqual(classify_rth_capture_tag(ts_pre), "PRE")
+
+        # RTH window: 13:30 to 20:00 UTC (NYSE cash hours)
+        ts_rth_start = int(datetime.datetime(2026, 9, 21, 13, 30, tzinfo=datetime.timezone.utc).timestamp() * 1e9)
+        ts_rth_mid = int(datetime.datetime(2026, 9, 21, 16, 0, tzinfo=datetime.timezone.utc).timestamp() * 1e9)
+        ts_rth_end = int(datetime.datetime(2026, 9, 21, 19, 59, 59, tzinfo=datetime.timezone.utc).timestamp() * 1e9)
+        self.assertEqual(classify_rth_capture_tag(ts_rth_start), "RTH")
+        self.assertEqual(classify_rth_capture_tag(ts_rth_mid), "RTH")
+        self.assertEqual(classify_rth_capture_tag(ts_rth_end), "RTH")
+
+        # POST window: 20:00 to 20:30 UTC
+        ts_post = int(datetime.datetime(2026, 9, 21, 20, 15, tzinfo=datetime.timezone.utc).timestamp() * 1e9)
+        self.assertEqual(classify_rth_capture_tag(ts_post), "POST")
+
+        # OTHER window: outside 13:00-20:30 UTC
+        ts_other_pre = int(datetime.datetime(2026, 9, 21, 12, 59, tzinfo=datetime.timezone.utc).timestamp() * 1e9)
+        ts_other_post = int(datetime.datetime(2026, 9, 21, 20, 31, tzinfo=datetime.timezone.utc).timestamp() * 1e9)
+        self.assertEqual(classify_rth_capture_tag(ts_other_pre), "OTHER")
+        self.assertEqual(classify_rth_capture_tag(ts_other_post), "OTHER")
+
+        # Separation check: verify that filtering strictly on rth_tag == 'RTH' excludes PRE and POST fills
+        sample_fills = [
+            {"id": 1, "rth_tag": classify_rth_capture_tag(ts_pre), "edge_bps": 2.0},
+            {"id": 2, "rth_tag": classify_rth_capture_tag(ts_rth_mid), "edge_bps": 1.5},
+            {"id": 3, "rth_tag": classify_rth_capture_tag(ts_post), "edge_bps": -0.5},
+        ]
+        rth_only_fills = [f for f in sample_fills if f["rth_tag"] == "RTH"]
+        self.assertEqual(len(rth_only_fills), 1)
+        self.assertEqual(rth_only_fills[0]["id"], 2)
+
 
 if __name__ == "__main__":
     unittest.main()

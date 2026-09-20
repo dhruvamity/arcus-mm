@@ -1,0 +1,9 @@
+=== POST-FIX PASSING DEMONSTRATION FOR W-11 (MUT-26) ===
+Command: .venv/bin/python -m unittest tests/test_calendar_regimes.py -k test_w11
+Target Test: TestCalendarRegimes.test_w11_rth_capture_tagging_and_separation
+
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.000s
+
+OK

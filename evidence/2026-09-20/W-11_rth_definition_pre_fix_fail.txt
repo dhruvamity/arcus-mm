@@ -1,0 +1,20 @@
+=== PRE-FIX FAILURE DEMONSTRATION FOR W-11 (MUT-26) ===
+Command: .venv/bin/python -m unittest tests/test_calendar_regimes.py -k test_w11
+Target Test: TestCalendarRegimes.test_w11_rth_capture_tagging_and_separation
+
+Before tagging fills as PRE (13:00-13:30), RTH (13:30-20:00), POST (20:00-20:30), OTHER (simulated via MUT-26 conflating PRE into RTH):
+======================================================================
+FAIL: test_w11_rth_capture_tagging_and_separation (test_calendar_regimes.TestCalendarRegimes.test_w11_rth_capture_tagging_and_separation)
+W-11 / Mandate v5 §2: Tag fills as PRE (13:00-13:30), RTH (13:30-20:00), POST (20:00-20:30), OTHER.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/dhruv/Desktop/CodeWithD/arcus-mm/tests/test_calendar_regimes.py", line 120, in test_w11_rth_capture_tagging_and_separation
+    self.assertEqual(classify_rth_capture_tag(ts_pre), "PRE")
+AssertionError: 'RTH' != 'PRE'
+- RTH
++ PRE
+
+----------------------------------------------------------------------
+Ran 1 test in 0.000s
+
+FAILED (failures=1)

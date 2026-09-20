@@ -222,6 +222,35 @@ class TestReportProvenance(unittest.TestCase):
             self.assertFalse(valid)
             self.assertTrue(any("missing valid ISO 8601 UTC format" in e for e in errors))
 
+    def test_w10_w14_status_report_ledger_counts_and_hygiene_advisory(self):
+        """W-10 & W-14: Status report finding counts derived strictly from audit_status.json and advisory notice present."""
+        import json
+        import tempfile
+        from scripts.generate_status_report import generate_status_markdown
+
+        audit_path = self.repo_root / "research" / "audit_status.json"
+        with open(audit_path, "r", encoding="utf-8") as f:
+            items = json.load(f)
+
+        expected_total = len(items)
+        expected_fixed = sum(1 for x in items if x.get("remediation_status") == "FIXED")
+        expected_open = sum(1 for x in items if x.get("remediation_status") == "OPEN")
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_status = Path(tmp_dir) / "status.md"
+            generate_status_markdown(tmp_status)
+            content = tmp_status.read_text(encoding="utf-8")
+
+            # W-10: Strictly derived counts in markdown
+            self.assertIn(f"| **Defect Ledger** | Total Findings | {expected_total} |", content)
+            self.assertIn(f"| **Defect Remediation** | Fixed / Open | {expected_fixed} / {expected_open} |", content)
+            self.assertIn(f"Audit status tracks {expected_total} findings across Mandates v3, v4, and v5. {expected_fixed} findings stand verified and remediated; {expected_open} findings are currently open", content)
+
+            # W-14: Credential hygiene advisory notice present
+            self.assertIn("## 4. Credential Hygiene Advisory (W-14)", content)
+            self.assertIn("rotate", content.lower())
+            self.assertIn("api key", content.lower())
+
 
 if __name__ == "__main__":
     unittest.main()

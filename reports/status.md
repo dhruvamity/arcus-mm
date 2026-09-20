@@ -1,7 +1,7 @@
 # Arcus MM — Active System & Verification Status
 
-**Generated At:** `2026-09-20T19:49:55Z`  
-**Git Commit:** `49af762`  
+**Generated At:** `2026-09-20T20:26:30Z`  
+**Git Commit:** `6082010`  
 **Headline Status:** `INCONCLUSIVE — no strategy validated`  
 
 ## 1. Governance & Operating Constraints
@@ -27,9 +27,9 @@
 | Subsystem | Metric | Current Value | Specification / Health |
 |---|---|---|---|
 | **Defect Ledger** | Total Findings | 49 | V-01..V-35 (35) + W-01..W-14 (14) |
-| **Defect Remediation** | Fixed / Open | 38 / 11 | Verified via `scripts/generate_audit_report.py` |
-| **Recorder PID 11661** | Uptime | 28.0 hours (100,836 s) | Status: ACTIVE / HEALTHY |
-| **Data Ingestion** | Recorded Messages | 35,912,498 frames | Free Disk: 151.9 GB |
+| **Defect Remediation** | Fixed / Open | 48 / 1 | Verified via `scripts/generate_audit_report.py` |
+| **Recorder PID 11661** | Uptime | 28.6 hours (103,031 s) | Status: ACTIVE / HEALTHY |
+| **Data Ingestion** | Recorded Messages | 36,660,963 frames | Free Disk: 150.6 GB |
 | **Wire Latency** | REST /v1/time p50 | 173.99 ms | Status: `PROVISIONAL` |
 
 ## 4. Credential Hygiene Advisory (W-14)
@@ -41,4 +41,4 @@
 
 ## 5. Key Takeaway
 
-Audit status tracks 49 findings across Mandates v3, v4, and v5. 38 findings stand verified and remediated; 11 findings are currently open for remediation under Mandate v5 Workstream A. Live execution is operating under PRE-FIX status with zero real orders placed. Tape recorder PID 11661 remains continuously active.
+Audit status tracks 49 findings across Mandates v3, v4, and v5. 48 findings stand verified and remediated; 1 findings are currently open for remediation under Mandate v5 Workstream A. Live execution is operating under PRE-FIX status with zero real orders placed. Tape recorder PID 11661 remains continuously active.

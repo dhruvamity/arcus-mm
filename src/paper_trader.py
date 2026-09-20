@@ -38,7 +38,7 @@ from src.strategies.adaptive_mm import AdaptiveMicrostructureStrategy
 from src.strategies.fixed_spread import FixedSpreadStrategy
 from src.strategies.volatility_clock import VolatilityClockStrategy
 from src.strategies.baselines import DoNothingStrategy, RandomSideQuotingStrategy
-from src.session_calendar import classify_regime
+from src.session_calendar import classify_regime, classify_rth_capture_tag
 from src.utils import now_ns
 
 logger = logging.getLogger("paper_trader")
@@ -267,6 +267,8 @@ class ArcusLivePaperTrader:
         """Logs simulated fills to disk and tracks physical match deduplication."""
         self.session_fills_count += len(fills)
         for f in fills:
+            if "rth_tag" not in f:
+                f["rth_tag"] = classify_rth_capture_tag(int(f.get("ts_ns", 0)))
             match_key = f"{f.get('market')}:{f.get('strategy_id')}:{f.get('ts_ns')}:{f.get('side')}:{f.get('price')}"
             self.session_unique_matches.add(match_key)
         if self._fills_file:

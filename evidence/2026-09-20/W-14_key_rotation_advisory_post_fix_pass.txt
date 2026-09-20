@@ -1,0 +1,10 @@
+=== POST-FIX PASSING DEMONSTRATION FOR W-14 ===
+Command: .venv/bin/python -m unittest tests/test_report_provenance.py -k test_w10
+Target Test: TestReportProvenance.test_w10_w14_status_report_ledger_counts_and_hygiene_advisory
+
+Generated status report: /var/folders/33/6hb_7rkd3v74jmphkh8b96480000gn/T/tmpte_x8b9i/status.md
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.014s
+
+OK

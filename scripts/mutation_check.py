@@ -608,6 +608,62 @@ def test_mutation_24_tautological_metric_regression() -> MutationResult:
         WalkForwardValidator.compute_daily_net_equity_change = orig_func
 
 
+def test_mutation_25_hardcoded_status_ledger_counts() -> MutationResult:
+    """MUT-25: Hardcodes defect finding counts in generate_status_report.py (W-10 regression)."""
+    import scripts.generate_status_report as gsr
+    orig_func = gsr.generate_status_markdown
+
+    def mutated_generate_status_markdown(output_path):
+        orig_func(output_path)
+        content = output_path.read_text(encoding="utf-8")
+        # BUG: Re-introduces hardcoded 34 count discrepancy
+        mutated_content = content.replace("Total Findings | 49", "Total Findings | 34")
+        output_path.write_text(mutated_content, encoding="utf-8")
+
+    gsr.generate_status_markdown = mutated_generate_status_markdown
+    try:
+        from tests.test_report_provenance import TestReportProvenance
+        failed, msg = run_targeted_test(TestReportProvenance, "test_w10_w14_status_report_ledger_counts_and_hygiene_advisory")
+        return MutationResult(
+            "MUT-25",
+            "Hardcoded Ledger Counts",
+            "TestReportProvenance.test_w10_w14_status_report_ledger_counts_and_hygiene_advisory",
+            "Hardcodes status report defect counts (e.g. 34 instead of programmatically derived 49), causing ledger discrepancies",
+            failed,
+            msg,
+        )
+    finally:
+        gsr.generate_status_markdown = orig_func
+
+
+def test_mutation_26_rth_capture_tag_conflation() -> MutationResult:
+    """MUT-26: Conflates PRE window into RTH in classify_rth_capture_tag (W-11 regression)."""
+    import src.session_calendar as sc
+    orig_func = sc.classify_rth_capture_tag
+
+    def mutated_classify_rth_capture_tag(ts_ns: int) -> str:
+        tag = orig_func(ts_ns)
+        # BUG: Conflates PRE buffer into RTH statistic
+        if tag == "PRE":
+            return "RTH"
+        return tag
+
+    sc.classify_rth_capture_tag = mutated_classify_rth_capture_tag
+    try:
+        from tests.test_calendar_regimes import TestCalendarRegimes
+        failed, msg = run_targeted_test(TestCalendarRegimes, "test_w11_rth_capture_tagging_and_separation")
+        return MutationResult(
+            "MUT-26",
+            "RTH Tag Conflation",
+            "TestCalendarRegimes.test_w11_rth_capture_tagging_and_separation",
+            "Conflates PRE (13:00-13:30) buffer fills into RTH statistic, violating strict RTH session definition",
+            failed,
+            msg,
+        )
+    finally:
+        sc.classify_rth_capture_tag = orig_func
+
+
 def main():
     mutations: List[Callable[[], MutationResult]] = [
         test_mutation_1_invert_queue,
@@ -634,6 +690,8 @@ def main():
         test_mutation_22_latency_uncalibrated_grid,
         test_mutation_23_margin_liquidation_bypass,
         test_mutation_24_tautological_metric_regression,
+        test_mutation_25_hardcoded_status_ledger_counts,
+        test_mutation_26_rth_capture_tag_conflation,
     ]
 
     print("=" * 80)
