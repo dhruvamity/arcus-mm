@@ -38,7 +38,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
-from src.backtester import ArcusEventBacktester, BacktestRunResult
+from src.sim.engine import ArcusEventBacktester, BacktestRunResult
 from src.models.fill import FillModelType
 from src.models.latency import LatencyConfig
 from src.strategies.base import BaseMarketMakingStrategy

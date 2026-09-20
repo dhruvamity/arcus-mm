@@ -10,7 +10,7 @@ Fulfills Mandate Sections 22, 38, 40, 43, 44 & 45:
 import unittest
 from pathlib import Path
 from src.walk_forward import WalkForwardValidator
-from src.backtester import BacktestRunResult
+from src.sim.engine import BacktestRunResult
 
 
 class TestReportProvenance(unittest.TestCase):

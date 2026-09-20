@@ -15,7 +15,7 @@ import pandas as pd
 from src.walk_forward import WalkForwardValidator
 from src.strategies.baselines import DoNothingStrategy, RandomSideQuotingStrategy
 from src.models.fill import FillModelType
-from src.backtester import ArcusEventBacktester
+from src.sim.engine import ArcusEventBacktester
 
 
 class TestWalkForwardProtocol(unittest.TestCase):

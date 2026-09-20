@@ -24,7 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.session_calendar import classify_regime
 from src.utils import now_ns
-from src.backtester import ArcusEventBacktester
+from src.sim.engine import ArcusEventBacktester
 from src.models.fill import FillModelType
 from src.models.latency import LatencyConfig
 from src.strategies.fixed_spread import FixedSpreadStrategy

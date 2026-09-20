@@ -58,3 +58,10 @@ recorder_heartbeat.json
 FULL_REPO_BUNDLE.md
 repo_bundle.md
 *.bundle.md
+
+# Runtime reports and data (Mandate v3 Section 16)
+reports/recorder_health/
+reports/generated/
+data/shadow/
+data/raw_v3/
+

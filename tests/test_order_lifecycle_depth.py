@@ -17,7 +17,7 @@ from src.models.fill import FillModelType, SimulatedQueueOrder, OrderStatus
 from src.models.latency import LatencyConfig
 from src.models.pnl import PnLAttributionEngine
 from src.strategies.fixed_spread import FixedSpreadStrategy
-from src.backtester import ArcusEventBacktester
+from src.sim.engine import ArcusEventBacktester
 
 
 class TestOrderLifecycleDepth(unittest.TestCase):

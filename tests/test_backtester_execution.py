@@ -5,7 +5,7 @@ from __future__ import annotations
 import unittest
 import pandas as pd
 
-from src.backtester import ArcusEventBacktester
+from src.sim.engine import ArcusEventBacktester
 from src.models.fill import FillModelType
 from src.models.rate_limit import ArcusRateLimitSimulator
 from src.strategies.fixed_spread import FixedSpreadStrategy
