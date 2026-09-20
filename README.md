@@ -20,7 +20,7 @@ arcus-mm/
 │   └── venue_verified.yaml         # Verified venue constraints, fees, speed bumps, off-hours rules
 ├── src/
 │   ├── auth.py                     # Ed25519 cryptographic signing (Scheme 1 & 2)
-│   ├── calendar.py                 # Timezone-aware regime classifier (US-RTH, OPEN_30, MON_GAP)
+│   ├── session_calendar.py         # Timezone-aware regime classifier (US-RTH, OPEN_30, MON_GAP)
 │   ├── config.py                   # Pydantic environment configuration & safety locks
 │   ├── ws_client.py                # High-resilience WebSocket client with heartbeat & reconnect
 │   ├── rest_client.py              # REST API client with IP rate-limit bucket tracking
@@ -155,6 +155,15 @@ python3 scripts/test_replay_parity.py
 1. **Zero Real Mainnet Orders**: Hardcoded mainnet order-submission locks are active. The framework exclusively performs public read-only streaming and local paper execution.
 2. **Report Integrity**: Non-negotiable Rule 3 requires that every prose metric in research reports traces directly to an underlying computed table cell validated by `scripts/verify_report.py`.
 3. **Regime Stratification**: Weekend data and weekday US-RTH sessions are treated as strictly distinct regimes and are never pooled into misleading headline numbers.
+
+---
+
+## Secrets Policy & Key Management
+
+1. **Never Commit Secrets**: Never commit `.env`, `.pem`, `.key`, or any sensitive credentials to git. The `.gitignore` strictly excludes these.
+2. **Never Share Bundles Containing Secrets**: Always generate bundles using `python scripts/generate_repo_bundle.py`, which validates against `git ls-files`, strictly ignores `.env*` (except `.env.example`), and runs an automated AST/regex secret scan prior to generation.
+3. **Immediate Rotation on Exposure**: If credentials ever appear in untrusted environments or unredacted files, immediately revoke and rotate API keys via the Arcus console.
+4. **Secret Scanner in CI**: Run `python scripts/secret_scan.py` to inspect tracked files. CI fails automatically if any potential private keys, API secrets, or unmocked wallet addresses are detected.
 
 ---
 

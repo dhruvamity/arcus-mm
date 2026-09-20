@@ -1,56 +1,64 @@
 #!/usr/bin/env python3
 """Repository Bundler for Arcus MM Quantitative Trading Platform.
+Fulfills Mandate v3 Section 6.
 
-Combines the complete contents of all repository files into a single, comprehensive
-local Markdown document (FULL_REPO_BUNDLE.md).
-
-Designed for ingestion by downstream coding agents, LLM contexts, or offline inspection.
-Enforces that this output file is strictly ignored by git and never pushed to remote.
-Scans and sanitizes any private credentials, tokens, or personal identifiers.
+Rules:
+1. Walks git ls-files only (never the filesystem).
+2. Explicitly excludes .env* except .env.example.
+3. Aborts if secret_scan returns non-zero.
+4. Prints summary table: included files, excluded files, byte count.
+5. Bundle header generated from scan results, never hand-written.
 """
+from __future__ import annotations
 
-import os
-import re
-import sys
 import datetime
+import os
 import subprocess
+import sys
 from pathlib import Path
-from typing import List, Dict, Tuple, Any
+from typing import Any
 
-# Sensitive patterns that must never be bundled
-SENSITIVE_PATTERNS = [
-    (re.compile(r"ghp_[a-zA-Z0-9]{30,}", re.IGNORECASE), "[REDACTED_GITHUB_TOKEN]"),
-    (re.compile(r"-----BEGIN [A-Z ]+PRIVATE KEY-----[\s\S]+?-----END [A-Z ]+PRIVATE KEY-----"), "[REDACTED_PRIVATE_KEY]"),
-    (re.compile(r"[a-zA-Z0-9_.+-]+@amityonline\.com", re.IGNORECASE), "dev@arcus-mm.local"),
-]
+REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from scripts.secret_scan import scan_content
 
 
-def get_all_repo_files(repo_root: Path) -> List[str]:
-    """Retrieves all tracked git files plus untracked source/test/config files in sorted order."""
-    tracked: List[str] = []
+def get_git_tracked_files(repo_root: Path) -> list[str]:
+    """Retrieves strictly git-tracked files using `git ls-files`."""
     try:
         output = subprocess.check_output(
-            ["git", "ls-files"], cwd=repo_root, universal_newlines=True
+            ["git", "ls-files"], cwd=repo_root, text=True
         )
-        tracked = [line.strip() for line in output.splitlines() if line.strip()]
+        return sorted([line.strip() for line in output.splitlines() if line.strip()])
     except Exception as e:
-        print(f"Warning: git ls-files error: {e}")
+        print(f"Error executing git ls-files: {e}", file=sys.stderr)
+        sys.exit(1)
 
-    # Also check if any untracked source files exist, excluding data/raw, .git, venv, pycache
-    all_files = set(tracked)
-    for root, dirs, filenames in os.walk(repo_root):
-        dirs[:] = [d for d in dirs if d not in {".git", "__pycache__", "venv", ".venv", "data"}]
-        for f in filenames:
-            if f in {"FULL_REPO_BUNDLE.md", ".DS_Store"} or f.endswith(".bundle.md"):
-                continue
-            rel = os.path.relpath(os.path.join(root, f), repo_root)
-            all_files.add(rel)
 
-    return sorted(list(all_files))
+def is_excluded(rel_path: str) -> tuple[bool, str]:
+    """Returns (is_excluded, reason)."""
+    p = Path(rel_path)
+    name = p.name
+
+    if name.startswith(".env") and name != ".env.example":
+        return True, "matches .env* exclusion rule"
+    if name.endswith(".pem") or name.endswith(".key"):
+        return True, "matches *.pem / *.key exclusion rule"
+    if name.endswith(".parquet"):
+        return True, "matches *.parquet exclusion rule"
+    if rel_path.startswith("data/") or rel_path.startswith("data\\"):
+        return True, "matches data/** exclusion rule"
+    if name in {"FULL_REPO_BUNDLE.md", ".DS_Store"} or name.endswith(".bundle.md"):
+        return True, "bundle artifact / OS metadata"
+    if name == ".gitkeep":
+        return True, "gitkeep placeholder"
+
+    return False, ""
 
 
 def detect_language(file_path: str) -> str:
-    """Detects markdown code block syntax language tag based on file extension."""
     ext = os.path.splitext(file_path)[1].lower()
     mapping = {
         ".py": "python",
@@ -71,7 +79,6 @@ def detect_language(file_path: str) -> str:
 
 
 def determine_fence(content: str) -> str:
-    """Determines safe backtick fence length to avoid escaping issues with nested code blocks."""
     max_consecutive = 0
     curr = 0
     for char in content:
@@ -85,16 +92,7 @@ def determine_fence(content: str) -> str:
     return "`" * fence_len
 
 
-def sanitize_content(content: str) -> str:
-    """Sanitizes content to strip any tokens, keys, or personal identifiers."""
-    sanitized = content
-    for pattern, replacement in SENSITIVE_PATTERNS:
-        sanitized = pattern.sub(replacement, sanitized)
-    return sanitized
-
-
 def categorize_file(path_str: str) -> str:
-    """Categorizes files for structured table of contents."""
     if path_str.startswith("src/exec/"):
         return "Execution Stack Plumbing (`src/exec/`)"
     elif path_str.startswith("src/sim/"):
@@ -125,39 +123,56 @@ def categorize_file(path_str: str) -> str:
         return "Root Project & Setup Files"
 
 
-def generate_bundle(repo_root: Path, output_file: Path):
-    """Deletes existing bundle, scans repository, and generates fresh FULL_REPO_BUNDLE.md."""
-    # 1. Fully delete existing bundle if present
+def generate_bundle(repo_root: Path, output_file: Path) -> None:
+    tracked_files = get_git_tracked_files(repo_root)
+
+    included_files: list[str] = []
+    excluded_files: list[tuple[str, str]] = []
+
+    for f in tracked_files:
+        excluded, reason = is_excluded(f)
+        if excluded:
+            excluded_files.append((f, reason))
+        else:
+            included_files.append(f)
+
+    # Pre-scan all included files with secret scanner
+    print("Running pre-bundle secret scan...")
+    all_findings = []
+    for rel_path in included_files:
+        full_path = repo_root / rel_path
+        if full_path.is_file():
+            try:
+                content = full_path.read_text(encoding="utf-8", errors="ignore")
+                findings = scan_content(rel_path, content)
+                all_findings.extend(findings)
+            except Exception as e:
+                print(f"Error scanning {rel_path}: {e}", file=sys.stderr)
+                sys.exit(1)
+
+    if all_findings:
+        print(f"ABORTING BUNDLE GENERATION: Secret scan detected {len(all_findings)} finding(s):", file=sys.stderr)
+        for fn, line, rule, val_len in all_findings:
+            print(f"  {fn}:{line} [{rule}] (value_length={val_len})", file=sys.stderr)
+        sys.exit(1)
+
+    print("Secret scan clean (0 findings). Proceeding with bundling.")
+
     if output_file.exists():
-        print(f"Deleting existing {output_file.name}...")
         output_file.unlink()
 
-    files = get_all_repo_files(repo_root)
-
-    # Exclude output file, gitkeeps, or binary/large cache files
-    files = [
-        f for f in files
-        if f != output_file.name
-        and not f.endswith(".bundle.md")
-        and f != "data/.gitkeep"
-        and not f.startswith("data/raw/")
-        and not f.startswith(".git/")
-    ]
-
-    file_metadata: List[Dict[str, Any]] = []
+    file_metadata: list[dict[str, Any]] = []
     total_lines = 0
     total_bytes = 0
 
-    # Collect stats and sanitize content
-    for rel_path in files:
+    for rel_path in included_files:
         full_path = repo_root / rel_path
         if not full_path.exists() or not full_path.is_file():
             continue
         try:
-            raw_content = full_path.read_text(encoding="utf-8", errors="replace")
-            clean_content = sanitize_content(raw_content)
-            lines = len(clean_content.splitlines())
-            size = len(clean_content.encode("utf-8"))
+            content = full_path.read_text(encoding="utf-8", errors="replace")
+            lines = len(content.splitlines())
+            size = len(content.encode("utf-8"))
             total_lines += lines
             total_bytes += size
             file_metadata.append({
@@ -166,44 +181,53 @@ def generate_bundle(repo_root: Path, output_file: Path):
                 "size": size,
                 "category": categorize_file(rel_path),
                 "lang": detect_language(rel_path),
-                "content": clean_content,
+                "content": content,
             })
         except Exception as e:
-            print(f"Warning: Could not read {rel_path}: {e}")
+            print(f"Warning: Could not read {rel_path}: {e}", file=sys.stderr)
 
-    print(f"Bundling {len(file_metadata)} files ({total_lines:,} lines, {total_bytes / (1024*1024):.2f} MB)...")
+    # Print summary table
+    print("\n--- BUNDLE SUMMARY ---")
+    print(f"Tracked files evaluated: {len(tracked_files)}")
+    print(f"Files included in bundle: {len(file_metadata)}")
+    print(f"Files excluded from bundle: {len(excluded_files)}")
+    print(f"Total content lines: {total_lines:,}")
+    print(f"Total content size: {total_bytes / 1024:.1f} KB ({total_bytes / (1024*1024):.2f} MB)")
+    if excluded_files:
+        print("\nExcluded files details:")
+        for ef, r in excluded_files:
+            print(f"  - {ef} ({r})")
+    print("----------------------\n")
 
-    now_iso = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now_utc = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
     # Generate document
     with open(output_file, "w", encoding="utf-8") as out:
-        out.write("# Arcus Market-Making Quantitative Platform — Complete Codebase Bundle\n\n")
+        out.write("# Arcus Market-Making Quantitative Platform — Codebase Bundle\n\n")
         out.write("> [!IMPORTANT]\n")
         out.write("> **LOCAL ONLY EXPORT BUNDLE — DO NOT COMMIT OR PUSH TO GITHUB**\n")
-        out.write("> This document concatenates the full repository source code and documentation.\n")
-        out.write("> Created for AI agents and local context windows that cannot pull git submodules or remote repositories.\n")
-        out.write("> All private tokens, credentials, and identifiers are strictly verified and absent.\n\n")
+        out.write("> Source: `git ls-files` tracked files only.\n")
+        out.write("> Secret Scan Status: 0 findings verified at build time.\n")
+        out.write(f"> Generated At: {now_utc}\n\n")
 
         out.write(f"- **Total Files:** {len(file_metadata)}\n")
-        out.write(f"- **Total Lines of Code / Documentation:** {total_lines:,}\n")
-        out.write(f"- **Total Repository Size:** {total_bytes / 1024:.1f} KB ({total_bytes / (1024*1024):.2f} MB)\n")
-        out.write(f"- **Generated At:** {now_iso}\n\n")
+        out.write(f"- **Total Lines:** {total_lines:,}\n")
+        out.write(f"- **Total Size:** {total_bytes / 1024:.1f} KB ({total_bytes / (1024*1024):.2f} MB)\n")
+        out.write(f"- **Excluded Files Count:** {len(excluded_files)}\n\n")
 
-        # Table of Contents
         out.write("## Table of Contents\n\n")
 
-        # Group by category
         categories = [
             "Root Project & Setup Files",
             "Core Platform Modules (`src/`)",
             "Execution Stack Plumbing (`src/exec/`)",
             "Simulation & Replay Engine (`src/sim/`)",
             "Market Making Strategies (`src/strategies/`)",
-            "Financial & Execution Models (`src/models/`)" ,
+            "Financial & Execution Models (`src/models/`)",
             "Operational & Analysis Runners (`scripts/`)",
             "Deterministic Test Suite (`tests/`)",
             "Venue Configurations (`configs/`)",
-            "Research Specifications & Ledgers (`research/`)",
+            "Research Specifications & Ledgers (`research/`)" ,
             "Research Reports & Health (`reports/`)",
             "Empirical Evidence Artifacts (`evidence/`)",
             "Mandate & Prompt History (`prompts/`)",
@@ -225,7 +249,7 @@ def generate_bundle(repo_root: Path, output_file: Path):
             out.write("\n")
 
         out.write("---\n\n")
-        out.write("## Full Repository Content (File by File)\n\n")
+        out.write("## Full Repository Content\n\n")
 
         for idx, f in enumerate(file_metadata, 1):
             p = f["path"]
@@ -246,10 +270,10 @@ def generate_bundle(repo_root: Path, output_file: Path):
             out.write(f"{fence}\n\n")
             out.write("---\n\n")
 
-    print(f"Successfully generated fresh {output_file.name} ({output_file.stat().st_size / (1024*1024):.2f} MB).")
+    print(f"Successfully generated {output_file.name} ({output_file.stat().st_size / (1024*1024):.2f} MB).")
 
 
-def main():
+def main() -> None:
     repo_root = Path(__file__).resolve().parent.parent
     output_file = repo_root / "FULL_REPO_BUNDLE.md"
     generate_bundle(repo_root, output_file)

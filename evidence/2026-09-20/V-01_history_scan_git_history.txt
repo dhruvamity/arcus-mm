@@ -1,0 +1,8 @@
+COMMAND: .venv/bin/python scripts/secret_scan.py --history 
+GIT_HEAD: 6bc350340b4b98e557c85e6ff6d0554ba2fc945e
+TIMESTAMP: 2026-09-20T09:21:53Z
+PYTHON_VERSION: Python 3.12.14
+EXIT_CODE: 0
+--- OUTPUT ---
+Scanning entire git history across all branches and commits...
+PASS: No secrets found (0 findings).
