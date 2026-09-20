@@ -1,6 +1,6 @@
 # Audit v3 Ledger — Ground Truth & Defect Remediation
 
-**Generated At:** `2026-09-20 18:31:47 UTC`  
+**Generated At:** `2026-09-20 18:36:14 UTC`  
 **Evaluation Scope:** All Findings (V-01 through V-32) from Mandate v3 (`prompts/2026-09-20_v3.md`)  
 **Commit Discrepancy Note:** Prior reports referenced commit hash `23a03f3` which does not exist on the remote GitHub repository. This occurred because the initial repository setup was committed and pushed via a squashed root commit (`0905008`), obliterating local scratch commit IDs. From this point forward, strict verifiable linear Git history is maintained with one commit per defect/milestone.  
 
@@ -44,6 +44,7 @@
 | **V-32** | `MINOR` | DOCS | Repo clutter and duplicates (~70 stale/duplicate files) | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/V-32_repo_cleanup_verified.txt`](evidence/2026-09-20/V-32_repo_cleanup_verified.txt) | [`tests/test_storage_manager.py`](tests/test_storage_manager.py) | `5010f91` |
 | **V-33** | `MINOR` | TESTS | Live paper trader tests non-hermetic without pre-existing data/raw snapshots | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/V-33_hermetic_live_paper_fixture.txt`](evidence/2026-09-20/V-33_hermetic_live_paper_fixture.txt) | [`tests/test_live_paper_trader.py`](tests/test_live_paper_trader.py) | `HEAD` |
 | **V-34** | `MAJOR` | METHODOLOGY | Primary paper session window (12:30-16:30 UTC) misses 4.5 of 6.5 NYSE RTH hours | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/V-34_rth_window_mismatch.txt`](evidence/2026-09-20/V-34_rth_window_mismatch.txt) | [`tests/test_calendar_regimes.py`](tests/test_calendar_regimes.py) | `HEAD` |
+| **V-35** | `MAJOR` | METHODOLOGY | Asset ranking rested solely on short-window weekend pilot tape without historical depth validation | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/V-35_deep_history_pull.txt`](evidence/2026-09-20/V-35_deep_history_pull.txt) | [`scripts/verify_report.py`](scripts/verify_report.py) | `HEAD` |
 
 ---
 
@@ -57,10 +58,10 @@ All referenced evidence and test suites are machine-validated to exist on disk:
 
 ## 3. Progress Metrics
 
-- **Total Findings Audited:** 34
-- **Confirmed Defects:** 34
+- **Total Findings Audited:** 35
+- **Confirmed Defects:** 35
 - **Refuted Defects:** 0
-- **Remediated (FIXED):** 34
+- **Remediated (FIXED):** 35
 - **In Progress:** 0
 - **Open:** 0
 

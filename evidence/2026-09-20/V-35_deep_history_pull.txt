@@ -1,0 +1,103 @@
+COMMAND: .venv/bin/python scripts/run_deep_history_screen.py --pages 2 --markets BTC-USD ETH-USD SOL-USD HYPE-USD ZEC-USD NEAR-USD LIT-USD UNI-USD XRP-USD AAVE-USD CASHCAT-USD SPY-USD QQQ-USD NVDA-USD AMD-USD SLV-USD GLD-USD GOOGL-USD SPCX-USD TSLA-USD 
+GIT_HEAD: d79ca59d5f8e1a1e4ea3d84f03dac27ecabc9bed
+TIMESTAMP: 2026-09-20T18:34:20Z
+PYTHON_VERSION: Python 3.12.14
+EXIT_CODE: 0
+--- OUTPUT ---
+2026-09-21 00:04:20,708 [INFO] Starting deep historical pull across 20 markets...
+2026-09-21 00:04:20,708 [INFO] [1/20] Pulling deep history for BTC-USD...
+2026-09-21 00:04:20,964 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=BTC-USD&timeframe=1h&to=1789929260708769 "HTTP/1.1 200 OK"
+2026-09-21 00:04:22,370 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=BTC-USD&timeframe=1h&to=1784530799999000 "HTTP/1.1 200 OK"
+2026-09-21 00:04:22,801 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/fundingRates?market=BTC-USD "HTTP/1.1 200 OK"
+2026-09-21 00:04:23,347 [INFO] [2/20] Pulling deep history for ETH-USD...
+2026-09-21 00:04:23,568 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=ETH-USD&timeframe=1h&to=1789929263348102 "HTTP/1.1 200 OK"
+2026-09-21 00:04:24,593 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=ETH-USD&timeframe=1h&to=1784530799999000 "HTTP/1.1 200 OK"
+2026-09-21 00:04:25,024 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/fundingRates?market=ETH-USD "HTTP/1.1 200 OK"
+2026-09-21 00:04:25,563 [INFO] [3/20] Pulling deep history for SOL-USD...
+2026-09-21 00:04:25,786 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=SOL-USD&timeframe=1h&to=1789929265563482 "HTTP/1.1 200 OK"
+2026-09-21 00:04:26,843 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=SOL-USD&timeframe=1h&to=1784530799999000 "HTTP/1.1 200 OK"
+2026-09-21 00:04:27,308 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/fundingRates?market=SOL-USD "HTTP/1.1 200 OK"
+2026-09-21 00:04:27,847 [INFO] [4/20] Pulling deep history for HYPE-USD...
+2026-09-21 00:04:28,059 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=HYPE-USD&timeframe=1h&to=1789929267847987 "HTTP/1.1 200 OK"
+2026-09-21 00:04:29,329 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=HYPE-USD&timeframe=1h&to=1784530799999000 "HTTP/1.1 200 OK"
+2026-09-21 00:04:29,759 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/fundingRates?market=HYPE-USD "HTTP/1.1 200 OK"
+2026-09-21 00:04:30,301 [INFO] [5/20] Pulling deep history for ZEC-USD...
+2026-09-21 00:04:30,544 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=ZEC-USD&timeframe=1h&to=1789929270301641 "HTTP/1.1 200 OK"
+2026-09-21 00:04:31,890 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=ZEC-USD&timeframe=1h&to=1784530799999000 "HTTP/1.1 200 OK"
+2026-09-21 00:04:32,353 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/fundingRates?market=ZEC-USD "HTTP/1.1 200 OK"
+2026-09-21 00:04:32,899 [INFO] [6/20] Pulling deep history for NEAR-USD...
+2026-09-21 00:04:33,103 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=NEAR-USD&timeframe=1h&to=1789929272900075 "HTTP/1.1 200 OK"
+2026-09-21 00:04:33,659 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=NEAR-USD&timeframe=1h&to=1784530799999000 "HTTP/1.1 200 OK"
+2026-09-21 00:04:34,084 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/fundingRates?market=NEAR-USD "HTTP/1.1 200 OK"
+2026-09-21 00:04:34,616 [INFO] [7/20] Pulling deep history for LIT-USD...
+2026-09-21 00:04:34,838 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=LIT-USD&timeframe=1h&to=1789929274616385 "HTTP/1.1 200 OK"
+2026-09-21 00:04:36,040 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=LIT-USD&timeframe=1h&to=1784530799999000 "HTTP/1.1 200 OK"
+2026-09-21 00:04:36,515 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/fundingRates?market=LIT-USD "HTTP/1.1 200 OK"
+2026-09-21 00:04:37,046 [INFO] [8/20] Pulling deep history for UNI-USD...
+2026-09-21 00:04:37,236 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=UNI-USD&timeframe=1h&to=1789929277046449 "HTTP/1.1 200 OK"
+2026-09-21 00:04:37,791 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=UNI-USD&timeframe=1h&to=1784530799999000 "HTTP/1.1 200 OK"
+2026-09-21 00:04:38,214 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/fundingRates?market=UNI-USD "HTTP/1.1 200 OK"
+2026-09-21 00:04:38,745 [INFO] [9/20] Pulling deep history for XRP-USD...
+2026-09-21 00:04:38,976 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=XRP-USD&timeframe=1h&to=1789929278745824 "HTTP/1.1 200 OK"
+2026-09-21 00:04:40,106 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=XRP-USD&timeframe=1h&to=1784530799999000 "HTTP/1.1 200 OK"
+2026-09-21 00:04:40,551 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/fundingRates?market=XRP-USD "HTTP/1.1 200 OK"
+2026-09-21 00:04:41,091 [INFO] [10/20] Pulling deep history for AAVE-USD...
+2026-09-21 00:04:41,295 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=AAVE-USD&timeframe=1h&to=1789929281091381 "HTTP/1.1 200 OK"
+2026-09-21 00:04:41,826 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=AAVE-USD&timeframe=1h&to=1784530799999000 "HTTP/1.1 200 OK"
+2026-09-21 00:04:42,261 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/fundingRates?market=AAVE-USD "HTTP/1.1 200 OK"
+2026-09-21 00:04:42,793 [INFO] [11/20] Pulling deep history for CASHCAT-USD...
+2026-09-21 00:04:43,020 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=CASHCAT-USD&timeframe=1h&to=1789929282793779 "HTTP/1.1 200 OK"
+2026-09-21 00:04:43,700 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=CASHCAT-USD&timeframe=1h&to=1784530799999000 "HTTP/1.1 200 OK"
+2026-09-21 00:04:43,876 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/fundingRates?market=CASHCAT-USD "HTTP/1.1 200 OK"
+2026-09-21 00:04:44,407 [INFO] [12/20] Pulling deep history for SPY-USD...
+2026-09-21 00:04:45,815 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=SPY-USD&timeframe=1h&to=1789929284407424 "HTTP/1.1 200 OK"
+2026-09-21 00:04:46,563 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=SPY-USD&timeframe=1h&to=1784530799999000 "HTTP/1.1 200 OK"
+2026-09-21 00:04:46,997 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/fundingRates?market=SPY-USD "HTTP/1.1 200 OK"
+2026-09-21 00:04:47,538 [INFO] [13/20] Pulling deep history for QQQ-USD...
+2026-09-21 00:04:49,356 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=QQQ-USD&timeframe=1h&to=1789929287538222 "HTTP/1.1 200 OK"
+2026-09-21 00:04:50,228 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=QQQ-USD&timeframe=1h&to=1784530799999000 "HTTP/1.1 200 OK"
+2026-09-21 00:04:50,672 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/fundingRates?market=QQQ-USD "HTTP/1.1 200 OK"
+2026-09-21 00:04:51,212 [INFO] [14/20] Pulling deep history for NVDA-USD...
+2026-09-21 00:04:52,894 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=NVDA-USD&timeframe=1h&to=1789929291212847 "HTTP/1.1 200 OK"
+2026-09-21 00:04:53,691 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=NVDA-USD&timeframe=1h&to=1784530799999000 "HTTP/1.1 200 OK"
+2026-09-21 00:04:54,126 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/fundingRates?market=NVDA-USD "HTTP/1.1 200 OK"
+2026-09-21 00:04:54,668 [INFO] [15/20] Pulling deep history for AMD-USD...
+2026-09-21 00:04:56,450 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=AMD-USD&timeframe=1h&to=1789929294668270 "HTTP/1.1 200 OK"
+2026-09-21 00:04:56,903 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=AMD-USD&timeframe=1h&to=1784530799999000 "HTTP/1.1 429 Too Many Requests"
+2026-09-21 00:04:56,903 [WARNING] Rate limited by ip on /v1/candles. Retry after 4000 ms.
+2026-09-21 00:04:56,903 [INFO] Rate limited on AMD-USD page 1, sleeping 4.0s before retry 1...
+2026-09-21 00:05:01,391 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=AMD-USD&timeframe=1h&to=1784530799999000 "HTTP/1.1 200 OK"
+2026-09-21 00:05:01,834 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/fundingRates?market=AMD-USD "HTTP/1.1 200 OK"
+2026-09-21 00:05:02,373 [INFO] [16/20] Pulling deep history for SLV-USD...
+2026-09-21 00:05:04,416 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=SLV-USD&timeframe=1h&to=1789929302373666 "HTTP/1.1 200 OK"
+2026-09-21 00:05:05,143 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=SLV-USD&timeframe=1h&to=1784530799999000 "HTTP/1.1 200 OK"
+2026-09-21 00:05:05,566 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/fundingRates?market=SLV-USD "HTTP/1.1 429 Too Many Requests"
+2026-09-21 00:05:05,567 [WARNING] Rate limited by ip on /v1/fundingRates. Retry after 4000 ms.
+2026-09-21 00:05:05,567 [INFO] Rate limited on funding for SLV-USD, sleeping 4.0s before retry 1...
+2026-09-21 00:05:09,739 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/fundingRates?market=SLV-USD "HTTP/1.1 200 OK"
+2026-09-21 00:05:10,279 [INFO] [17/20] Pulling deep history for GLD-USD...
+2026-09-21 00:05:12,330 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=GLD-USD&timeframe=1h&to=1789929310279779 "HTTP/1.1 200 OK"
+2026-09-21 00:05:12,786 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=GLD-USD&timeframe=1h&to=1784530799999000 "HTTP/1.1 429 Too Many Requests"
+2026-09-21 00:05:12,786 [WARNING] Rate limited by ip on /v1/candles. Retry after 4000 ms.
+2026-09-21 00:05:12,787 [INFO] Rate limited on GLD-USD page 1, sleeping 4.0s before retry 1...
+2026-09-21 00:05:17,293 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=GLD-USD&timeframe=1h&to=1784530799999000 "HTTP/1.1 200 OK"
+2026-09-21 00:05:17,726 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/fundingRates?market=GLD-USD "HTTP/1.1 200 OK"
+2026-09-21 00:05:18,266 [INFO] [18/20] Pulling deep history for GOOGL-USD...
+2026-09-21 00:05:20,049 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=GOOGL-USD&timeframe=1h&to=1789929318266607 "HTTP/1.1 200 OK"
+2026-09-21 00:05:20,768 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=GOOGL-USD&timeframe=1h&to=1784530799999000 "HTTP/1.1 200 OK"
+2026-09-21 00:05:21,202 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/fundingRates?market=GOOGL-USD "HTTP/1.1 200 OK"
+2026-09-21 00:05:21,731 [INFO] [19/20] Pulling deep history for SPCX-USD...
+2026-09-21 00:05:23,347 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=SPCX-USD&timeframe=1h&to=1789929321731309 "HTTP/1.1 200 OK"
+2026-09-21 00:05:23,769 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=SPCX-USD&timeframe=1h&to=1784530799999000 "HTTP/1.1 429 Too Many Requests"
+2026-09-21 00:05:23,770 [WARNING] Rate limited by ip on /v1/candles. Retry after 5000 ms.
+2026-09-21 00:05:23,770 [INFO] Rate limited on SPCX-USD page 1, sleeping 4.0s before retry 1...
+2026-09-21 00:05:28,475 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=SPCX-USD&timeframe=1h&to=1784530799999000 "HTTP/1.1 200 OK"
+2026-09-21 00:05:28,634 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/fundingRates?market=SPCX-USD "HTTP/1.1 429 Too Many Requests"
+2026-09-21 00:05:28,635 [WARNING] Rate limited by ip on /v1/fundingRates. Retry after 1000 ms.
+2026-09-21 00:05:28,635 [INFO] Rate limited on funding for SPCX-USD, sleeping 4.0s before retry 1...
+2026-09-21 00:05:32,805 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/fundingRates?market=SPCX-USD "HTTP/1.1 200 OK"
+2026-09-21 00:05:33,336 [INFO] [20/20] Pulling deep history for TSLA-USD...
+2026-09-21 00:05:34,775 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=TSLA-USD&timeframe=1h&to=1789929333336972 "HTTP/1.1 200 OK"
+2026-09-21 00:05:35,951 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/candles?market=TSLA-USD&timeframe=1h&to=1784530799999000 "HTTP/1.1 200 OK"
+2026-09-21 00:05:36,376 [INFO] HTTP Request: GET https://api.arcus.xyz/v1/fundingRates?market=TSLA-USD "HTTP/1.1 200 OK"
+2026-09-21 00:05:36,911 [INFO] Generated deep history report at: /Users/dhruv/Desktop/CodeWithD/arcus-mm/research/deep_history_screen.md

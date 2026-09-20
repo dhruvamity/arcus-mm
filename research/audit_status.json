@@ -406,5 +406,17 @@
     "test_file": "tests/test_calendar_regimes.py",
     "commit_hash": "HEAD",
     "notes": "Mandate v4 §1 confirms RTH mismatch. Fixed by splitting into immediate 24/7 crypto execution and expanding RTH paper session to 13:00-20:30 UTC spanning full market open to close."
+  },
+  {
+    "id": "V-35",
+    "severity": "MAJOR",
+    "category": "METHODOLOGY",
+    "summary": "Asset ranking rested solely on short-window weekend pilot tape without historical depth validation",
+    "reproduction_status": "CONFIRMED",
+    "remediation_status": "FIXED",
+    "evidence_file": "evidence/2026-09-20/V-35_deep_history_pull.txt",
+    "test_file": "scripts/verify_report.py",
+    "commit_hash": "HEAD",
+    "notes": "Mandate v4 §2 WS-L deep historical pull paged 1h candles backward across 20 markets discovering up to 305 days retention depth. Discovered severe activity depression (up to 71x) on weekend equity/commodity perps, justifying 13:00-20:30 UTC RTH window, while crypto perps confirmed stable regime."
   }
 ]
