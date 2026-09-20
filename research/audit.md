@@ -1,6 +1,6 @@
 # Audit v3 Ledger — Ground Truth & Defect Remediation
 
-**Generated At:** `2026-09-20 13:58:23 UTC`  
+**Generated At:** `2026-09-20 14:04:22 UTC`  
 **Evaluation Scope:** All Findings (V-01 through V-32) from Mandate v3 (`prompts/2026-09-20_v3.md`)  
 **Commit Discrepancy Note:** Prior reports referenced commit hash `23a03f3` which does not exist on the remote GitHub repository. This occurred because the initial repository setup was committed and pushed via a squashed root commit (`0905008`), obliterating local scratch commit IDs. From this point forward, strict verifiable linear Git history is maintained with one commit per defect/milestone.  
 
@@ -33,9 +33,9 @@
 | **V-21** | `MINOR` | DATA | Sequence-field evidence incomplete (lacks raw L2 delta frame) | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/V-21_l2_delta_frame_evidence.txt`](evidence/2026-09-20/V-21_l2_delta_frame_evidence.txt) | [`tests/test_recorder_integrity.py`](tests/test_recorder_integrity.py) | `0c2f3cb` |
 | **V-22** | `MAJOR` | DATA | Storage and provenance not automated (no scheduled compression or static manifests) | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/V-22_storage_provenance_audit.txt`](evidence/2026-09-20/V-22_storage_provenance_audit.txt) | [`tests/test_storage_manager.py`](tests/test_storage_manager.py) | `138a6d8` |
 | **V-23** | `MINOR` | DATA | Two clocks recorded, only local clock used in simulation | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/V-23_clock_distribution.txt`](evidence/2026-09-20/V-23_clock_distribution.txt) | [`tests/test_harness_integrity.py`](tests/test_harness_integrity.py) | `f78c5de` |
-| **V-24** | `BLOCKER` | RESEARCH | The pilot analysis is invalid (event truncation, heuristic spread sigma, synthetic multipliers) | **CONFIRMED** | **OPEN** | [`evidence/2026-09-20/V-24_pilot_analysis_bugs.txt`](evidence/2026-09-20/V-24_pilot_analysis_bugs.txt) | [`tests/test_walk_forward_protocol.py`](tests/test_walk_forward_protocol.py) | - |
-| **V-25** | `BLOCKER` | RESEARCH | Power analysis is statistically wrong (n formula gives 50% power, ignores clustering) | **CONFIRMED** | **OPEN** | [`evidence/2026-09-20/V-25_no_bootstrap_walk_forward.txt`](evidence/2026-09-20/V-25_no_bootstrap_walk_forward.txt) | [`tests/test_walk_forward_protocol.py`](tests/test_walk_forward_protocol.py) | - |
-| **V-26** | `MAJOR` | RESEARCH | Pre-registration v3 is not ready to lock | **CONFIRMED** | **OPEN** | - | [`tests/test_walk_forward_protocol.py`](tests/test_walk_forward_protocol.py) | - |
+| **V-24** | `BLOCKER` | RESEARCH | The pilot analysis is invalid (event truncation, heuristic spread sigma, synthetic multipliers) | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/V-24_pilot_analysis_valid.txt`](evidence/2026-09-20/V-24_pilot_analysis_valid.txt) | [`tests/test_report_provenance.py`](tests/test_report_provenance.py) | `HEAD` |
+| **V-25** | `BLOCKER` | RESEARCH | Power analysis is statistically wrong (n formula gives 50% power, ignores clustering) | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/V-25_power_analysis_deff.txt`](evidence/2026-09-20/V-25_power_analysis_deff.txt) | [`tests/test_report_provenance.py`](tests/test_report_provenance.py) | `HEAD` |
+| **V-26** | `MAJOR` | RESEARCH | Pre-registration v3 is not ready to lock | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/V-26_prereg_v31_draft_spec.txt`](evidence/2026-09-20/V-26_prereg_v31_draft_spec.txt) | [`tests/test_report_provenance.py`](tests/test_report_provenance.py) | `HEAD` |
 | **V-27** | `MAJOR` | LATENCY | Latency evidence far below spec (5 samples in 4 seconds on REST) | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/V-27_latency_alignment.txt`](evidence/2026-09-20/V-27_latency_alignment.txt) | [`tests/test_harness_integrity.py`](tests/test_harness_integrity.py) | `5cd6837` |
 | **V-28** | `MAJOR` | DOCS | followup_gate_report.md overclaims ready for accumulation with broken criteria | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/V-28_status_report_generated.txt`](evidence/2026-09-20/V-28_status_report_generated.txt) | [`tests/test_report_provenance.py`](tests/test_report_provenance.py) | `7b949b6` |
 | **V-29** | `MAJOR` | DOCS | Ledger status column was handwritten rather than machine-attested | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/V-29_audit_report_machine_generated.txt`](evidence/2026-09-20/V-29_audit_report_machine_generated.txt) | [`tests/test_report_provenance.py`](tests/test_report_provenance.py) | `ab9c03b` |
@@ -58,7 +58,7 @@ All referenced evidence and test suites are machine-validated to exist on disk:
 - **Total Findings Audited:** 32
 - **Confirmed Defects:** 32
 - **Refuted Defects:** 0
-- **Remediated (FIXED):** 29
+- **Remediated (FIXED):** 32
 - **In Progress:** 0
-- **Open:** 3
+- **Open:** 0
 

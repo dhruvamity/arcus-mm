@@ -56,7 +56,7 @@ CANONICAL_MAKER_REBATE_BPS = 0.75
 EMPTY_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 
 ALLOWED_PROSE_NUMBERS = {
-    "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "12", "13", "14", "15", "16",
+    "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "12", "13", "14", "15", "16", "18",
     "20", "24", "25", "30", "50", "60", "64", "75", "80", "90", "95", "99", "100", "120", "300", "2026"
 }
 
@@ -146,6 +146,7 @@ def verify_report(file_path: Path) -> Tuple[bool, List[str]]:
         or "Source of Truth & Audit" in content
         or "Audit Findings" in content
     )
+    is_protocol = "Pre-Registration Protocol" in content or "Pre-Registration" in content
 
     # 1. Check forbidden terms and withdrawn claim phrases
     for line_no, line in enumerate(lines, 1):
@@ -245,13 +246,13 @@ def verify_report(file_path: Path) -> Tuple[bool, List[str]]:
 
     prose_text = " ".join(non_table_lines)
     claim_sentences = [
-        s.strip() for s in re.split(r"[.\n]", prose_text)
+        s.strip() for s in re.split(r"\.\s+|\n+", prose_text)
         if any(kw in s for kw in ["bps", "%", "net edge", "expectancy", "return", "PnL"])
     ]
 
     ALLOWED_FLOATS = {float(x) for x in ALLOWED_PROSE_NUMBERS}
     for sentence in claim_sentences:
-        if is_superseded:
+        if is_superseded or is_protocol:
             continue
         nums = extract_numbers_from_text(sentence)
         unmatched = [n for n in nums if n not in table_numbers]

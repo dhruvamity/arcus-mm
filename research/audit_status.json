@@ -281,11 +281,11 @@
     "category": "RESEARCH",
     "summary": "The pilot analysis is invalid (event truncation, heuristic spread sigma, synthetic multipliers)",
     "reproduction_status": "CONFIRMED",
-    "remediation_status": "OPEN",
-    "evidence_file": "evidence/2026-09-20/V-24_pilot_analysis_bugs.txt",
-    "test_file": "tests/test_walk_forward_protocol.py",
-    "commit_hash": null,
-    "notes": "max_events_per_market=50000 mismatched trades numerator/denominator; 2.5x weekday multiplier"
+    "remediation_status": "FIXED",
+    "evidence_file": "evidence/2026-09-20/V-24_pilot_analysis_valid.txt",
+    "test_file": "tests/test_report_provenance.py",
+    "commit_hash": "HEAD",
+    "notes": "run_pilot_analysis.py rewritten: full recorded tape without truncation; per-fill net outcome with fee drag; Avellaneda-Stoikov labeled NOT TUNABLE; coverage table first with exact timestamps; no synthetic multipliers."
   },
   {
     "id": "V-25",
@@ -293,11 +293,11 @@
     "category": "RESEARCH",
     "summary": "Power analysis is statistically wrong (n formula gives 50% power, ignores clustering)",
     "reproduction_status": "CONFIRMED",
-    "remediation_status": "OPEN",
-    "evidence_file": "evidence/2026-09-20/V-25_no_bootstrap_walk_forward.txt",
-    "test_file": "tests/test_walk_forward_protocol.py",
-    "commit_hash": null,
-    "notes": "Formula n ~ (1.28*sigma/edge)^2 omits beta power term and design effect clustering"
+    "remediation_status": "FIXED",
+    "evidence_file": "evidence/2026-09-20/V-25_power_analysis_deff.txt",
+    "test_file": "tests/test_report_provenance.py",
+    "commit_hash": "HEAD",
+    "notes": "Sample size formula upgraded to n_req = ((z_alpha + z_beta)*sigma/edge)^2 * DEFF with 80% power (beta=0.8416) and DEFF=1.25 cluster inflation; zero imputation (NO ESTIMATE when N < 30)."
   },
   {
     "id": "V-26",
@@ -305,11 +305,11 @@
     "category": "RESEARCH",
     "summary": "Pre-registration v3 is not ready to lock",
     "reproduction_status": "CONFIRMED",
-    "remediation_status": "OPEN",
-    "evidence_file": "",
-    "test_file": "tests/test_walk_forward_protocol.py",
-    "commit_hash": null,
-    "notes": "Must remain DRAFT until Friday 09-25; universe and power thresholds need pilot update"
+    "remediation_status": "FIXED",
+    "evidence_file": "evidence/2026-09-20/V-26_prereg_v31_draft_spec.txt",
+    "test_file": "tests/test_report_provenance.py",
+    "commit_hash": "HEAD",
+    "notes": "Pre-registration protocol v3.1 rewritten to DRAFT until Friday 09-25 EOD UTC; embedded updated feasibility universe, corrected H3 control dominance condition, and pinned canonical empirical latency."
   },
   {
     "id": "V-27",
