@@ -509,6 +509,61 @@ class TestSimEngine(unittest.TestCase):
         eng.on_event(SimEvent(SimEventType.BBO, t_drip, self.market, {"bid_price": 100.0, "ask_price": 100.2, "bid_size": 1.0, "ask_size": 1.0}))
         self.assertGreater(len(ctx.in_flight_orders), 0)
 
+    def test_19_w01_min_size_bids_not_rejected_on_min_clip_markets(self):
+        """W-01: Verifies minimum-size bids are not silently rejected on min-size-bound markets.
+
+        On BTC: mid = 81000.05, tick = 0.1, step/min size = 0.0001, min notional = 5.0.
+        Both BID (0.0001 @ 80996.0 = $8.0996) and ASK (0.0001 @ 81004.1 = $8.10041) must be RESTING.
+        Also verifies HYPE-like and ZEC-like market specifications.
+        """
+        specs = [
+            ("BTC-USD", 81000.05, 0.1, 0.0001, 0.0001, 5.0, 10.0),
+            ("HYPE-USD", 25.0, 0.001, 0.0001, 0.1, 5.0, 5.0),
+            ("ZEC-USD", 45.0, 0.001, 0.00001, 0.001, 5.0, 5.0),
+        ]
+        for mkt, mid, tick_sz, step_sz, min_sz, min_notional, clip_notional in specs:
+            strat = FixedSpreadStrategy(
+                market=mkt,
+                tick_size=tick_sz,
+                step_size=step_sz,
+                spread_bps=1.0,
+                clip_notional=clip_notional,
+                min_notional=min_notional,
+                min_order_size=min_sz,
+            )
+            engine = SimEngine(
+                markets={
+                    mkt: {
+                        "tick_size": tick_sz,
+                        "step_size": step_sz,
+                        "min_order_size": min_sz,
+                        "min_notional": min_notional,
+                    }
+                },
+                strategies={"strat": strat},
+                fill_models=[FillModelType.MODEL_B_MODERATE],
+                latency_config=LatencyConfig(order_entry_latency_ms=10.0, cancel_latency_ms=10.0),
+            )
+            t0 = 1_000_000_000
+            half = tick_sz * 2
+            engine.on_event(SimEvent(SimEventType.BBO, t0, mkt, {
+                "bid_price": mid - half,
+                "ask_price": mid + half,
+                "bid_size": min_sz * 10,
+                "ask_size": min_sz * 10,
+            }))
+            # Advance clock past entry latency (20ms > 10ms)
+            engine.on_event(SimEvent(SimEventType.CLOCK_TICK, t0 + int(20e6), mkt, {}))
+
+            ctx = engine.contexts["strat"]
+            bid_order = ctx.active_bid[FillModelType.MODEL_B_MODERATE]
+            ask_order = ctx.active_ask[FillModelType.MODEL_B_MODERATE]
+
+            self.assertIsNotNone(bid_order, f"[{mkt}] Bid order must not be None")
+            self.assertEqual(bid_order.status, OrderStatus.RESTING, f"[{mkt}] Bid order must be RESTING")
+            self.assertIsNotNone(ask_order, f"[{mkt}] Ask order must not be None")
+            self.assertEqual(ask_order.status, OrderStatus.RESTING, f"[{mkt}] Ask order must be RESTING")
+
     def test_13_mutation_tests(self):
         """Test 13: Mutation tests (at least 16 mutations applied to the engine fail test suite)."""
         from scripts.mutation_check import (
@@ -529,6 +584,7 @@ class TestSimEngine(unittest.TestCase):
             test_mutation_15_ignore_rate_limits,
             test_mutation_16_recv_time_joins,
             test_mutation_17_c_world_from_b_inventory,
+            test_mutation_18_mid_based_min_clip_check,
         )
         mutations = [
             test_mutation_1_invert_queue,
@@ -548,10 +604,11 @@ class TestSimEngine(unittest.TestCase):
             test_mutation_15_ignore_rate_limits,
             test_mutation_16_recv_time_joins,
             test_mutation_17_c_world_from_b_inventory,
+            test_mutation_18_mid_based_min_clip_check,
         ]
         results = [m() for m in mutations]
         caught = sum(1 for r in results if r.caught)
-        self.assertGreaterEqual(caught, 16, f"Must catch at least 16 mutations, caught {caught}")
+        self.assertGreaterEqual(caught, 18, f"Must catch at least 18 mutations, caught {caught}")
 
 
 if __name__ == "__main__":

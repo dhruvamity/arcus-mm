@@ -1,0 +1,20 @@
+COMMAND: .venv/bin/python -m unittest tests.test_sim_engine.TestSimEngine.test_19_w01_min_size_bids_not_rejected_on_min_clip_markets 
+GIT_HEAD: 04b998bfce0df41e2a2b4597872fc1ff63d788d9
+TIMESTAMP: 2026-09-20T19:37:08Z
+PYTHON_VERSION: Python 3.12.14
+EXIT_CODE: 1
+--- OUTPUT ---
+F
+======================================================================
+FAIL: test_19_w01_min_size_bids_not_rejected_on_min_clip_markets (tests.test_sim_engine.TestSimEngine.test_19_w01_min_size_bids_not_rejected_on_min_clip_markets)
+W-01: Verifies minimum-size bids are not silently rejected on min-size-bound markets.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/dhruv/Desktop/CodeWithD/arcus-mm/tests/test_sim_engine.py", line 562, in test_19_w01_min_size_bids_not_rejected_on_min_clip_markets
+    self.assertIsNotNone(bid_order, f"[{mkt}] Bid order must not be None")
+AssertionError: unexpectedly None : [BTC-USD] Bid order must not be None
+
+----------------------------------------------------------------------
+Ran 1 test in 0.001s
+
+FAILED (failures=1)

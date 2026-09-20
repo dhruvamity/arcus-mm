@@ -64,8 +64,12 @@ class BaseMarketMakingStrategy(ABC):
         raw_qty = eff_notional / reference_price
         snapped_qty = self.round_to_step(raw_qty)
         # Ensure snapped quantity does not fall below minOrderNotional due to downward rounding
-        if snapped_qty * reference_price < min_clip_notional - 1e-6:
+        if snapped_qty * reference_price < self.min_notional - 1e-6:
             snapped_qty = float(to_decimal(snapped_qty) + to_decimal(self.step_size))
+        if self.min_order_size > 0 and snapped_qty < self.min_order_size:
+            snapped_qty = self.min_order_size
+        if snapped_qty < self.step_size:
+            snapped_qty = self.step_size
         return snapped_qty
 
     @abstractmethod

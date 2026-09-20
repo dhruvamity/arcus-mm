@@ -1,6 +1,6 @@
 # Master Audit Ledger — Ground Truth & Defect Remediation
 
-**Generated At:** `2026-09-20 19:35:28 UTC`  
+**Generated At:** `2026-09-20 19:40:39 UTC`  
 **Evaluation Scope:** All Findings (V-01 through V-35, W-01 through W-14) from Mandates v3, v4, and v5  
 **Commit Discrepancy Note:** Prior reports referenced commit hash `23a03f3` which does not exist on the remote GitHub repository. This occurred because the initial repository setup was committed and pushed via a squashed root commit (`0905008`), obliterating local scratch commit IDs. From this point forward, strict verifiable linear Git history is maintained with one commit per defect/milestone.  
 
@@ -45,7 +45,7 @@
 | **V-33** | `MINOR` | TESTS | Live paper trader tests non-hermetic without pre-existing data/raw snapshots | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/V-33_hermetic_live_paper_fixture.txt`](evidence/2026-09-20/V-33_hermetic_live_paper_fixture.txt) | [`tests/test_live_paper_trader.py`](tests/test_live_paper_trader.py) | `HEAD` |
 | **V-34** | `MAJOR` | METHODOLOGY | Primary paper session window (12:30-16:30 UTC) misses 4.5 of 6.5 NYSE RTH hours | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/V-34_rth_window_mismatch.txt`](evidence/2026-09-20/V-34_rth_window_mismatch.txt) | [`tests/test_calendar_regimes.py`](tests/test_calendar_regimes.py) | `HEAD` |
 | **V-35** | `MAJOR` | METHODOLOGY | Asset ranking rested solely on short-window weekend pilot tape without historical depth validation | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/V-35_deep_history_pull.txt`](evidence/2026-09-20/V-35_deep_history_pull.txt) | [`scripts/verify_report.py`](scripts/verify_report.py) | `HEAD` |
-| **W-01** | `BLOCKER` | SIMULATION | Minimum-size bids silently rejected (target_size x target_price vs mid clip) | **CONFIRMED** | **OPEN** | - | [`tests/test_sim_engine.py`](tests/test_sim_engine.py) | - |
+| **W-01** | `BLOCKER` | SIMULATION | Minimum-size bids silently rejected (target_size x target_price vs mid clip) | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/W-01_min_size_bid_post_fix_pass.txt`](evidence/2026-09-20/W-01_min_size_bid_post_fix_pass.txt) | [`tests/test_sim_engine.py`](tests/test_sim_engine.py) | `HEAD` |
 | **W-02** | `BLOCKER` | STATISTICS | Walk-forward significance test is tautological (spread at fill instant vs mid) | **CONFIRMED** | **OPEN** | - | [`tests/test_walk_forward_protocol.py`](tests/test_walk_forward_protocol.py) | - |
 | **W-03** | `MAJOR` | STRATEGY | Adaptive (OFI/microprice) strategy never receives microprice/OFI signal from engine | **CONFIRMED** | **OPEN** | - | [`tests/test_sim_engine.py`](tests/test_sim_engine.py) | - |
 | **W-04** | `MAJOR` | ECONOMICS | A +0.75 bps maker rebate assumed across pilot, prereg, and verify_report does not exist at base tier | **CONFIRMED** | **OPEN** | - | [`tests/test_pnl_accounting.py`](tests/test_pnl_accounting.py) | - |
@@ -75,7 +75,7 @@ All referenced evidence and test suites are machine-validated to exist on disk:
 - **Total Findings Audited:** 49
 - **Confirmed Defects:** 49
 - **Refuted Defects:** 0
-- **Remediated (FIXED):** 34
+- **Remediated (FIXED):** 35
 - **In Progress:** 0
-- **Open:** 15
+- **Open:** 14
 

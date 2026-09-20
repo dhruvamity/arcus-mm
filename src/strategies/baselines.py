@@ -77,8 +77,14 @@ class RandomSideQuotingStrategy(BaseMarketMakingStrategy):
         if self.rng.random() < 0.5:
             # Quote only BID
             bid_price = self.round_to_tick(mid_price - half_spread)
-            return (Quote(side="BUY", price=bid_price, size=clip_size), None)
+            bid_size = self.calculate_clip_size(self.clip_notional, bid_price)
+            if bid_size <= 0:
+                bid_size = self.step_size
+            return (Quote(side="BUY", price=bid_price, size=bid_size), None)
         else:
             # Quote only ASK
             ask_price = self.round_to_tick(mid_price + half_spread)
-            return (None, Quote(side="SELL", price=ask_price, size=clip_size))
+            ask_size = self.calculate_clip_size(self.clip_notional, ask_price)
+            if ask_size <= 0:
+                ask_size = self.step_size
+            return (None, Quote(side="SELL", price=ask_price, size=ask_size))

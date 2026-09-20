@@ -1,5 +1,5 @@
 ARCUS SIMENGINE MUTATION VERIFICATION REPORT
-Generated: 2026-09-20 | Total Mutations: 17 | Caught: 17
+Generated: 2026-09-20 | Total Mutations: 18 | Caught: 18
 
 | ID | Mutation Name | Target Test | Status | Defect Description |
 |---|---|---|---|---|
@@ -20,6 +20,7 @@ Generated: 2026-09-20 | Total Mutations: 17 | Caught: 17
 | MUT-15 | Ignore Rate Limit Denials | `TestSimEngine.test_18_subaccount_rate_limit_denial_and_drip` | **CAUGHT** | Ignores exhausted rate limit pool and allows orders anyway |
 | MUT-16 | Recv Time Order Fill (Lookahead) | `TestSimEngine.test_8_no_lookahead` | **CAUGHT** | Fills orders based on event receive time rather than arrival timestamp |
 | MUT-17 | C-World Shares Inventory | `TestSimEngine.test_17_independent_fill_worlds_quoting` | **CAUGHT** | Model C quotes and tracks from Model A/B inventory instead of independent state |
+| MUT-18 | Mid-Based Min-Clip Check | `TestSimEngine.test_19_w01_min_size_bids_not_rejected_on_min_clip_markets` | **CAUGHT** | Reintroduces mid-based clip validation rejecting min-size bids below mid |
 
 Detailed Failure Traces:
 
@@ -123,4 +124,10 @@ Test Exception Message: AssertionError: 3 != 0 : Trade before order arrival must
 Description: Model C quotes and tracks from Model A/B inventory instead of independent state
 Target: TestSimEngine.test_17_independent_fill_worlds_quoting
 Outcome: CAUGHT BY TEST
-Test Exception Message: AssertionError: 0.0999 != 0.0
+Test Exception Message: AssertionError: 0.1 != 0.0
+
+--- MUT-18: Mid-Based Min-Clip Check ---
+Description: Reintroduces mid-based clip validation rejecting min-size bids below mid
+Target: TestSimEngine.test_19_w01_min_size_bids_not_rejected_on_min_clip_markets
+Outcome: CAUGHT BY TEST
+Test Exception Message: AssertionError: unexpectedly None : [BTC-USD] Bid order must not be None

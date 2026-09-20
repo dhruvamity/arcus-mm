@@ -91,7 +91,14 @@ class VolatilityClockStrategy(BaseMarketMakingStrategy):
         if ask_price <= bid_price:
             ask_price = self.round_to_tick(bid_price + self.tick_size)
 
+        clip_size_bid = self.calculate_clip_size(self.clip_notional, bid_price)
+        clip_size_ask = self.calculate_clip_size(self.clip_notional, ask_price)
+        if clip_size_bid <= 0:
+            clip_size_bid = self.step_size
+        if clip_size_ask <= 0:
+            clip_size_ask = self.step_size
+
         return (
-            Quote(side="BUY", price=bid_price, size=clip_size),
-            Quote(side="SELL", price=ask_price, size=clip_size),
+            Quote(side="BUY", price=bid_price, size=clip_size_bid),
+            Quote(side="SELL", price=ask_price, size=clip_size_ask),
         )

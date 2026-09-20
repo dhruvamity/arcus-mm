@@ -59,13 +59,14 @@ class AdaptiveMicrostructureStrategy(BaseMarketMakingStrategy):
 
         if abs(inv_clips) >= 4.0:
             # Rebalance only: quote only to reduce position
-            clip_size = self.round_to_step(clip_qty)
             if inv_clips > 0:
                 ask_p = self.round_to_tick(mid_price)
-                return (None, Quote(side="SELL", price=ask_p, size=clip_size))
+                ask_size = self.calculate_clip_size(self.clip_notional, ask_p)
+                return (None, Quote(side="SELL", price=ask_p, size=ask_size))
             else:
                 bid_p = self.round_to_tick(mid_price)
-                return (Quote(side="BUY", price=bid_p, size=clip_size), None)
+                bid_size = self.calculate_clip_size(self.clip_notional, bid_p)
+                return (Quote(side="BUY", price=bid_p, size=bid_size), None)
 
         # 2. Dynamic Spread Sizing
         # Spread expands with volatility and market spread
@@ -99,11 +100,14 @@ class AdaptiveMicrostructureStrategy(BaseMarketMakingStrategy):
         if ask_price <= bid_price:
             ask_price = self.round_to_tick(bid_price + self.tick_size)
 
-        clip_size = self.round_to_step(clip_qty)
-        if clip_size <= 0:
-            clip_size = self.step_size
+        clip_size_bid = self.calculate_clip_size(self.clip_notional, bid_price)
+        clip_size_ask = self.calculate_clip_size(self.clip_notional, ask_price)
+        if clip_size_bid <= 0:
+            clip_size_bid = self.step_size
+        if clip_size_ask <= 0:
+            clip_size_ask = self.step_size
 
         return (
-            Quote(side="BUY", price=bid_price, size=clip_size),
-            Quote(side="SELL", price=ask_price, size=clip_size),
+            Quote(side="BUY", price=bid_price, size=clip_size_bid),
+            Quote(side="SELL", price=ask_price, size=clip_size_ask),
         )

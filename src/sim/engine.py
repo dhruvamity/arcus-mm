@@ -715,7 +715,11 @@ class SimEngine:
         if target_bid:
             target_p = float(snap_to_tick(target_bid.price, venue.tick_size))
             target_s = float(snap_to_step(target_bid.size, venue.step_size))
-            if target_s * target_p >= venue.get_min_executable_clip() - 1e-6:
+            if (
+                target_s >= venue.min_order_size - 1e-9
+                and target_s <= venue.max_order_size + 1e-9
+                and target_s * target_p >= venue.min_notional - 1e-6
+            ):
                 for fm in models_to_update:
                     existing_bid = ctx.active_bid.get(fm) if fm is not None else (ctx.active_bid.get(ctx.fill_models[0]) if ctx.fill_models else None)
                     if existing_bid and existing_bid.status == OrderStatus.RESTING:
@@ -766,7 +770,11 @@ class SimEngine:
         if target_ask:
             target_p = float(snap_to_tick(target_ask.price, venue.tick_size))
             target_s = float(snap_to_step(target_ask.size, venue.step_size))
-            if target_s * target_p >= venue.get_min_executable_clip() - 1e-6:
+            if (
+                target_s >= venue.min_order_size - 1e-9
+                and target_s <= venue.max_order_size + 1e-9
+                and target_s * target_p >= venue.min_notional - 1e-6
+            ):
                 for fm in models_to_update:
                     existing_ask = ctx.active_ask.get(fm) if fm is not None else (ctx.active_ask.get(ctx.fill_models[0]) if ctx.fill_models else None)
                     if existing_ask and existing_ask.status == OrderStatus.RESTING:

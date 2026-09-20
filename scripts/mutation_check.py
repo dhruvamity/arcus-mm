@@ -408,6 +408,34 @@ def test_mutation_17_c_world_from_b_inventory() -> MutationResult:
         SimEngine.__init__ = orig_init
 
 
+def test_mutation_18_mid_based_min_clip_check() -> MutationResult:
+    """Mutation 18: Reintroduce mid-based min-clip check on quotes (W-01 regression)."""
+    from src.utils import snap_to_tick, snap_to_step
+    orig_sched = SimEngine._schedule_quote_update
+
+    def mutated_sched(self, venue, ctx, fill_model, target_bid, target_ask, ts_ns):
+        # BUG: Mid-based clip comparison rejects minimum-size bids below mid
+        min_clip = venue.get_min_executable_clip()
+        if target_bid:
+            p = float(snap_to_tick(target_bid.price, venue.tick_size))
+            s = float(snap_to_step(target_bid.size, venue.step_size))
+            if s * p < min_clip - 1e-6:
+                target_bid = None
+        if target_ask:
+            p = float(snap_to_tick(target_ask.price, venue.tick_size))
+            s = float(snap_to_step(target_ask.size, venue.step_size))
+            if s * p < min_clip - 1e-6:
+                target_ask = None
+        return orig_sched(self, venue, ctx, fill_model, target_bid, target_ask, ts_ns)
+
+    SimEngine._schedule_quote_update = mutated_sched
+    try:
+        failed, msg = run_targeted_test(TestSimEngine, "test_19_w01_min_size_bids_not_rejected_on_min_clip_markets")
+        return MutationResult("MUT-18", "Mid-Based Min-Clip Check", "TestSimEngine.test_19_w01_min_size_bids_not_rejected_on_min_clip_markets", "Reintroduces mid-based clip validation rejecting min-size bids below mid", failed, msg)
+    finally:
+        SimEngine._schedule_quote_update = orig_sched
+
+
 def main():
     mutations: List[Callable[[], MutationResult]] = [
         test_mutation_1_invert_queue,
@@ -427,6 +455,7 @@ def main():
         test_mutation_15_ignore_rate_limits,
         test_mutation_16_recv_time_joins,
         test_mutation_17_c_world_from_b_inventory,
+        test_mutation_18_mid_based_min_clip_check,
     ]
 
     print("=" * 80)
