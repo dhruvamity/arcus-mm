@@ -53,8 +53,8 @@ def generate_audit_markdown(status_data: list[dict], output_file: Path) -> None:
         "",
         "## 1. Master Audit Ledger (V-01 through V-32)",
         "",
-        "| ID | Severity | Category | Finding Summary | Repro Status | Remediation | Evidence File | Commit |",
-        "|---|---|---|---|---|---|---|---|",
+        "| ID | Severity | Category | Finding Summary | Repro Status | Remediation | Evidence File | Verification Test | Commit |",
+        "|---|---|---|---|---|---|---|---|---|",
     ]
 
     counts = {"CONFIRMED": 0, "REFUTED": 0, "FIXED": 0, "IN_PROGRESS": 0, "OPEN": 0}
@@ -67,6 +67,7 @@ def generate_audit_markdown(status_data: list[dict], output_file: Path) -> None:
         repro = item["reproduction_status"]
         remed = item["remediation_status"]
         ev = item.get("evidence_file", "")
+        test_ref = item.get("test_file", "")
         commit = item.get("commit_hash") or "-"
         commit_str = f"`{commit}`" if commit != "-" else "-"
 
@@ -74,7 +75,8 @@ def generate_audit_markdown(status_data: list[dict], output_file: Path) -> None:
         counts[remed] = counts.get(remed, 0) + 1
 
         ev_link = f"[`{ev}`]({ev})" if ev else "-"
-        md.append(f"| **{vid}** | `{sev}` | {cat} | {summary} | **{repro}** | **{remed}** | {ev_link} | {commit_str} |")
+        test_link = f"[`{test_ref}`]({test_ref})" if test_ref else "-"
+        md.append(f"| **{vid}** | `{sev}` | {cat} | {summary} | **{repro}** | **{remed}** | {ev_link} | {test_link} | {commit_str} |")
 
     md.extend([
         "",
