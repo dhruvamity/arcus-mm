@@ -147,6 +147,9 @@ class ArcusRateLimitSimulator:
         self.pool_exhaustion_count += 1
         return False
 
+    def record_cancellation(self, now_ts: Optional[float] = None) -> bool:
+        return self.record_order_cancellation(now_ts)
+
     def record_placement(self, now_ts: Optional[float] = None) -> bool:
         return self.record_order_placement(now_ts)
 
