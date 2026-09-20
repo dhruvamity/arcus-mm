@@ -526,6 +526,30 @@ def test_mutation_21_manifest_missing_target_dir() -> MutationResult:
         dm.generate_manifest_for_date = orig_gen
 
 
+def test_mutation_22_latency_uncalibrated_grid() -> MutationResult:
+    """MUT-22: Truncates or uncalibrates pre-declared sensitivity grid in configs/latency_model.yaml."""
+    from src.models import latency as lm
+
+    orig_func = lm.get_pre_declared_latency_grid
+
+    def mutated_grid(config_path=None):
+        return [10.0, 50.0]  # Uncalibrated, violates WS-A pre-declared grid [25.0, 60.0, 150.0, 300.0, 700.0]
+
+    lm.get_pre_declared_latency_grid = mutated_grid
+    try:
+        failed, msg = run_targeted_test(TestSimEngine, "test_24_w08_latency_calibration_and_canonical_grid")
+        return MutationResult(
+            "MUT-22",
+            "Uncalibrated Latency Sensitivity Grid",
+            "TestSimEngine.test_24_w08_latency_calibration_and_canonical_grid",
+            "Mutates pre-declared latency sensitivity grid to [10.0, 50.0], violating pre-registered WS-A specification",
+            failed,
+            msg,
+        )
+    finally:
+        lm.get_pre_declared_latency_grid = orig_func
+
+
 def main():
     mutations: List[Callable[[], MutationResult]] = [
         test_mutation_1_invert_queue,
@@ -549,6 +573,7 @@ def main():
         test_mutation_19_drop_ofi_microprice_argument,
         test_mutation_20_model_c_sub_tick_fills,
         test_mutation_21_manifest_missing_target_dir,
+        test_mutation_22_latency_uncalibrated_grid,
     ]
 
     print("=" * 80)

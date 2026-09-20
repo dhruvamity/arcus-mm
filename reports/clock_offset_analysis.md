@@ -1,4 +1,5 @@
-# Empirical Two-Clock Offset & Wire Latency Distribution (WS-C / V-23)
+# Empirical Two-Clock Offset & Wire Latency Distribution (WS-C / V-23 / W-08)
+> **Status:** `PROVISIONAL_PING_ONLY` (One-way wire transit estimate from WebSocket frames; canonical REST RTT is ~174ms p50 per `configs/latency_model.yaml`).
 
 **Generated At:** `2026-09-20T13:54:00Z`  
 **Formula:** `Δt = (recv_ts_ns - contents.timestamp * 1000) / 1e6` (ms)  

@@ -509,11 +509,11 @@
     "category": "LATENCY",
     "summary": "Latency evidence is inconsistent and sourced from REST time pings rather than order round trips",
     "reproduction_status": "CONFIRMED",
-    "remediation_status": "OPEN",
-    "evidence_file": "",
-    "test_file": "tests/test_harness_integrity.py",
-    "commit_hash": "-",
-    "notes": "Reports cite conflicting latencies (77.8ms vs 174ms); both are REST /v1/time pings, not order execution RTT."
+    "remediation_status": "FIXED",
+    "evidence_file": "evidence/2026-09-20/W-08_latency_post_fix_pass.txt",
+    "test_file": "tests/test_sim_engine.py",
+    "commit_hash": "PENDING_COMMIT",
+    "notes": "Created configs/latency_model.yaml as canonical latency source; labeled all latency numbers PROVISIONAL pending live testnet RTT benchmarks; labeled 77.8ms as PROVISIONAL_PING_ONLY; established pre-declared sensitivity grid [25ms, 60ms, 150ms, 300ms, 700ms]; added MUT-22."
   },
   {
     "id": "W-09",

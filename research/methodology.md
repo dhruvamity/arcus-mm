@@ -50,9 +50,11 @@ Realistic passive market making simulations fail when latency is treated as a co
 5. **Effective Arrival Timestamp:**
    $$t_{\text{effective}} = t_{\text{event}} + t_{\text{feed}} + t_{\text{dec}} + t_{\text{send}} + t_{\text{ack}}$$
 
-### 2.2 Empirical Latency Sampling (Fix V-11)
-Instead of arbitrary hardcoded delays, `EmpiricalLatencyModel` samples transit times from recorded distribution histograms:
-- **Baseline Crypto RTT (p50):** $77.8\,\text{ms}$ (interdecile range: $74.4\,\text{ms}$ to $78.8\,\text{ms}$).
+### 2.2 Empirical Latency Sampling (Fix V-11 / W-08)
+Instead of arbitrary delays, `EmpiricalLatencyModel` samples transit times from recorded distribution histograms loaded from the canonical `configs/latency_model.yaml` (all provisional pending live testnet benchmark):
+- **Canonical REST RTT (p50):** $173.99\,\text{ms}$ (`p95`: $386.86\,\text{ms}$, `p99`: $511.06\,\text{ms}$, provisional benchmark via `/v1/time`).
+- **One-Way Wire Transit:** $77.8\,\text{ms}$ (`PROVISIONAL_PING_ONLY`, interdecile range: $74.4\,\text{ms}$ to $78.8\,\text{ms}$).
+- **Pre-Declared Sensitivity Grid (WS-A):** $[25\,\text{ms}, 60\,\text{ms}, 150\,\text{ms}, 300\,\text{ms}, 700\,\text{ms}]$.
 - **In-flight Adverse Selection:** An order in `CANCEL_REQUESTED` state remains resting on the venue book until $t_{\text{effective\_cancel}}$. Incoming aggressive trades matching within this transit window execute against the resting quote, recording authentic in-flight adverse selection.
 
 ---

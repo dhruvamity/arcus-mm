@@ -779,6 +779,47 @@ class TestSimEngine(unittest.TestCase):
             "Model C MUST fill when trade clears resting quote by >= 1 full tick",
         )
 
+    def test_24_w08_latency_calibration_and_canonical_grid(self):
+        """W-08: Verifies canonical latency configuration, pre-declared sensitivity grid, and provisional labels."""
+        from src.models.latency import (
+            load_canonical_latency_config,
+            get_pre_declared_latency_grid,
+            CANONICAL_LATENCY_CONFIG_PATH,
+            EmpiricalLatencyModel,
+        )
+
+        # 1. Config file must exist and be loadable
+        self.assertTrue(CANONICAL_LATENCY_CONFIG_PATH.exists(), "configs/latency_model.yaml must exist")
+        cfg = load_canonical_latency_config()
+        self.assertIn("status", cfg)
+        self.assertEqual(cfg["status"], "PROVISIONAL", "Latency configuration status must be PROVISIONAL")
+
+        # 2. Pre-declared sensitivity grid per WS-A must match exact specification
+        grid = get_pre_declared_latency_grid()
+        self.assertEqual(
+            grid,
+            [25.0, 60.0, 150.0, 300.0, 700.0],
+            "Pre-declared sensitivity grid must strictly be [25.0, 60.0, 150.0, 300.0, 700.0]",
+        )
+
+        # 3. Empirical RTT and one-way wire transit labeling
+        emp = cfg.get("empirical_rtt", {})
+        self.assertEqual(emp.get("status"), "PROVISIONAL")
+        self.assertAlmostEqual(float(emp.get("p50_rtt_ms", 0.0)), 173.99, places=2)
+
+        wire = cfg.get("one_way_wire_transit", {})
+        self.assertEqual(
+            wire.get("status"),
+            "PROVISIONAL_PING_ONLY",
+            "One-way wire transit ping estimate must be explicitly labeled PROVISIONAL_PING_ONLY",
+        )
+
+        # 4. EmpiricalLatencyModel successfully samples from canonical YAML
+        model = EmpiricalLatencyModel(CANONICAL_LATENCY_CONFIG_PATH)
+        self.assertGreater(len(model.samples), 0, "EmpiricalLatencyModel must load distribution samples from YAML")
+        sample = model.sample_ms("place")
+        self.assertGreaterEqual(sample, 25.0)
+
     def test_13_mutation_tests(self):
         """Test 13: Mutation tests (at least 16 mutations applied to the engine fail test suite)."""
         from scripts.mutation_check import (
@@ -803,6 +844,7 @@ class TestSimEngine(unittest.TestCase):
             test_mutation_19_drop_ofi_microprice_argument,
             test_mutation_20_model_c_sub_tick_fills,
             test_mutation_21_manifest_missing_target_dir,
+            test_mutation_22_latency_uncalibrated_grid,
         )
         mutations = [
             test_mutation_1_invert_queue,
@@ -826,10 +868,11 @@ class TestSimEngine(unittest.TestCase):
             test_mutation_19_drop_ofi_microprice_argument,
             test_mutation_20_model_c_sub_tick_fills,
             test_mutation_21_manifest_missing_target_dir,
+            test_mutation_22_latency_uncalibrated_grid,
         ]
         results = [m() for m in mutations]
         caught = sum(1 for r in results if r.caught)
-        self.assertGreaterEqual(caught, 21, f"Must catch at least 21 mutations, caught {caught}")
+        self.assertGreaterEqual(caught, 22, f"Must catch at least 22 mutations, caught {caught}")
 
 
 if __name__ == "__main__":

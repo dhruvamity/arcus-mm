@@ -1,0 +1,9 @@
+=== POST-FIX PASSING DEMONSTRATION FOR W-08 (MUT-22) ===
+Command: .venv/bin/python -m unittest tests/test_sim_engine.py -k test_24_w08
+Target Test: TestSimEngine.test_24_w08_latency_calibration_and_canonical_grid
+
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.002s
+
+OK

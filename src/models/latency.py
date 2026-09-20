@@ -12,11 +12,54 @@ from __future__ import annotations
 Supports testing at baseline, +100ms, +500ms, +1s, +5s.
 """
 
-from typing import Dict, Any, Optional
+from pathlib import Path
+from typing import Dict, Any, Optional, List
+import yaml
+
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+CANONICAL_LATENCY_CONFIG_PATH = REPO_ROOT / "configs/latency_model.yaml"
+
+
+def load_canonical_latency_config(config_path: Optional[Path] = None) -> Dict[str, Any]:
+    """Loads single canonical latency configuration from configs/latency_model.yaml.
+    All values are labeled PROVISIONAL until authenticated testnet RTT is benchmarked.
+    """
+    p = config_path or CANONICAL_LATENCY_CONFIG_PATH
+    if not p.exists():
+        return {
+            "status": "PROVISIONAL",
+            "sensitivity_grid_ms": [25.0, 60.0, 150.0, 300.0, 700.0],
+            "empirical_rtt": {"status": "PROVISIONAL", "p50_rtt_ms": 173.99},
+            "one_way_wire_transit": {"status": "PROVISIONAL_PING_ONLY", "p50_ms": 77.86},
+        }
+    with open(p, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+
+def get_pre_declared_latency_grid(config_path: Optional[Path] = None) -> List[float]:
+    """Returns pre-declared sensitivity grid [25.0, 60.0, 150.0, 300.0, 700.0] ms per WS-A."""
+    cfg = load_canonical_latency_config(config_path)
+    grid = cfg.get("sensitivity_grid_ms") or [25.0, 60.0, 150.0, 300.0, 700.0]
+    return [float(x) for x in grid]
 
 
 class LatencyConfig:
     """Latency parameters in milliseconds."""
+
+    @classmethod
+    def from_canonical_yaml(cls, config_path: Optional[Path] = None) -> LatencyConfig:
+        """Constructs LatencyConfig from the single canonical configs/latency_model.yaml."""
+        cfg = load_canonical_latency_config(config_path)
+        base = cfg.get("baseline_pipeline_ms", {})
+        return cls(
+            feed_latency_ms=float(base.get("feed_latency_ms", 20.0)),
+            decision_latency_ms=float(base.get("decision_latency_ms", 5.0)),
+            send_latency_ms=float(base.get("send_latency_ms", 25.0)),
+            ack_latency_ms=float(base.get("ack_latency_ms", 10.0)),
+            cancel_latency_ms=float(base.get("cancel_latency_ms", 25.0)),
+            modify_latency_ms=float(base.get("modify_latency_ms", 30.0)),
+            additional_stress_latency_ms=float(base.get("additional_stress_latency_ms", 0.0)),
+        )
 
     def __init__(
         self,
@@ -151,6 +194,21 @@ class EmpiricalLatencyModel(LatencyModel):
                         rec = json.loads(line)
                         if "rtt_ms" in rec and rec.get("status") == "ok":
                             self.samples.append(float(rec["rtt_ms"]))
+            except Exception:
+                pass
+            return
+
+        if self.samples_file.suffix in (".yaml", ".yml"):
+            try:
+                with open(self.samples_file, "r", encoding="utf-8") as f:
+                    ydata = yaml.safe_load(f)
+                rtt = ydata.get("empirical_rtt") or ydata.get("empirical_latency") or {}
+                if "p50_rtt_ms" in rtt:
+                    p50 = float(rtt["p50_rtt_ms"])
+                    p95 = float(rtt.get("p95_rtt_ms", p50 * 1.5))
+                    p99 = float(rtt.get("p99_rtt_ms", p95 * 1.3))
+                    p_min = float(rtt.get("min_rtt_ms", p50 * 0.7))
+                    self.samples = [p_min, p50, p95, p99]
             except Exception:
                 pass
             return

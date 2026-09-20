@@ -1,5 +1,5 @@
 ARCUS SIMENGINE MUTATION VERIFICATION REPORT
-Generated: 2026-09-20 | Total Mutations: 21 | Caught: 21
+Generated: 2026-09-20 | Total Mutations: 22 | Caught: 22
 
 | ID | Mutation Name | Target Test | Status | Defect Description |
 |---|---|---|---|---|
@@ -24,6 +24,7 @@ Generated: 2026-09-20 | Total Mutations: 21 | Caught: 21
 | MUT-19 | Drop OFI/Microprice Signal | `TestSimEngine.test_22_w03_microprice_ofi_signal_wired_to_quotes` | **CAUGHT** | Drops microprice and OFI order flow signal by forcing deviation to 0.0 |
 | MUT-20 | Model C Sub-Tick Fills | `TestSimEngine.test_23_w09_model_c_trade_strictly_through_by_tick` | **CAUGHT** | Reverts Model C to fill on sub-tick prints rather than strictly through by >= 1 tick |
 | MUT-21 | Manifest Missing Target Dir | `TestStorageManager.test_w12_hermetic_manifest_generation_on_fresh_clone` | **CAUGHT** | Removes target directory creation, re-breaking manifest generation on clean clones |
+| MUT-22 | Uncalibrated Latency Sensitivity Grid | `TestSimEngine.test_24_w08_latency_calibration_and_canonical_grid` | **CAUGHT** | Mutates pre-declared latency sensitivity grid to [10.0, 50.0], violating pre-registered WS-A specification |
 
 Detailed Failure Traces:
 
@@ -151,4 +152,10 @@ Test Exception Message: AssertionError: 1 != 0 : Model C must NOT fill when trad
 Description: Removes target directory creation, re-breaking manifest generation on clean clones
 Target: TestStorageManager.test_w12_hermetic_manifest_generation_on_fresh_clone
 Outcome: CAUGHT BY TEST
-Test Exception Message: FileNotFoundError: [Errno 2] No such file or directory: '/var/folders/33/6hb_7rkd3v74jmphkh8b96480000gn/T/tmpd0pi8huv/fresh_clone_repo/data/MANIFEST_2026-09-19.sha256'
+Test Exception Message: FileNotFoundError: [Errno 2] No such file or directory: '/var/folders/33/6hb_7rkd3v74jmphkh8b96480000gn/T/tmpygfupalq/fresh_clone_repo/data/MANIFEST_2026-09-19.sha256'
+
+--- MUT-22: Uncalibrated Latency Sensitivity Grid ---
+Description: Mutates pre-declared latency sensitivity grid to [10.0, 50.0], violating pre-registered WS-A specification
+Target: TestSimEngine.test_24_w08_latency_calibration_and_canonical_grid
+Outcome: CAUGHT BY TEST
+Test Exception Message: + [25.0, 60.0, 150.0, 300.0, 700.0] : Pre-declared sensitivity grid must strictly be [25.0, 60.0, 150.0, 300.0, 700.0]

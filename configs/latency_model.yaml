@@ -1,0 +1,46 @@
+# Arcus Canonical Latency Configuration & Jitter Models (W-08)
+# Status: PROVISIONAL pending live authenticated testnet measurement
+version: "1.0.0"
+status: "PROVISIONAL"
+
+# Pre-declared sensitivity grid for backtest, pilot, and OOS validation (WS-A)
+sensitivity_grid_ms:
+  - 25.0
+  - 60.0
+  - 150.0
+  - 300.0
+  - 700.0
+
+# Canonical empirical benchmark (from scripts/measure_latency.py against /v1/time)
+empirical_rtt:
+  status: "PROVISIONAL"
+  source: "latency/latency_summary.json"
+  endpoint: "/v1/time"
+  p50_rtt_ms: 173.99
+  p95_rtt_ms: 386.86
+  p99_rtt_ms: 511.06
+  stress_p95_plus_500ms: 886.86
+
+# One-way wire transit ping estimate (PROVISIONAL_PING_ONLY)
+# Note: Measured from WebSocket recv_ts_ns minus contents.timestamp; subject to clock skew
+one_way_wire_transit:
+  status: "PROVISIONAL_PING_ONLY"
+  p50_ms: 77.86
+  interdecile_p10_ms: 74.46
+  interdecile_p90_ms: 78.86
+
+# Default baseline latency breakdown for simulation engine
+baseline_pipeline_ms:
+  feed_latency_ms: 20.0
+  decision_latency_ms: 5.0
+  send_latency_ms: 25.0
+  ack_latency_ms: 10.0
+  cancel_latency_ms: 25.0
+  modify_latency_ms: 30.0
+  additional_stress_latency_ms: 0.0
+
+# Venue speed bumps (from venue documentation)
+venue_speed_bumps:
+  taker_speed_bump_ms: 50.0
+  alo_skips_speed_bump: true
+  cancels_skip_speed_bump: true
