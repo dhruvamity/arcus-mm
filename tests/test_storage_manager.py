@@ -104,13 +104,31 @@ class TestStorageManager(unittest.TestCase):
         mock_raw.mkdir(parents=True, exist_ok=True)
         (mock_raw / "btc.jsonl.gz").write_bytes(b"fake gz content")
 
-        manifest_path = generate_manifest_for_date(mock_date, source_dirs=[mock_raw])
+        mock_manifest_dir = self.dir_path / "data"
+        manifest_path = generate_manifest_for_date(mock_date, source_dirs=[mock_raw], manifest_dir=mock_manifest_dir)
         self.assertTrue(manifest_path.exists())
         content = manifest_path.read_text(encoding="utf-8")
         self.assertIn("PREV_MANIFEST", content)
         self.assertIn("MANIFEST_DIGEST", content)
         # Clean up mock manifest
         manifest_path.unlink(missing_ok=True)
+
+    def test_w12_hermetic_manifest_generation_on_fresh_clone(self):
+        """W-12: Verifies that manifest generation succeeds hermetically even when data/ directory does not pre-exist."""
+        from scripts.data_manifest import generate_manifest_for_date
+        mock_date = "2026-09-19"
+        fresh_clone_root = self.dir_path / "fresh_clone_repo"
+        fresh_clone_data = fresh_clone_root / "data"
+        self.assertFalse(fresh_clone_data.exists())
+
+        mock_source = self.dir_path / "incoming_raw" / mock_date
+        mock_source.mkdir(parents=True, exist_ok=True)
+        (mock_source / "eth.jsonl.gz").write_bytes(b"hermetic clean clone payload")
+
+        manifest_path = generate_manifest_for_date(mock_date, source_dirs=[mock_source], manifest_dir=fresh_clone_data)
+        self.assertTrue(manifest_path.exists())
+        self.assertTrue(fresh_clone_data.exists())
+        self.assertTrue(manifest_path.is_relative_to(fresh_clone_root))
 
 
 if __name__ == "__main__":

@@ -737,7 +737,8 @@ class TestSimEngine(unittest.TestCase):
             min_notional=5.0,
         )
         engine = SimEngine(
-            markets=self.specs,
+            markets=[self.market],
+            market_specs=self.specs,
             strategies={"strat": strat},
             fill_models=[FillModelType.MODEL_C_CONSERVATIVE],
             paired_common_quotes=False,
@@ -801,6 +802,7 @@ class TestSimEngine(unittest.TestCase):
             test_mutation_18_mid_based_min_clip_check,
             test_mutation_19_drop_ofi_microprice_argument,
             test_mutation_20_model_c_sub_tick_fills,
+            test_mutation_21_manifest_missing_target_dir,
         )
         mutations = [
             test_mutation_1_invert_queue,
@@ -823,10 +825,11 @@ class TestSimEngine(unittest.TestCase):
             test_mutation_18_mid_based_min_clip_check,
             test_mutation_19_drop_ofi_microprice_argument,
             test_mutation_20_model_c_sub_tick_fills,
+            test_mutation_21_manifest_missing_target_dir,
         ]
         results = [m() for m in mutations]
         caught = sum(1 for r in results if r.caught)
-        self.assertGreaterEqual(caught, 20, f"Must catch at least 20 mutations, caught {caught}")
+        self.assertGreaterEqual(caught, 21, f"Must catch at least 21 mutations, caught {caught}")
 
 
 if __name__ == "__main__":

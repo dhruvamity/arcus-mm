@@ -1,5 +1,5 @@
 ARCUS SIMENGINE MUTATION VERIFICATION REPORT
-Generated: 2026-09-20 | Total Mutations: 20 | Caught: 20
+Generated: 2026-09-20 | Total Mutations: 21 | Caught: 21
 
 | ID | Mutation Name | Target Test | Status | Defect Description |
 |---|---|---|---|---|
@@ -23,6 +23,7 @@ Generated: 2026-09-20 | Total Mutations: 20 | Caught: 20
 | MUT-18 | Mid-Based Min-Clip Check | `TestSimEngine.test_19_w01_min_size_bids_not_rejected_on_min_clip_markets` | **CAUGHT** | Reintroduces mid-based clip validation rejecting min-size bids below mid |
 | MUT-19 | Drop OFI/Microprice Signal | `TestSimEngine.test_22_w03_microprice_ofi_signal_wired_to_quotes` | **CAUGHT** | Drops microprice and OFI order flow signal by forcing deviation to 0.0 |
 | MUT-20 | Model C Sub-Tick Fills | `TestSimEngine.test_23_w09_model_c_trade_strictly_through_by_tick` | **CAUGHT** | Reverts Model C to fill on sub-tick prints rather than strictly through by >= 1 tick |
+| MUT-21 | Manifest Missing Target Dir | `TestStorageManager.test_w12_hermetic_manifest_generation_on_fresh_clone` | **CAUGHT** | Removes target directory creation, re-breaking manifest generation on clean clones |
 
 Detailed Failure Traces:
 
@@ -145,3 +146,9 @@ Description: Reverts Model C to fill on sub-tick prints rather than strictly thr
 Target: TestSimEngine.test_23_w09_model_c_trade_strictly_through_by_tick
 Outcome: CAUGHT BY TEST
 Test Exception Message: AssertionError: 1 != 0 : Model C must NOT fill when trade does not clear resting quote by at least 1 full tick (99.85 vs 99.9 - 0.1 = 99.8)
+
+--- MUT-21: Manifest Missing Target Dir ---
+Description: Removes target directory creation, re-breaking manifest generation on clean clones
+Target: TestStorageManager.test_w12_hermetic_manifest_generation_on_fresh_clone
+Outcome: CAUGHT BY TEST
+Test Exception Message: FileNotFoundError: [Errno 2] No such file or directory: '/var/folders/33/6hb_7rkd3v74jmphkh8b96480000gn/T/tmpd0pi8huv/fresh_clone_repo/data/MANIFEST_2026-09-19.sha256'

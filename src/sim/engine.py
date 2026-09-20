@@ -281,6 +281,9 @@ class SimEngine:
         subaccount_rate_limiter: Optional[ArcusRateLimitSimulator] = None,
         random_seed: int = 42,
     ):
+        if isinstance(markets, dict) and market_specs is None:
+            market_specs = markets
+            markets = list(markets.keys())
         self.markets = markets
         self.fill_models = fill_models or [
             FillModelType.MODEL_A_TOUCH,

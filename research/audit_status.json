@@ -557,11 +557,11 @@
     "category": "TESTS",
     "summary": "test_storage_manager.py non-hermetic on fresh checkout with uncommitted data/ directory",
     "reproduction_status": "CONFIRMED",
-    "remediation_status": "OPEN",
-    "evidence_file": "",
+    "remediation_status": "FIXED",
+    "evidence_file": "evidence/2026-09-20/W-12_clean_clone_post_fix_pass.txt",
     "test_file": "tests/test_storage_manager.py",
-    "commit_hash": "-",
-    "notes": "Manifest test fails on clean checkout because data/ directory is not committed. Use hermetic temp dir."
+    "commit_hash": "PENDING_COMMIT",
+    "notes": "data_manifest.py ensures target directory exists; test_storage_manager uses hermetic temp directories; venue.py adds fallback fixture for clean clones; MUT-21 verified."
   },
   {
     "id": "W-13",

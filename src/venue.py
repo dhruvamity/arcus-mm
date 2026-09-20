@@ -19,6 +19,9 @@ def find_latest_markets_snapshot(repo_root: Optional[Path] = None) -> Optional[P
     snapshots = sorted(root.glob("data/raw/*/rest_snapshots/markets_*.json"))
     if snapshots:
         return snapshots[-1]
+    fallback = root / "tests/fixtures/markets_snapshot_sample.json"
+    if fallback.exists():
+        return fallback
     return None
 
 

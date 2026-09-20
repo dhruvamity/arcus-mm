@@ -485,6 +485,47 @@ def test_mutation_20_model_c_sub_tick_fills() -> MutationResult:
         SimEngine._evaluate_fill_quantity = orig_eval
 
 
+def test_mutation_21_manifest_missing_target_dir() -> MutationResult:
+    """MUT-21: Manifest generator does not create missing target dir (crashes on clean clone)."""
+    import scripts.data_manifest as dm
+    from tests.test_storage_manager import TestStorageManager
+
+    orig_gen = dm.generate_manifest_for_date
+
+    def mutated_gen(date_str, source_dirs=None, manifest_dir=None):
+        target_dir = manifest_dir or dm.DATA_DIR
+        # BUG: Omit target_dir.mkdir(parents=True, exist_ok=True)
+        if source_dirs is None:
+            source_dirs = []
+        if not source_dirs:
+            raise FileNotFoundError(f"No data directories found for date {date_str}")
+        manifest_path = target_dir / f"MANIFEST_{date_str}.sha256"
+        prev_manifest, prev_hash = dm.get_previous_manifest(date_str, manifest_dir=target_dir)
+        lines = [
+            f"# ARCUS DATA INTEGRITY MANIFEST: {date_str}",
+            f"# PREV_MANIFEST: {prev_manifest.name if prev_manifest else 'GENESIS'}",
+            f"# PREV_MANIFEST_SHA256: {prev_hash}",
+            "# TIMESTAMP_UTC: 2026-09-20T00:00:00Z",
+            "# FORMAT: <sha256_hex>  <relative_path>",
+        ]
+        manifest_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        return manifest_path
+
+    dm.generate_manifest_for_date = mutated_gen
+    try:
+        failed, msg = run_targeted_test(TestStorageManager, "test_w12_hermetic_manifest_generation_on_fresh_clone")
+        return MutationResult(
+            "MUT-21",
+            "Manifest Missing Target Dir",
+            "TestStorageManager.test_w12_hermetic_manifest_generation_on_fresh_clone",
+            "Removes target directory creation, re-breaking manifest generation on clean clones",
+            failed,
+            msg,
+        )
+    finally:
+        dm.generate_manifest_for_date = orig_gen
+
+
 def main():
     mutations: List[Callable[[], MutationResult]] = [
         test_mutation_1_invert_queue,
@@ -507,6 +548,7 @@ def main():
         test_mutation_18_mid_based_min_clip_check,
         test_mutation_19_drop_ofi_microprice_argument,
         test_mutation_20_model_c_sub_tick_fills,
+        test_mutation_21_manifest_missing_target_dir,
     ]
 
     print("=" * 80)
