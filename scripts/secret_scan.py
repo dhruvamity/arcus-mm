@@ -41,6 +41,7 @@ FIXTURE_PATH_PATTERNS = [
     re.compile(r'(^|/)tests?/'),
     re.compile(r'(^|/)fixtures?/'),
     re.compile(r'\.env\.example$'),
+    re.compile(r'(^|/)FULL_REPO_BUNDLE\.md$'),
 ]
 
 DUMMY_VALUES = {
