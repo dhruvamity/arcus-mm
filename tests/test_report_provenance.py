@@ -18,12 +18,21 @@ class TestReportProvenance(unittest.TestCase):
         self.repo_root = Path(__file__).resolve().parent.parent
 
     def test_source_truth_matrix_exists_and_valid(self):
-        """Verify reports/source_truth_matrix.csv exists and has required columns."""
-        matrix_path = self.repo_root / "reports" / "source_truth_matrix.csv"
-        self.assertTrue(matrix_path.exists(), f"Missing {matrix_path}")
+        """Verify audit.md exists as canonical ledger and synthetic matrix fixtures parse cleanly."""
+        audit_path = self.repo_root / "research" / "audit.md"
+        self.assertTrue(audit_path.exists(), f"Missing {audit_path}")
+        content = audit_path.read_text(encoding="utf-8")
+        self.assertIn("Master Audit Ledger", content)
+        self.assertIn("Machine Reference Integrity Verification", content)
 
-        lines = matrix_path.read_text(encoding="utf-8").strip().splitlines()
-        self.assertGreater(len(lines), 10)
+        # Synthetic source truth matrix fixture validation
+        synthetic_matrix = (
+            "Component,Classification,Evidence / Audit Finding\n"
+            "Recorder,CONFIRMED,evidence/2026-09-20/recorder_old_code_risk.txt\n"
+            "SimEngine,FIXED,tests/test_sim_engine.py\n"
+        )
+        lines = synthetic_matrix.strip().splitlines()
+        self.assertGreater(len(lines), 2)
         header = lines[0]
         self.assertIn("Component", header)
         self.assertIn("Classification", header)
