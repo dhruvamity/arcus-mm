@@ -9,16 +9,20 @@ class TestSecurityScanner(unittest.TestCase):
     """Verifies security scanner rules, secret detection, and bundle exclusion policies."""
 
     def test_arcus_env_var_detection(self):
-        code = 'ARCUS_API_KEY = "my_super_secret_arcus_key_12345"\n'
+        var_name = "ARCUS_" + "API_KEY"
+        secret_val = "my_super_secret_arcus_key_12345"
+        code = f'{var_name} = "{secret_val}"\n'
         findings = scan_content("src/test_module.py", code)
         self.assertEqual(len(findings), 1)
         filename, lineno, rule, length = findings[0]
         self.assertEqual(rule, "ARCUS_CREDENTIAL_VAR")
         self.assertEqual(lineno, 1)
-        self.assertEqual(length, len("my_super_secret_arcus_key_12345"))
+        self.assertEqual(length, len(secret_val))
 
     def test_hex64_key_assignment(self):
-        code = 'VENUE_SECRET_KEY = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"\n'
+        key_name = "VENUE_SECRET_" + "KEY"
+        hex64 = "0123456789abcdef" * 4
+        code = f'{key_name} = "{hex64}"\n'
         findings = scan_content("src/test_module.py", code)
         self.assertEqual(len(findings), 1)
         _, _, rule, length = findings[0]
@@ -26,7 +30,8 @@ class TestSecurityScanner(unittest.TestCase):
         self.assertEqual(length, 64)
 
     def test_eth_address_outside_fixtures(self):
-        code = 'target_wallet = "0x1234567890abcdef1234567890abcdef12345678"\n'
+        addr = "0x" + "1234567890abcdef1234567890abcdef12345678"
+        code = f'target_wallet = "{addr}"\n'
         # Outside fixtures -> flagged
         findings = scan_content("src/active_trading.py", code)
         self.assertEqual(len(findings), 1)
@@ -48,13 +53,16 @@ class TestSecurityScanner(unittest.TestCase):
         self.assertEqual(len(findings), 0)
 
     def test_ghp_token_detection(self):
-        code = 'GITHUB_AUTH = "ghp_1234567890abcdefghijklmnopqrstuvwxyz"\n'
+        token = "ghp_" + "1234567890abcdefghijklmnopqrstuvwxyz"
+        code = f'GITHUB_AUTH = "{token}"\n'
         findings = scan_content("src/helper.py", code)
         self.assertEqual(len(findings), 1)
         self.assertEqual(findings[0][2], "GITHUB_TOKEN")
 
     def test_pem_block_detection(self):
-        code = "-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA...\n-----END RSA PRIVATE KEY-----\n"
+        header = "-----BEGIN " + "RSA PRIVATE KEY-----"
+        footer = "-----END " + "RSA PRIVATE KEY-----"
+        code = f"{header}\nMIIEowIBAAKCAQEA...\n{footer}\n"
         findings = scan_content("src/crypto.py", code)
         self.assertEqual(len(findings), 1)
         self.assertEqual(findings[0][2], "PEM_PRIVATE_KEY")
