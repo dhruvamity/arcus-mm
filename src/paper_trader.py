@@ -112,9 +112,14 @@ class ArcusLivePaperTrader:
         logger.info("Querying live market metadata from GET /v1/markets...")
         try:
             markets_res = await self.rest_client._request("GET", "/v1/markets", "markets")
-            items = markets_res.get("markets") or markets_res if isinstance(markets_res, list) else []
+            if isinstance(markets_res, dict):
+                items = markets_res.get("markets") or markets_res.get("data") or []
+            elif isinstance(markets_res, list):
+                items = markets_res
+            else:
+                items = []
             for item in items:
-                m_name = item.get("market") or item.get("name")
+                m_name = item.get("marketDisplayName") or item.get("market") or item.get("name")
                 if m_name in self.markets:
                     self.market_specs[m_name] = {
                         "tick_size": float(item.get("tickSize", 0.001)),
@@ -125,14 +130,13 @@ class ArcusLivePaperTrader:
                     }
                     logger.info(f"Loaded live metadata for {m_name}: {self.market_specs[m_name]}")
         except Exception as e:
-            logger.warning(f"Could not load live /v1/markets ({e}). Falling back to conservative venue metadata.")
+            logger.warning(f"Could not load live /v1/markets ({e}). Falling back to canonical venue metadata.")
 
-        # Ensure all markets have specs
+        # Ensure all markets have specs from canonical venue metadata
+        from src.venue import get_market_spec
         for m in self.markets:
             if m not in self.market_specs:
-                self.market_specs[m] = DEFAULT_MARKET_SPECS.get(
-                    m, {"tick_size": 0.01, "step_size": 0.0001, "min_notional": 5.0, "min_order_size": 0.001}
-                )
+                self.market_specs[m] = get_market_spec(m)
 
         # Build strategy instances per market and capital scenario
         strategies: Dict[str, Any] = {}

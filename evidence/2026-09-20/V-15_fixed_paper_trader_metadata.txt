@@ -1,0 +1,8 @@
+COMMAND: .venv/bin/python -c $'\ndict_res = {\'markets\': [{\'marketDisplayName\': \'BTC-USD\', \'tickSize\': \'0.1\', \'stepSize\': \'0.0001\'}]}\nlist_res = [{\'marketDisplayName\': \'BTC-USD\', \'tickSize\': \'0.1\', \'stepSize\': \'0.0001\'}]\n\ndef parse(res):\n    if isinstance(res, dict):\n        return res.get(\'markets\') or res.get(\'data\') or []\n    elif isinstance(res, list):\n        return res\n    return []\n\nprint(\'Dict parse len:\', len(parse(dict_res)))\nprint(\'List parse len:\', len(parse(list_res)))\n' 
+GIT_HEAD: 15a0a9e0d214db666710df5548aff3fccefbf1d4
+TIMESTAMP: 2026-09-20T09:29:17Z
+PYTHON_VERSION: Python 3.12.14
+EXIT_CODE: 0
+--- OUTPUT ---
+Dict parse len: 1
+List parse len: 1
