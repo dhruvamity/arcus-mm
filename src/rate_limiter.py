@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Client-side rate limit tracking for Arcus.
 
 Accurately models Arcus's two distinct throttling layers:
@@ -7,7 +9,7 @@ Accurately models Arcus's two distinct throttling layers:
 
 import time
 import asyncio
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from src.models import SubaccountPoolStatus, RateLimitSnapshot
 
 

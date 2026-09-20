@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 """Strategy 1: Fixed-Spread Symmetric Quoting (Control Baseline).
 
-Fulfills Section 22 of prompt.md:
 - Posts both sides at a static offset from reference price.
 - No inventory skew.
 - No adaptive spread.

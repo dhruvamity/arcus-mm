@@ -13,14 +13,12 @@ Fulfills Phase 15 requirements from prompt.md:
 import argparse
 import asyncio
 import datetime
-import json
 import logging
-import os
 import signal
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Dict, Any
 
 # Add project root to sys.path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -62,7 +60,7 @@ def generate_paper_report(
         f"**Date:** {now_str}  ",
         f"**Session ID:** `{session_id}`  ",
         f"**Session Duration:** {hours:.2f} hours ({duration_secs:.0f} seconds)  ",
-        f"**Execution Mode:** Live Public Mainnet Feeds (ZERO REAL MAINNET ORDERS)  ",
+        "**Execution Mode:** Live Public Mainnet Feeds (ZERO REAL MAINNET ORDERS)  ",
         "",
         "## 1. Executive Summary",
         "",

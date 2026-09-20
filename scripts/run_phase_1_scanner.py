@@ -7,13 +7,12 @@ and produces the Phase 1 datasets and reports.
 """
 
 import asyncio
-import json
 import logging
 import sys
 import time
 from decimal import Decimal
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 import pandas as pd
 
 # Add project root to sys.path
@@ -99,11 +98,9 @@ async def scan_market_universe():
             logger.info(f"[{idx+1}/{len(markets)}] Scanning {symbol} (ID: {market_id})...")
 
             # Fetch BBO
-            bbo_data = {}
             bid_p, ask_p, bid_s, ask_s = None, None, None, None
             try:
                 bbo_res = await client._request("GET", f"/v1/bbo/{symbol}", "bbo")
-                bbo_data = bbo_res
                 bb = bbo_res.get("bestBid") or {}
                 ba = bbo_res.get("bestAsk") or {}
                 if bb.get("price") and ba.get("price"):

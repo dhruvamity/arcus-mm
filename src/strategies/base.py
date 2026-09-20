@@ -1,7 +1,8 @@
+from __future__ import annotations
+
 """Abstract Strategy Base for Arcus Perpetuals Market Making."""
 
 from abc import ABC, abstractmethod
-from decimal import Decimal
 from typing import Optional, Tuple, Dict, Any
 
 from src.utils import snap_to_tick, snap_to_step, to_decimal

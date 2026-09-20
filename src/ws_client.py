@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 """Asynchronous WebSocket Client for Arcus Perpetuals."""
 
 import asyncio
 import json
 import logging
 import ssl
-from typing import Dict, Any, Optional, Callable, Awaitable, Set, Union, Tuple
+from typing import Dict, Any, Optional, Callable, Awaitable, Union, Tuple
 import websockets
 from websockets.protocol import State
 try:
@@ -187,7 +189,7 @@ class ArcusWsClient:
         if method in self.MUTATING_WS_METHODS:
             if self.config.environment == "mainnet" and self.config.mainnet_order_lock:
                 raise PermissionError(
-                    f"WEBSOCKET {method} ON MAINNET IS HARD-BLOCKED by prompt.md Section 26 safety lock!"
+                    f"WEBSOCKET {method} ON MAINNET IS HARD-BLOCKED by safety lock!"
                 )
         if not self.signer:
             raise ValueError("Signer required for authenticated WebSocket trading RPC")
@@ -257,7 +259,6 @@ class ArcusWsClient:
                     break
                 raw_msg = await self._ws.recv()
                 msg = json.loads(raw_msg)
-                msg_type = msg.get("type")
 
                 # Handle RPC correlated responses
                 if "id" in msg and msg.get("id") in self._pending_requests:

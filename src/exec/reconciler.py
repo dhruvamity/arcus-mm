@@ -1,12 +1,13 @@
+from __future__ import annotations
+
 """State Reconciliation Engine for Arcus MM Execution Stack.
 
-Fulfills Mandate Section 10:
 - Reconciles positions, open orders, and fills against exchange venue state
 - Detects discrepancies, missing orders, and ghost orders
 - Emits structured ReconciliationReport and flags Sev-1 mismatches
 """
 
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any
 from dataclasses import dataclass, field
 import time
 

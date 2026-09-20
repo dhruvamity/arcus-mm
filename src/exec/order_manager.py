@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 """Order Manager and Rate-Limit Pool Accounting for Arcus MM Execution Stack.
 
-Fulfills Mandate Section 10:
 - Place / modify / cancel / cancelAll order management
 - Rate-limit pools per venue docs:
   - place: 1 order unit
@@ -16,7 +17,7 @@ Fulfills Mandate Section 10:
 import time
 import uuid
 from enum import Enum
-from typing import Dict, List, Optional, Any
+from typing import Dict, Optional, Any
 from src.exec.rejection_handlers import RejectionHandler, RejectionReason
 
 

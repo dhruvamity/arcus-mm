@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 """Latency Pipeline Model for Arcus Market Making.
 
-Fulfills Section 18 of prompt.md:
 - Feed latency (WS market data arrival)
 - Decision latency (strategy compute time)
 - Send latency (network transit to gateway)
@@ -11,7 +12,7 @@ Fulfills Section 18 of prompt.md:
 Supports testing at baseline, +100ms, +500ms, +1s, +5s.
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 
 class LatencyConfig:

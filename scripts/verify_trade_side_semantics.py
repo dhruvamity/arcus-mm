@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Verifies trade side semantics from recorded BBO + Trades (WS-1 Test 2).
 
 Determines whether trade['side'] represents taker side or maker side by
@@ -7,9 +9,8 @@ Outputs to evidence/trade_side_semantics.md.
 """
 
 import json
-import sys
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Dict, Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 

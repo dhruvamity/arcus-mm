@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 """Unit Tests for Unified SimEngine.
 
-Fulfills Mandate v2 Section 5.6:
 1. Scripted scenario hand-computed expectations (A, B, C).
 2. A >= B >= C monotonicity.
 3. Cancel-latency pick-off risk.
@@ -219,6 +220,7 @@ class TestSimEngine(unittest.TestCase):
         self.engine.on_event(SimEvent(SimEventType.BBO, t0, self.market, {"bid_price": 99.90, "ask_price": 100.10, "bid_size": 1.0, "ask_size": 1.0}))
         ctx = self.engine.contexts["fixed_spread"]
         in_flight_bid = next(o for o in ctx.in_flight_orders if o.side == "BUY")
+        self.assertIsNotNone(in_flight_bid)
 
         # Trade arrives at t0 + 5ms (arrival is at t0 + 20ms)
         e_early_trade = SimEvent(SimEventType.TRADE, t0 + int(5e6), self.market, {"price": 99.0, "size": 1.0, "side": "SELL"})
@@ -230,6 +232,7 @@ class TestSimEngine(unittest.TestCase):
         venue = self.engine.venues[self.market]
         t0 = 1_000_000_000_000_000_000
         vol1 = venue.volatility_estimator.update(t0, 100.0)
+        self.assertGreaterEqual(vol1, 0.0)
         vol2 = venue.volatility_estimator.update(t0 + 1_000_000_000, 101.0)
         self.assertGreater(vol2, 0.0)
 

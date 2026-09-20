@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 """Data Quality and Event Normalization Pipeline for Arcus Perpetuals.
 
-Fulfills Phase 3 requirements from prompt.md:
 - Reads raw immutable JSONL events from data/raw/
 - Validates data quality:
   - Sequence monotonicity & gap detection (honoring snapshot boundary splice rule)
@@ -16,7 +17,7 @@ import datetime
 import json
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Any
 import pandas as pd
 
 logger = logging.getLogger(__name__)

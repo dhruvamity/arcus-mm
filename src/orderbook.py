@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Local L2 Order Book reconstructor and sequence validator.
 
 Implements exact Arcus L2 sequence rules:
@@ -8,7 +10,7 @@ Implements exact Arcus L2 sequence rules:
 - Computes microprice, spread, and book imbalance.
 """
 
-from typing import Dict, List, Tuple, Optional, Any
+from typing import Dict, Tuple, Optional, Any
 from decimal import Decimal
 import logging
 from src.utils import to_decimal

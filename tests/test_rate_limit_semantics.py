@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 """Deterministic Unit Test Suite for Arcus Rate-Limit Economics.
 
-Fulfills Mandate Section 5:
 - Independent Order and Cancel pool separation (20,000 order / 40,000 cancel).
 - Unit costs: PLACE (1 order), MODIFY (1 order), CANCEL (1 cancel), CANCEL_ALL (1,000 cancel).
 - Fill replenishment: +1 unit per $0.10 traded notional, bounded by pool capacity.
@@ -10,7 +11,7 @@ Fulfills Mandate Section 5:
 
 import unittest
 from src.models.rate_limit import ArcusRateLimitSimulator
-from src.models.fill import SimulatedQueueOrder, FillEngine, FillModelType
+from src.models.fill import SimulatedQueueOrder
 
 
 class TestRateLimitSemantics(unittest.TestCase):

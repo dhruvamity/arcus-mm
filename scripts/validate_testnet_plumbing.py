@@ -1,6 +1,6 @@
 """Phase 12: Testnet Execution Plumbing & Cryptographic Validation.
 
-Fulfills Phase 12 of prompt.md while respecting the zero-balance constraint:
+Validates execution plumbing while respecting the zero-balance constraint:
 - Validates Ed25519 Scheme 1 typed payload canonicalization & signatures.
 - Validates Ed25519 Scheme 2 legacy signing message construction & signatures.
 - Checks testnet venue endpoints, nanosecond timestamp drift tolerance, and active credentials.
@@ -10,7 +10,6 @@ Fulfills Phase 12 of prompt.md while respecting the zero-balance constraint:
 
 import asyncio
 import datetime
-import json
 import logging
 from pathlib import Path
 
@@ -100,7 +99,7 @@ async def main():
         f"| **Ed25519 Scheme 1 (Typed Payload)** | Key-sorted compact JSON (`placeOrder`, `cancelOrder`, `modifyOrder`) | {'✅ PASS' if results['scheme_1_signature_valid'] else '❌ FAIL'} |",
         f"| **Ed25519 Scheme 2 (Legacy Action)** | `X-Timestamp + ACTION + canonicalJSON` (`scheduleCancel`, `setLeverage`) | {'✅ PASS' if results['scheme_2_signature_valid'] else '❌ FAIL'} |",
         f"| **Venue Rate Limit Pools** | Subaccount Pools (20,000 Order, 40,000 Cancel) | {'✅ PASS' if results['rate_limits_verified'] else '⚠️ UNCHECKED'} |",
-        f"| **Account Collateral Balance** | Initial experimental capital deposit | `Unfunded ($0.00)` (As Noted by User) |",
+        "| **Account Collateral Balance** | Initial experimental capital deposit | `Unfunded ($0.00)` (As Noted by User) |",
         "",
         "## 3. Order Execution Safety Constraint",
         "",

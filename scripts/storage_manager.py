@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """Storage Manager and Data Archival Plan for Arcus MM.
 
-Fulfills Mandate Section 6.5:
 - Scans closed raw data files in data/raw/
 - Compresses closed files using gzip/zstd with SHA-256 checksum verification
 - Prohibits deleting any raw data file without a verified compressed copy
-- Checks disk free space with an alarm threshold at 30 GB
+- Checks disk free space with an alarm threshold at 40 GB
 - Emits 13-day storage projections and disk usage reports
 """
 
@@ -16,10 +17,10 @@ import shutil
 import hashlib
 import argparse
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, Tuple, Optional
 
-# Constants per Mandate Section 6.5
-ALARM_THRESHOLD_GB = 30.0
+# Constants
+ALARM_THRESHOLD_GB = 40.0
 RECORDING_TARGET_DAYS = 13.0
 
 

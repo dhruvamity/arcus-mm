@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 """Strategy 2: Avellaneda–Stoikov (A-S) Baseline Correctly Defined.
 
-Fulfills Section 17 & 21 of prompt.md:
 - Reservation price: r = s - q * gamma * sigma^2 * T
 - Total spread: delta = s * [gamma * sigma^2 * T + (2 / gamma) * ln(1 + gamma / kappa)]
 - Quotes: bid = r - delta/2, ask = r + delta/2
@@ -12,7 +13,6 @@ Fulfills Section 17 & 21 of prompt.md:
 
 import math
 from typing import Optional, Tuple, Dict, Any
-import numpy as np
 import pandas as pd
 
 from src.strategies.base import BaseMarketMakingStrategy, Quote
@@ -25,7 +25,6 @@ def calibrate_kappa_from_trades(
 ) -> Tuple[float, Dict[str, Any]]:
     """Empirically estimates order arrival intensity kappa from observed trades.
 
-    Fulfills Section 17.1 of prompt.md:
     kappa relates trade arrival frequency lambda to distance from mid delta/2:
     lambda(delta) = A * exp(-kappa * delta)
     """

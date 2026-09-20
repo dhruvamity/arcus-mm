@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Unit Tests for Unified Live Paper Trader Rebuilt on SimEngine (R-08).
 
 Verifies:
@@ -7,8 +9,6 @@ Verifies:
 - Session directory persistence and SHA-256 manifest generation.
 """
 
-import asyncio
-import json
 import tempfile
 import unittest
 from pathlib import Path

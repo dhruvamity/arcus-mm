@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Unit Tests for Market Calendar, Regime Tagging, and Early Closes (R-18).
 
 Verifies:
@@ -9,14 +11,10 @@ Verifies:
 
 import datetime
 import unittest
-from zoneinfo import ZoneInfo
 
-from src.calendar import (
+from src.session_calendar import (
     classify_regime,
-    is_us_equity_holiday,
     get_us_equity_close_time,
-    US_EARLY_CLOSES_2026,
-    MarketRegimeTag,
 )
 
 

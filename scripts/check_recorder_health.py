@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """Generates or updates the Recorder Health & Integrity Dashboard.
 
 Reads data/recorder_heartbeat.json and scans data/raw/ to produce
@@ -7,7 +9,6 @@ reports/recorder_health/latest_health.md.
 
 import datetime
 import json
-import shutil
 import sys
 from pathlib import Path
 

@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 """Fill Models for Arcus Perpetuals Backtesting.
 
-Fulfills Section 4.1 & 4.2 of prompt.md:
 - Model A (Optimistic / Diagnostic): Price touch => fill up to trade size.
 - Model B (Moderate): Strict queue-aware FIFO model behind displayed depth.
   - Size decrease preserves queue priority.
@@ -15,7 +16,7 @@ Fulfills Section 4.1 & 4.2 of prompt.md:
 """
 
 from enum import Enum
-from typing import Optional, Dict, Any
+from typing import Optional
 
 
 class FillModelType(str, Enum):

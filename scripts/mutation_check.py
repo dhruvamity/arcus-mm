@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """Programmatic Mutation Verification Suite for Arcus Unified SimEngine.
 
-Fulfills Mandate v2 Section 5.6 Test 13 & Mandate Section 13 (R-07):
-Applies at least 8 deliberate code/logic mutations to SimEngine and its core
+Applies deliberate code/logic mutations to SimEngine and its core
 subsystems, verifying that the unit test suite FAILS on each mutation (confirming
 the tests are sensitive to real defects and have no blind spots).
 
@@ -22,15 +23,14 @@ Mutations tested:
 import sys
 import unittest
 from pathlib import Path
-from typing import Callable, Any, Tuple, List, Dict
+from typing import Callable, Any, Tuple, List
 
 # Ensure project root is in sys.path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.sim.engine import SimEngine, SimEvent, SimEventType, RiskState, SimulatedOrder
+from src.sim.engine import SimEngine
 from src.models.fill import FillModelType, OrderStatus
-from src.models.latency import LatencyConfig
 from src.models.pnl import PnLAttributionEngine
 from tests.test_sim_engine import TestSimEngine
 from tests.test_harness_integrity import TestHarnessIntegrity
@@ -302,7 +302,7 @@ def main():
         if res.caught:
             print(f"        Failure Reason: {res.error_msg}")
         else:
-            print(f"        ERROR: Unit test did not catch this mutation!")
+            print("        ERROR: Unit test did not catch this mutation!")
 
     print("-" * 80)
     all_caught = all(r.caught for r in results)

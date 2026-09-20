@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 """Rejection Handlers for Arcus MM Execution Stack.
 
-Fulfills Mandate Section 10:
 Handles venue rejection reasons:
 - POST_ONLY_WOULD_CROSS
 - UNDERCOLLATERALIZED
@@ -11,7 +12,7 @@ Handles venue rejection reasons:
 """
 
 from enum import Enum
-from typing import Dict, Any, Optional, Callable
+from typing import Dict, Any, Callable
 
 
 class RejectionReason(str, Enum):

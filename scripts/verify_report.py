@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """Report Verification Script for Arcus Research Reports.
 
-Fulfills Non-negotiable Rule 3 from prompt.md and corrective pass requirements:
 - Ensures reports are generated from computed tables, never hand-narrated.
 - Checks that numbers in prose trace directly to table cells.
 - Enforces strict prohibition of forbidden words ("CERTIFIED", un-quarantined "CONDITIONAL YES").
@@ -20,7 +21,7 @@ import argparse
 import re
 import sys
 from pathlib import Path
-from typing import List, Dict, Set, Tuple
+from typing import List, Set, Tuple
 
 
 FORBIDDEN_PATTERNS = [

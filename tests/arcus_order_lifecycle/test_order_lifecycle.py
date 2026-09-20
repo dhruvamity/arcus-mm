@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Phase 0 Order Lifecycle Test Suite.
 
 Validates order construction, Scheme 1 typing, ALO flag encoding,
@@ -72,6 +74,7 @@ class TestArcusOrderLifecycle(unittest.TestCase):
             timeInForce=TimeInForce.ALO,
         )
 
+        self.assertIsNotNone(order)
         with self.assertRaises(PermissionError) as ctx:
             client._assert_trading_allowed()
         self.assertIn("MAINNET", str(ctx.exception))

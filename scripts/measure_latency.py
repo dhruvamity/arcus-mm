@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """Continuous Empirical Latency Measurement for Arcus Perpetuals.
 
-Fulfills Mandate v2 Section 7 (Workstream 4 / R-13):
 - Measures real RTT from the local machine:
   1. REST /v1/markets round-trip time.
   2. WebSocket ping/pong round-trip time.
   3. WebSocket subscribe-ack round-trip time.
 - Drops pseudo 'clock skew' metric (which measured BBO book staleness rather than network skew).
-- Records every raw sample with UTC timestamp in latency/latency_raw_samples.jsonl and reports/latency_raw_samples.jsonl.
+- Records every raw sample with UTC timestamp in latency/latency_raw_samples.jsonl.
 - Computes empirical p50, p95, p99 latency distributions.
-- Emits canonical results to latency/empirical_samples.json, reports/latency_benchmarks.json, and reports/latency_summary.md.
 - Supports continuous 24h background sampling every 10–30 seconds.
 """
 
 import argparse
+
 import asyncio
 import datetime
 import json
@@ -26,7 +27,6 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.config import settings
 from src.rest_client import ArcusRestClient
 from src.ws_client import ArcusWsClient
 

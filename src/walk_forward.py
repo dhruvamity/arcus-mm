@@ -1,11 +1,7 @@
-"""LEGACY MODULE - DEPRECATED.
-DO NOT USE FOR FORMAL BACKTESTING OR RESEARCH.
-Superseded by canonical SimEngine (src/sim/engine.py) and Pre-registration Protocol v3 (research/prereg_backtest.md).
-Preserved for backward test compatibility only.
+from __future__ import annotations
 
-Formal Walk-Forward Validation, Multiple-Testing Control & Machine-Checkable Gates.
+"""Formal Walk-Forward Validation, Multiple-Testing Control & Machine-Checkable Gates.
 
-Fulfills Mandate Sections 18, 19, 20, 21 of prompt.md:
 - Pre-registered Chronology:
   - Tuning Week: 2026-09-21 through 2026-09-25
   - Parameter Freeze: 2026-09-26 12:00 UTC

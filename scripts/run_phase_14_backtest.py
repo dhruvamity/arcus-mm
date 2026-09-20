@@ -13,17 +13,16 @@ import argparse
 import datetime
 import json
 import logging
-import math
 import sys
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any
 
 import pandas as pd
 
 # Add project root to sys.path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.calendar import classify_regime
+from src.session_calendar import classify_regime
 from src.utils import now_ns
 from src.backtester import ArcusEventBacktester
 from src.models.fill import FillModelType
@@ -31,7 +30,6 @@ from src.models.latency import LatencyConfig
 from src.strategies.fixed_spread import FixedSpreadStrategy
 from src.strategies.avellaneda_stoikov import AvellanedaStoikovStrategy
 from src.strategies.volatility_clock import VolatilityClockStrategy
-from src.strategies.adaptive_mm import AdaptiveMicrostructureStrategy
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("phase_14_runner")
@@ -157,7 +155,7 @@ def generate_phase_14_data_coverage_report(coverage: List[Dict[str, Any]], outpu
         "# Phase 14 — Market Data Coverage & Regime Stratification Report",
         "",
         f"**Generated At:** {now_str}  ",
-        f"**Report Type:** `DATA COVERAGE REPORT` (Distinct from Formal Backtest Report per Section 9)  ",
+        "**Report Type:** `DATA COVERAGE REPORT` (Distinct from Formal Backtest Report per Section 9)  ",
         f"**Total Streaming Messages Recorded:** {total_msgs:,}  ",
         f"**Total Genuine Real Trades Logged:** {total_trades:,}  ",
         f"**Peak Market Duration:** {max_hrs:.2f} hours  ",
@@ -214,7 +212,6 @@ def run_deterministic_backtest_matrix(
         m_dir = target_date / m
         bbo_f = m_dir / "bbo.jsonl"
         trades_f = m_dir / "trades.jsonl"
-        l2_f = m_dir / "l2OrderbookUpdates.jsonl"
 
         if not bbo_f.exists() or not trades_f.exists():
             continue
@@ -336,9 +333,9 @@ def generate_phase_14_backtest_report(backtest_results: List[Dict[str, Any]], ou
         "# Phase 14 — Formal Event-Driven Backtest Report",
         "",
         f"**Generated At:** {now_str}  ",
-        f"**Report Type:** `FORMAL BACKTEST REPORT` (Generated via deterministic event replay; zero synthetic multipliers)  ",
+        "**Report Type:** `FORMAL BACKTEST REPORT` (Generated via deterministic event replay; zero synthetic multipliers)  ",
         f"**Total Simulation Runs:** {len(df)} configurations  ",
-        f"**Execution Engine:** `ArcusEventBacktester` with order state machine & dynamic realized volatility  ",
+        "**Execution Engine:** `ArcusEventBacktester` with order state machine & dynamic realized volatility  ",
         "",
         "---",
         "",

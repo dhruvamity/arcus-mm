@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 """Unit tests for Walk-Forward Protocol, Baselines, and Multiple-Testing Control.
 
-Fulfills Mandate Sections 18, 19, 20, 21 of prompt.md:
 - Pre-registered walk-forward split integrity.
 - Do-Nothing and Random-Side Quoting baseline behavior.
 - Student's t p-value calculation.
@@ -10,11 +11,9 @@ Fulfills Mandate Sections 18, 19, 20, 21 of prompt.md:
 
 import unittest
 import pandas as pd
-import numpy as np
 
 from src.walk_forward import WalkForwardValidator
 from src.strategies.baselines import DoNothingStrategy, RandomSideQuotingStrategy
-from src.strategies.fixed_spread import FixedSpreadStrategy
 from src.models.fill import FillModelType
 from src.backtester import ArcusEventBacktester
 

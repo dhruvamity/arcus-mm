@@ -1,0 +1,133 @@
+COMMAND: python3 -m pyflakes src scripts tests legacy
+GIT_HEAD: ab55a3f244d6c59aa29025a0c33ef461f4a51e20
+TIMESTAMP: 2026-09-20T08:55:31Z
+PYTHON_VERSION: Python 3.14.5
+EXIT_CODE: 1
+--- OUTPUT ---
+src/config.py:3:1: 'os' imported but unused
+src/config.py:5:1: 'typing.Optional' imported but unused
+src/watchdog.py:14:1: 'os' imported but unused
+src/recorder.py:330:17: local variable 'new_client' is assigned to but never used
+src/rate_limiter.py:10:1: 'typing.Optional' imported but unused
+src/ws_client.py:7:1: 'typing.Set' imported but unused
+src/ws_client.py:260:17: local variable 'msg_type' is assigned to but never used
+src/paper_trader.py:24:1: 'time' imported but unused
+src/paper_trader.py:30:1: 'src.sim.engine.RiskState' imported but unused
+src/paper_trader.py:41:1: 'src.strategies.avellaneda_stoikov.AvellanedaStoikovStrategy' imported but unused
+src/orderbook.py:11:1: 'typing.List' imported but unused
+src/characterization.py:16:1: 'typing.List' imported but unused
+src/backtester.py:19:1: 'pathlib.Path' imported but unused
+src/backtester.py:21:1: 'numpy as np' imported but unused
+src/normalizer.py:19:1: 'typing.Tuple' imported but unused
+src/rest_client.py:4:1: 'typing.Union' imported but unused
+src/rest_client.py:11:1: 'src.utils.good_til_time_nanos' imported but unused
+src/rest_client.py:18:1: 'src.models.OrderSide' imported but unused
+src/rest_client.py:18:1: 'src.models.TimeInForce' imported but unused
+src/strategies/avellaneda_stoikov.py:15:1: 'numpy as np' imported but unused
+src/strategies/base.py:4:1: 'decimal.Decimal' imported but unused
+src/models/latency.py:29:33: undefined name 'Optional'
+src/models/fill.py:18:1: 'typing.Dict' imported but unused
+src/models/fill.py:18:1: 'typing.Any' imported but unused
+src/models/core.py:6:1: 'pydantic.Field' imported but unused
+src/exec/reconciler.py:9:1: 'typing.Optional' imported but unused
+src/exec/rejection_handlers.py:14:1: 'typing.Optional' imported but unused
+src/exec/order_manager.py:19:1: 'typing.List' imported but unused
+src/sim/engine.py:13:1: 'dataclasses.field' imported but unused
+src/sim/engine.py:14:1: 'decimal.Decimal' imported but unused
+src/sim/engine.py:17:1: 'json' imported but unused
+src/sim/engine.py:19:1: 'math' imported but unused
+src/sim/engine.py:21:1: 'typing.Tuple' imported but unused
+src/sim/engine.py:21:1: 'typing.Callable' imported but unused
+src/sim/engine.py:29:1: 'src.utils.to_decimal' imported but unused
+src/sim/engine.py:527:13: local variable 'clip_notional' is assigned to but never used
+scripts/verify_report.py:23:1: 'typing.Dict' imported but unused
+scripts/check_recorder_health.py:10:1: 'shutil' imported but unused
+scripts/test_replay_parity.py:31:1: 'src.strategies.fixed_spread.FixedSpreadStrategy' imported but unused
+scripts/storage_manager.py:19:1: 'typing.List' imported but unused
+scripts/run_phase_14_backtest.py:16:1: 'math' imported but unused
+scripts/run_phase_14_backtest.py:19:1: 'typing.Optional' imported but unused
+scripts/run_phase_14_backtest.py:34:1: 'src.strategies.adaptive_mm.AdaptiveMicrostructureStrategy' imported but unused
+scripts/run_phase_14_backtest.py:160:9: f-string is missing placeholders
+scripts/run_phase_14_backtest.py:217:9: local variable 'l2_f' is assigned to but never used
+scripts/run_phase_14_backtest.py:339:9: f-string is missing placeholders
+scripts/run_phase_14_backtest.py:341:9: f-string is missing placeholders
+scripts/secret_scan.py:18:1: 'os' imported but unused
+scripts/secret_scan.py:117:5: local variable 'e' is assigned to but never used
+scripts/run_pilot_analysis.py:35:1: 'src.market_specs.MARKET_SPECS' imported but unused
+scripts/run_pilot_analysis.py:296:9: local variable 'expected_5d_trades' is assigned to but never used
+scripts/reconcile_trades.py:14:1: 'typing.List' imported but unused
+scripts/run_paper_trader.py:16:1: 'json' imported but unused
+scripts/run_paper_trader.py:18:1: 'os' imported but unused
+scripts/run_paper_trader.py:23:1: 'typing.List' imported but unused
+scripts/run_paper_trader.py:65:9: f-string is missing placeholders
+scripts/run_adverse_selection_study.py:10:1: 'json' imported but unused
+scripts/run_adverse_selection_study.py:26:9: f-string is missing placeholders
+scripts/run_phase_1_scanner.py:10:1: 'json' imported but unused
+scripts/run_phase_1_scanner.py:16:1: 'typing.Optional' imported but unused
+scripts/run_phase_1_scanner.py:106:17: local variable 'bbo_data' is assigned to but never used
+scripts/validate_testnet_plumbing.py:13:1: 'json' imported but unused
+scripts/validate_testnet_plumbing.py:103:9: f-string is missing placeholders
+scripts/run_live_paper_session.py:15:1: 'hashlib' imported but unused
+scripts/run_live_paper_session.py:28:1: 'src.sim.engine.SimEngine' imported but unused
+scripts/run_live_paper_session.py:29:1: 'src.models.fill.FillModelType' imported but unused
+scripts/run_live_paper_session.py:30:1: 'src.models.latency.LatencyConfig' imported but unused
+scripts/run_live_paper_session.py:41:17: undefined name 'Optional'
+scripts/run_live_paper_session.py:140:5: local variable 'markets' is assigned to but never used
+scripts/run_live_paper_session.py:143:5: local variable 'total_fills' is assigned to but never used
+scripts/run_live_paper_session.py:152:9: f-string is missing placeholders
+scripts/run_live_paper_session.py:153:9: f-string is missing placeholders
+scripts/verify_trade_side_semantics.py:10:1: 'sys' imported but unused
+scripts/verify_trade_side_semantics.py:12:1: 'typing.List' imported but unused
+scripts/measure_latency.py:29:1: 'src.config.settings' imported but unused
+scripts/mutation_check.py:25:1: 'typing.Dict' imported but unused
+scripts/mutation_check.py:31:1: 'src.sim.engine.SimEvent' imported but unused
+scripts/mutation_check.py:31:1: 'src.sim.engine.SimEventType' imported but unused
+scripts/mutation_check.py:31:1: 'src.sim.engine.RiskState' imported but unused
+scripts/mutation_check.py:31:1: 'src.sim.engine.SimulatedOrder' imported but unused
+scripts/mutation_check.py:33:1: 'src.models.latency.LatencyConfig' imported but unused
+scripts/mutation_check.py:305:19: f-string is missing placeholders
+tests/test_order_lifecycle_depth.py:15:1: 'src.models.fill.FillEngine' imported but unused
+tests/test_backtester_execution.py:8:1: 'numpy as np' imported but unused
+tests/test_rate_limit_semantics.py:13:1: 'src.models.fill.FillEngine' imported but unused
+tests/test_rate_limit_semantics.py:13:1: 'src.models.fill.FillModelType' imported but unused
+tests/test_pnl_accounting.py:69:9: local variable 'fee' is assigned to but never used
+tests/test_walk_forward_protocol.py:13:1: 'numpy as np' imported but unused
+tests/test_walk_forward_protocol.py:17:1: 'src.strategies.fixed_spread.FixedSpreadStrategy' imported but unused
+tests/test_sim_engine.py:221:9: local variable 'in_flight_bid' is assigned to but never used
+tests/test_sim_engine.py:232:9: local variable 'vol1' is assigned to but never used
+tests/test_harness_integrity.py:16:1: 'math' imported but unused
+tests/test_harness_integrity.py:22:1: 'src.session_calendar.MarketRegimeTag' imported but unused
+tests/test_harness_integrity.py:23:1: 'src.adverse_selection.HORIZONS_SEC' imported but unused
+tests/test_harness_integrity.py:70:9: local variable 'f_a3' is assigned to but never used
+tests/test_harness_integrity.py:71:9: local variable 'f_b3' is assigned to but never used
+tests/test_harness_integrity.py:72:9: local variable 'f_c3' is assigned to but never used
+tests/test_harness_integrity.py:305:5: redefinition of unused 'datetime' from line 13
+tests/test_calendar_regimes.py:12:1: 'zoneinfo.ZoneInfo' imported but unused
+tests/test_calendar_regimes.py:14:1: 'src.session_calendar.is_us_equity_holiday' imported but unused
+tests/test_calendar_regimes.py:14:1: 'src.session_calendar.US_EARLY_CLOSES_2026' imported but unused
+tests/test_calendar_regimes.py:14:1: 'src.session_calendar.MarketRegimeTag' imported but unused
+tests/test_storage_manager.py:14:1: 'scripts.storage_manager.ALARM_THRESHOLD_GB' imported but unused
+tests/test_live_paper_trader.py:10:1: 'asyncio' imported but unused
+tests/test_live_paper_trader.py:11:1: 'json' imported but unused
+tests/arcus_connectivity/test_connectivity.py:10:1: 'src.config.settings' imported but unused
+tests/arcus_order_lifecycle/test_order_lifecycle.py:67:9: local variable 'order' is assigned to but never used
+legacy/run_backtest_matrix.py:9:1: 'argparse' imported but unused
+legacy/run_backtest_matrix.py:10:1: 'datetime' imported but unused
+legacy/run_backtest_matrix.py:11:1: 'json' imported but unused
+legacy/run_backtest_matrix.py:13:1: 'pathlib.Path' imported but unused
+legacy/run_backtest_matrix.py:14:1: 'pandas as pd' imported but unused
+legacy/run_backtest_matrix.py:16:1: 'src.backtester.ArcusEventBacktester' imported but unused
+legacy/run_backtest_matrix.py:17:1: 'src.models.fill.FillModelType' imported but unused
+legacy/run_backtest_matrix.py:18:1: 'src.models.latency.LatencyConfig' imported but unused
+legacy/run_backtest_matrix.py:19:1: 'src.strategies.fixed_spread.FixedSpreadStrategy' imported but unused
+legacy/run_backtest_matrix.py:20:1: 'src.strategies.avellaneda_stoikov.AvellanedaStoikovStrategy' imported but unused
+legacy/run_backtest_matrix.py:21:1: 'src.strategies.volatility_clock.VolatilityClockStrategy' imported but unused
+legacy/enrich_with_candles.py:41:9: local variable 'min_ts' is assigned to but never used
+legacy/enrich_with_candles.py:54:21: local variable 'high_p' is assigned to but never used
+legacy/enrich_with_candles.py:55:21: local variable 'low_p' is assigned to but never used
+legacy/enrich_with_candles.py:56:21: local variable 'close_p' is assigned to but never used
+legacy/run_walk_forward.py:9:1: 'argparse' imported but unused
+legacy/run_walk_forward.py:10:1: 'datetime' imported but unused
+legacy/run_walk_forward.py:11:1: 'json' imported but unused
+legacy/run_walk_forward.py:15:1: 'pandas as pd' imported but unused
+legacy/run_walk_forward.py:19:1: 'legacy.run_backtest_matrix.MARKET_SPECS' imported but unused

@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 """Event-Driven Backtesting Engine for Arcus Perpetuals Market Making.
 
-Fulfills Mandate Sections 6, 7, 8, 12, 14, 15, 16 of prompt.md:
 - Deterministic event replay with ZERO look-ahead bias
 - High-fidelity L2 Order Book Depth Replay (snapshots + deltas)
 - Explicit Order Lifecycle State Machine:
@@ -16,9 +17,7 @@ Fulfills Mandate Sections 6, 7, 8, 12, 14, 15, 16 of prompt.md:
 
 import json
 import logging
-from pathlib import Path
 from typing import Dict, List, Optional, Any
-import numpy as np
 import pandas as pd
 
 from src.models.fill import FillEngine, FillModelType, SimulatedQueueOrder, OrderStatus

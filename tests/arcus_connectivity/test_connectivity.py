@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Phase 0 Connectivity Test Suite.
 
 Validates REST and WebSocket connectivity, health checks, clock synchronization,
@@ -6,12 +8,16 @@ and public channel snapshots.
 
 import unittest
 import asyncio
+import os
 import time
-from src.config import settings
 from src.rest_client import ArcusRestClient
 from src.ws_client import ArcusWsClient
 
 
+@unittest.skipUnless(
+    os.environ.get("ARCUS_RUN_INTEGRATION") == "1",
+    "Skipping integration network test (set ARCUS_RUN_INTEGRATION=1 to run)",
+)
 class TestArcusConnectivity(unittest.IsolatedAsyncioTestCase):
     """Verifies live venue connectivity and latency bounds."""
 

@@ -1,0 +1,47 @@
+COMMAND: bash scripts/ci.sh 
+GIT_HEAD: ab55a3f244d6c59aa29025a0c33ef461f4a51e20
+TIMESTAMP: 2026-09-20T09:20:15Z
+PYTHON_VERSION: Python 3.12.14
+EXIT_CODE: 0
+--- OUTPUT ---
+=== Running CI for Arcus MM ===
+Using reference interpreter: Python 3.12.14
+
+--- Testing with Python 3.12.14 ---
+Running pyflakes...
+Running offline unit tests...
+sss......[SOL-USD] Mid-stream sequence gap: expected 104, got 105
+............[BTC-USD] Mid-stream sequence gap: expected 107, got 110
+............................../opt/homebrew/Cellar/python@3.12/3.12.14/Frameworks/Python.framework/Versions/3.12/lib/python3.12/json/decoder.py:354: ResourceWarning: unclosed <socket.socket fd=11, family=30, type=1, proto=6, laddr=('2405:201:48:400f:cd89:2261:c54a:1ac6', 63246, 0, 0), raddr=('2606:4700:9ae3:7e86:543:0:4c44:e037', 443, 0, 0)>
+  obj, end = self.scan_once(s, idx)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/opt/homebrew/Cellar/python@3.12/3.12.14/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/selector_events.py:879: ResourceWarning: unclosed transport <_SelectorSocketTransport fd=11>
+  _warn(f"unclosed transport {self!r}", ResourceWarning, source=self)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+.................[BTC-USD] Sequence gap in l2OrderbookUpdates: expected 106, got 110. Marking book INVALID and emitting INVALID_BOOK_INTERVAL.
+..[BTC-USD] Sequence gap in l2OrderbookUpdates: expected 106, got 110. Marking book INVALID and emitting INVALID_BOOK_INTERVAL.
+...................................WATCHDOG TRIGGERED: Heartbeat expired: 0.09s elapsed (limit: 0.05s). Executing emergency cleanup!
+......
+----------------------------------------------------------------------
+Ran 111 tests in 1.969s
+
+OK (skipped=3)
+
+--- Testing with Python 3.14.5 ---
+Running pyflakes...
+Running offline unit tests...
+sss......[SOL-USD] Mid-stream sequence gap: expected 104, got 105
+............[BTC-USD] Mid-stream sequence gap: expected 107, got 110
+...............................................[BTC-USD] Sequence gap in l2OrderbookUpdates: expected 106, got 110. Marking book INVALID and emitting INVALID_BOOK_INTERVAL.
+..[BTC-USD] Sequence gap in l2OrderbookUpdates: expected 106, got 110. Marking book INVALID and emitting INVALID_BOOK_INTERVAL.
+...................................WATCHDOG TRIGGERED: Heartbeat expired: 0.09s elapsed (limit: 0.05s). Executing emergency cleanup!
+......
+----------------------------------------------------------------------
+Ran 111 tests in 2.833s
+
+OK (skipped=3)
+
+--- Running secret scanner on git-tracked files ---
+PASS: No secrets found (0 findings).
+
+=== ALL CI CHECKS PASSED ===

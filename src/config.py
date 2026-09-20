@@ -1,8 +1,9 @@
+from __future__ import annotations
+
 """Configuration and environment management for Arcus trading infrastructure."""
 
-import os
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Literal
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from dotenv import load_dotenv

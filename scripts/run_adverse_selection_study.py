@@ -7,7 +7,6 @@ Generates reports/phase_6_adverse_selection_report.md and reports/phase_6_toxici
 
 import argparse
 import datetime
-import json
 import logging
 from pathlib import Path
 import pandas as pd
@@ -23,7 +22,7 @@ def generate_markdown_report(results: list[dict], output_md: Path):
         "# Phase 6 — Adverse-Selection & Inventory-Toxicity Empirical Study",
         "",
         f"**Date:** {datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}  ",
-        f"**Sample Size:** Candidate universe evaluated across 100ms–60s post-fill horizons  ",
+        "**Sample Size:** Candidate universe evaluated across 100ms–60s post-fill horizons  ",
         "",
         "## 1. Executive Summary & Core Hypothesis Verification",
         "",

@@ -1,33 +1,31 @@
 #!/usr/bin/env python3
-"""CLI Runner for Gate G3 Live Paper Trading & Replay Parity Verification.
+from __future__ import annotations
 
-Fulfills Mandate v2 Section 9 (Workstream 6) and Gate G3:
+"""CLI Runner for Live Paper Trading & Replay Parity Verification.
+
 - Streams public mainnet WebSocket frames through canonical SimEngine (ZERO orders placed).
 - Persists all raw frames to data/live_paper/<session_id>/raw_stream.jsonl with SHA-256 manifest.
 - Evaluates paired strategy configurations under $50 and $100 capital envelopes across primary markets.
 - Performs post-session Bit-for-Bit Replay Parity Verification against a fresh SimEngine instance.
-- Emits reports/phase_15_live_paper_report.md with strictly computed metrics and Rule 11 outcome labels.
+- Emits reports with strictly computed metrics.
 """
 
 import argparse
 import asyncio
 import datetime
-import hashlib
 import json
 import logging
 from pathlib import Path
 import sys
 import time
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 
 # Add repo root to sys.path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 from src.paper_trader import ArcusLivePaperTrader
-from src.sim.engine import SimEngine, SimEvent, SimEventType
-from src.models.fill import FillModelType
-from src.models.latency import LatencyConfig
+from src.sim.engine import SimEvent, SimEventType
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("live_paper_runner")
@@ -137,10 +135,8 @@ def generate_live_paper_report(
 ) -> None:
     """Generates reports/phase_15_live_paper_report.md from computed session data."""
     sid = live_summary["session_id"]
-    markets = live_summary["markets"]
     start_utc = live_summary["session_start_utc"]
     end_utc = live_summary["session_end_utc"]
-    total_fills = live_summary["total_fills_logged"]
     parity_ok = parity_res.get("parity_passed", False)
     parity_str = "✅ PASS (Bit-for-Bit Hash Match)" if parity_ok else "❌ FAIL (Hash Mismatch)"
 
@@ -149,8 +145,8 @@ def generate_live_paper_report(
         "",
         f"**Session ID:** `{sid}`  ",
         f"**Session Interval (UTC):** {start_utc} → {end_utc}  ",
-        f"**Execution Mode:** Read-Only Public WS Streaming → Unified `SimEngine`  ",
-        f"**Mainnet Order Invariant:** Strictly 0 real orders submitted (`APPROVE_MAINNET_ORDERS = NO`)  ",
+        "**Execution Mode:** Read-Only Public WS Streaming → Unified `SimEngine`  ",
+        "**Mainnet Order Invariant:** Strictly 0 real orders submitted (`APPROVE_MAINNET_ORDERS = NO`)  ",
         f"**Replay Parity:** {parity_str}  ",
         "",
         "## 1. Executive Summary & Gate G3 Status",

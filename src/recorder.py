@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 """High-Resilience Public WebSocket Market Data Recorder for Arcus Perpetuals.
 
-Fulfills Section 5 (Workstream 2) of prompt.md:
 - Multi-socket pool management with deterministic subscription assignment (<=50 subs per socket).
 - Scheduled socket rotation (<23h lifetime) with overlapping connections (15s overlap).
 - Microsecond/nanosecond local receive timestamping (recv_ts_ns) alongside venue timestamps.
@@ -327,7 +328,7 @@ class ArcusStreamRecorder:
 
             try:
                 # 1. Connect new socket and establish subscriptions
-                new_client = await self._spawn_socket_session(pool_idx, new_session_id, pool_markets)
+                await self._spawn_socket_session(pool_idx, new_session_id, pool_markets)
 
                 # 2. Overlap period: keep old socket open while new starts receiving
                 logger.info(f"Pool {pool_idx}: Overlapping rotation active for {self.overlap_secs}s...")

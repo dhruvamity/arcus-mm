@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 """Unit Tests for Rigorous PnL Accounting & Five-Way Attribution.
 
-Fulfills Mandate Sections 12, 13, 14, 15 & 44:
 - Strict balance-sheet identity: Cash + Position * Mid == Equity
 - 5-Way attribution summing to Net PnL: Realized Spread + MTM - Fees + Funding == Net PnL
 - Separate Maker (0 bps) and Taker (2.25 bps) fee accounting
@@ -67,6 +68,7 @@ class TestPnLAccounting(unittest.TestCase):
         expected_exit_price = bid * (1.0 - 2.0 / 10_000.0)  # 98.9802
 
         fee = self.engine.force_flatten(current_bid=bid, current_ask=ask, current_mid=mid, slippage_bps=slippage_bps)
+        self.assertGreater(fee, 0.0)
         self.assertEqual(self.engine.position, 0.0)
         last_fill = self.engine.fills[-1]
         self.assertEqual(last_fill["side"], "SELL")

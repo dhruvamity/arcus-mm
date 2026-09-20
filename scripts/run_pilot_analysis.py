@@ -32,7 +32,7 @@ import pandas as pd
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.market_specs import get_market_spec, MARKET_SPECS
+from src.market_specs import get_market_spec
 from src.models.fill import FillModelType
 from src.models.latency import LatencyConfig
 from src.sim.engine import SimEngine, SimEvent, SimEventType
@@ -293,7 +293,6 @@ def run_pilot(data_dir: Path, output_dir: Path, max_events_per_market: int = 500
 
         # Extrapolate to 5-day OOS window (assume 2.5x higher activity on weekdays vs weekend)
         weekday_multiplier = 2.5 if market not in ("BTC-USD", "ETH-USD", "SOL-USD") else 1.2
-        expected_5d_trades = trades_hr * 24.0 * 5.0 * weekday_multiplier
 
         for strat_id, sres in strat_results.items():
             fills_c = sres["model_c_fills"]

@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 """Live Mainnet Paper Trading Engine for Arcus Perpetuals Rebuilt on Unified SimEngine.
 
-Fulfills Mandate v2 Section 5 & 9 (Closing Defect R-08):
 - Single-path execution: Feeds live public mainnet WebSocket frames into canonical SimEngine.on_event().
 - ZERO real orders placed (read-only mainnet data stream).
 - Single shared WebSocket connection across all subscribed markets (eliminating duplicate sockets).
@@ -21,7 +22,6 @@ import hashlib
 import json
 import logging
 from pathlib import Path
-import time
 from typing import Dict, List, Optional, Any, Union
 
 from src.config import ArcusConfig, settings
@@ -31,16 +31,14 @@ from src.sim.engine import (
     SimEngine,
     SimEvent,
     SimEventType,
-    RiskState,
 )
 from src.models.fill import FillModelType
 from src.models.latency import LatencyConfig
 from src.strategies.adaptive_mm import AdaptiveMicrostructureStrategy
 from src.strategies.fixed_spread import FixedSpreadStrategy
 from src.strategies.volatility_clock import VolatilityClockStrategy
-from src.strategies.avellaneda_stoikov import AvellanedaStoikovStrategy
 from src.strategies.baselines import DoNothingStrategy, RandomSideQuotingStrategy
-from src.calendar import classify_regime
+from src.session_calendar import classify_regime
 from src.utils import now_ns
 
 logger = logging.getLogger("paper_trader")

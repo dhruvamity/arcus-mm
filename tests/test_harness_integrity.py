@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 """Deterministic Integrity Test Suite for Arcus Backtesting Harness.
 
-Fulfills Section 4.1 of prompt.md:
 1. Fill monotonicity: Fills(A) >= Fills(B) >= Fills(C) on identical quote/trade paths.
 2. Queue model: FIFO depletion, size decrease preserves priority, price change/size increase loses priority.
 3. PnL identity: cash + inventory * mid - fees +- funding == equity at every step; 5-way attribution sums to total.
@@ -13,14 +14,13 @@ Fulfills Section 4.1 of prompt.md:
 import datetime
 import hashlib
 import json
-import math
 import unittest
 import numpy as np
 
 from src.models.fill import FillEngine, FillModelType, SimulatedQueueOrder
 from src.models.pnl import PnLAttributionEngine
-from src.calendar import classify_regime, MarketRegimeTag
-from src.adverse_selection import compute_markouts, HORIZONS_SEC
+from src.session_calendar import classify_regime
+from src.adverse_selection import compute_markouts
 
 
 class TestHarnessIntegrity(unittest.TestCase):
@@ -70,6 +70,9 @@ class TestHarnessIntegrity(unittest.TestCase):
         f_a3 = engine_a.process_trade(order_a, "SELL", 99.90, 5.0)
         f_b3 = engine_b.process_trade(order_b, "SELL", 99.90, 5.0)
         f_c3 = engine_c.process_trade(order_c, "SELL", 99.90, 5.0)
+        self.assertEqual(f_a3, 3.0)
+        self.assertEqual(f_b3, 5.0)
+        self.assertEqual(f_c3, 5.0)
 
         # Total cumulative fills:
         tot_a = order_a.filled_size
@@ -302,6 +305,5 @@ class TestHarnessIntegrity(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    import datetime
     unittest.main()
 

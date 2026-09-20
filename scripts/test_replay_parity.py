@@ -12,6 +12,8 @@ Fulfills Mandate v2 Section 5.1, 5.6 (Test 12) & Section 13 (R-06):
   4. Final equity and net PnL
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import logging
@@ -28,7 +30,6 @@ from src.models.fill import FillModelType
 from src.models.latency import LatencyConfig
 from src.sim.engine import SimEngine, SimEvent, SimEventType
 from src.strategies.adaptive_mm import AdaptiveMicrostructureStrategy
-from src.strategies.fixed_spread import FixedSpreadStrategy
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("replay_parity")

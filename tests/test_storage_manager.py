@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 """Unit Tests for Storage Manager and Data Archival Integrity.
 
-Fulfills Mandate Section 6.5:
 - Verifies disk space threshold and alarm triggering logic
 - Verifies SHA-256 bit-for-bit checksum verification on gzip compression
 - Verifies that raw data is not deleted unless verified compressed copy exists
@@ -16,7 +17,6 @@ from scripts.storage_manager import (
     check_disk_space,
     compress_file_with_verification,
     project_storage_needs,
-    ALARM_THRESHOLD_GB,
 )
 
 

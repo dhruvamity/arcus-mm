@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 """Independent Dead-Man's Switch and Watchdog Monitor for Arcus Perpetuals.
 
-Fulfills Mandate Section 4.2 & Section 27 of prompt.md:
 - Independent watchdog process / loop that monitors the main engine's heartbeat.
 - Triggers immediate emergency cancellation (`cancelAllOrders`) if heartbeat ceases (>5s stale).
 - Tracks venue-side scheduleCancel deadlines.
@@ -11,7 +12,6 @@ import asyncio
 import datetime
 import json
 import logging
-import os
 import time
 from pathlib import Path
 from typing import Optional, Callable, Dict, Any, Awaitable

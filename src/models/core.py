@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 """Data models and enums for Arcus perpetuals."""
 
 from enum import Enum, IntEnum
 from decimal import Decimal
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class OrderSide(str, Enum):

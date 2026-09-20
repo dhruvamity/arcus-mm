@@ -1,4 +1,6 @@
-"""Trade Reconciliation Script for Mandate v2 (WS-1 Test 1).
+from __future__ import annotations
+
+"""Trade Reconciliation Script for Mandate (WS-1 Test 1).
 
 Pulls public REST trades via GET /v1/trades and reconciles them against
 WebSocket-recorded trades in data/raw/2026-09-19/<market>/trades.jsonl.
@@ -11,7 +13,7 @@ import json
 import logging
 import sys
 from pathlib import Path
-from typing import Dict, List, Set, Any
+from typing import Dict, Set, Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))

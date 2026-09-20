@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 """Control Baselines for Formal Market Making Validation.
 
-Fulfills Mandate Section 20 of prompt.md:
 - S0 Do-Nothing Baseline: Zero active quotes, flat inventory, zero PnL.
 - Random-Side Quoting Baseline: Randomly quotes only Bid or only Ask (seeded pseudo-randomly).
 """

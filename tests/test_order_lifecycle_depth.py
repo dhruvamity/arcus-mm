@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 """Unit test suite for Phase 4 Order Lifecycle, L2 Depth Replay, and In-Flight Adverse Selection.
 
-Fulfills Mandate Sections 6, 7, 12, 13, 14 of prompt.md:
 - Order status state machine transitions: SUBMITTING -> RESTING -> CANCEL_REQUESTED -> CANCELLED.
 - In-place modification preserves queue priority.
 - Price modification triggers cancel-replace with latency delay.
@@ -12,7 +13,7 @@ import unittest
 import pandas as pd
 from decimal import Decimal
 
-from src.models.fill import FillEngine, FillModelType, SimulatedQueueOrder, OrderStatus
+from src.models.fill import FillModelType, SimulatedQueueOrder, OrderStatus
 from src.models.latency import LatencyConfig
 from src.models.pnl import PnLAttributionEngine
 from src.strategies.fixed_spread import FixedSpreadStrategy

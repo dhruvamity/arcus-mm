@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 """Adverse Selection & Toxicity Markout Engine for Arcus Perpetuals.
 
-Fulfills Section 4.1, 4.4, and 6.5 of prompt.md:
 - Strict un-clamped markout horizons: [100ms, 500ms, 1s, 5s, 10s, 30s, 60s].
 - Fills whose target timestamp (t + h) exceeds recorded data are DROPPED, never clamped.
 - Reports N (sample size) and confidence intervals per horizon.

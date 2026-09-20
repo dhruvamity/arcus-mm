@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 """Unified Single-Path Simulation Engine (SimEngine) for Arcus Perpetuals.
 
-Fulfills Mandate v2 Section 5:
 - One engine, one code path for Replay, Backtest, Live Paper, and Testnet.
 - Consumes single time-ordered stream of events: BBO, L2_DELTA, TRADE, FUNDING, ORACLE_MARK, CLOCK_TICK.
 - Explicit order lifecycle with transit latency and in-flight cancel risk.
@@ -10,15 +11,12 @@ Fulfills Mandate v2 Section 5:
 - Risk manager state machine (inventory caps, stale BBO >3s, crossed book, sequence gaps, daily loss limit).
 """
 
-from dataclasses import dataclass, field
-from decimal import Decimal
+from dataclasses import dataclass
 from enum import Enum
 import hashlib
-import json
 import logging
-import math
 import random
-from typing import Dict, List, Optional, Tuple, Any, Callable
+from typing import Dict, List, Optional, Any
 
 from src.models.fill import FillModelType, OrderStatus
 from src.models.latency import LatencyConfig
@@ -26,7 +24,7 @@ from src.models.pnl import PnLAttributionEngine, TimeAwareFundingModel
 from src.models.rate_limit import ArcusRateLimitSimulator
 from src.orderbook import LocalOrderBook
 from src.strategies.base import BaseMarketMakingStrategy, Quote
-from src.utils import snap_to_tick, snap_to_step, to_decimal
+from src.utils import snap_to_tick, snap_to_step
 from src.volatility import RealizedVolatilityEstimator
 
 logger = logging.getLogger("sim_engine")
@@ -524,7 +522,6 @@ class SimEngine:
             # Check inventory limits against Central Model B position
             pnl_b = ctx.pnl_engines[FillModelType.MODEL_B_MODERATE]
             inv_units = pnl_b.position
-            clip_notional = venue.get_min_executable_clip()
 
             quotes = ctx.strategy.generate_quotes(
                 mid_price=venue.current_mid,

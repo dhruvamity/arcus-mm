@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 """Deterministic Realized Volatility Estimator for Arcus Perpetuals Market Making.
 
-Fulfills Section 16 of prompt.md:
 - Deterministic volatility estimator from historical/live BBO or mid data.
 - 1-second sampling grid for log-returns.
 - EWMA variance filter with configurable half-life (default 300s).

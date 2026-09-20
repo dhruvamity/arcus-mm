@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 """Asynchronous REST Client for Arcus Perpetuals."""
 
 import logging
-from typing import Dict, Any, Optional, List, Union
+from typing import Dict, Any, Optional, List
 from decimal import Decimal
 import httpx
 
@@ -12,7 +14,6 @@ from src.utils import (
     to_ticks,
     to_quantums,
     good_til_time_micros,
-    good_til_time_nanos,
     now_ns,
 )
 from src.models import (
@@ -20,8 +21,6 @@ from src.models import (
     BBO,
     OrderRequest,
     OrderResponse,
-    OrderSide,
-    TimeInForce,
 )
 
 logger = logging.getLogger(__name__)
@@ -257,10 +256,10 @@ class ArcusRestClient:
     # --------------------------------------------------------------------------
 
     def _assert_trading_allowed(self) -> None:
-        """Enforces prompt.md hard safety rules."""
+        """Enforces hard trading safety rules."""
         if self.config.environment == "mainnet" and self.config.mainnet_order_lock:
             raise PermissionError(
-                "SUBMITTING ORDERS ON MAINNET IS HARD-BLOCKED by prompt.md rules!"
+                "SUBMITTING ORDERS ON MAINNET IS HARD-BLOCKED by safety lock rules!"
             )
         if not self.signer:
             raise ValueError("Signer not configured with a valid private key")

@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 """Strategy 3: Volatility-Clock Spread Sizing.
 
-Fulfills Section 22 of prompt.md:
 - Spread proportional to k * sigma from dynamic realized volatility estimator.
 - Dynamic spread adaptation to volatility bursts.
 - Inventory lean: shifts reservation price to induce rebalancing fills.

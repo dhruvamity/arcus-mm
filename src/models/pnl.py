@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 """Rigorous PnL Accounting & Five-Way Attribution Engine for Arcus Perpetuals.
 
-Fulfills Section 4.1 & 4.3 of prompt.md:
 - Strict balance-sheet identity enforced at every step:
   cash + inventory * mid - fees +- funding == equity
 - Accurate 5-way PnL attribution summing exactly to total net PnL:

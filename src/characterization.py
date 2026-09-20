@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Phase 4 Candidate Market Microstructure & Liquidity Characterization Engine.
 
 Computes deep empirical metrics across candidate markets:
@@ -13,7 +15,7 @@ Computes deep empirical metrics across candidate markets:
 import json
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Dict, Optional, Any
 import numpy as np
 import pandas as pd
 

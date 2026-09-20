@@ -1,11 +1,9 @@
-"""Tests for Backtester Execution, Paper Telemetry, and Walk-Forward Smoke.
+from __future__ import annotations
 
-Fulfills Mandate Section 4 (P0-1, P0-2, P0-3 blockers).
-"""
+"""Tests for Backtester Execution, Paper Telemetry, and Walk-Forward Smoke."""
 
 import unittest
 import pandas as pd
-import numpy as np
 
 from src.backtester import ArcusEventBacktester
 from src.models.fill import FillModelType

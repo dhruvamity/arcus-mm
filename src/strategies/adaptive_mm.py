@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 """Full Production Strategy: Adaptive Microstructure Market Maker with Overlays.
 
-Fulfills Phase 8 & Phase 9 of prompt.md:
 - Core: Dynamic spread based on volatility clock (k * sigma)
 - Overlay 1: Microprice & Order Flow Imbalance (OFI) toxic-flow skew
 - Overlay 2: Non-linear inventory mean-reverting lean
