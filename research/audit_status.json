@@ -533,11 +533,11 @@
     "category": "BOOKKEEPING",
     "summary": "Ledger count discrepancy between reports/status.md (34) and research/audit_status.json (35)",
     "reproduction_status": "CONFIRMED",
-    "remediation_status": "OPEN",
-    "evidence_file": "",
-    "test_file": "scripts/generate_status_report.py",
-    "commit_hash": "-",
-    "notes": "Reports must derive finding counts programmatically and directly from audit_status.json."
+    "remediation_status": "FIXED",
+    "evidence_file": "evidence/2026-09-20/W-10_status_ledger_counts_post_fix_pass.txt",
+    "test_file": "tests/test_report_provenance.py",
+    "commit_hash": "5ff7730",
+    "notes": "Status report finding counts strictly and programmatically derived from audit_status.json in generate_status_report.py; verified in test_report_provenance.py; MUT-25 added."
   },
   {
     "id": "W-11",
@@ -545,11 +545,11 @@
     "category": "METHODOLOGY",
     "summary": "RTH definitions differ between paper capture window (13:00-20:30) and NYSE cash hours (13:30-20:00)",
     "reproduction_status": "CONFIRMED",
-    "remediation_status": "OPEN",
-    "evidence_file": "",
+    "remediation_status": "FIXED",
+    "evidence_file": "evidence/2026-09-20/W-11_rth_definition_post_fix_pass.txt",
     "test_file": "tests/test_calendar_regimes.py",
-    "commit_hash": "-",
-    "notes": "Paper runner captures pre/post buffers (13:00-20:30 UTC); fills must be tagged PRE, RTH, POST."
+    "commit_hash": "5ff7730",
+    "notes": "Implemented classify_rth_capture_tag in src/session_calendar.py; tagged all fill records as PRE (13:00-13:30), RTH (13:30-20:00), POST (20:00-20:30), or OTHER in SimEngine and PaperTrader; verified statistical separation in test_calendar_regimes.py; MUT-26 added."
   },
   {
     "id": "W-12",
@@ -581,11 +581,11 @@
     "category": "SECURITY",
     "summary": "Credential hygiene requirement to rotate API keys if earlier bundle containing .env was exposed",
     "reproduction_status": "CONFIRMED",
-    "remediation_status": "OPEN",
-    "evidence_file": "",
-    "test_file": "scripts/secret_scan.py",
-    "commit_hash": "-",
-    "notes": "Add advisory notice in status reports requesting API key rotation if historical bundle was shared externally."
+    "remediation_status": "FIXED",
+    "evidence_file": "evidence/2026-09-20/W-14_key_rotation_advisory_post_fix_pass.txt",
+    "test_file": "tests/test_report_provenance.py",
+    "commit_hash": "5ff7730",
+    "notes": "Added Section 4 Credential Hygiene Advisory to generate_status_report.py and reports/status.md advising human to rotate Ethereum master and subaccount API keys if earlier bundle was exposed externally; verified in test_report_provenance.py."
   }
 ]
 
