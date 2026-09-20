@@ -437,11 +437,11 @@
     "category": "STATISTICS",
     "summary": "Walk-forward significance test is tautological (spread at fill instant vs mid)",
     "reproduction_status": "CONFIRMED",
-    "remediation_status": "OPEN",
-    "evidence_file": "",
+    "remediation_status": "FIXED",
+    "evidence_file": "evidence/2026-09-20/W-02_tautological_metric_post_fix_pass.txt",
     "test_file": "tests/test_walk_forward_protocol.py",
-    "commit_hash": "-",
-    "notes": "Scores fills as price vs mid at fill instant without post-fill adverse selection, taker exit fees, or inventory markouts."
+    "commit_hash": "3bbe199",
+    "notes": "Replaced tautological fill-instant spread capture with day-level net equity change including conservative end-of-day forced exit haircut (2.25 bps taker fee + 1 tick slippage); implemented paired t-test vs DoNothing and RandomSide controls, 10,000-block bootstrap, and Holm-Bonferroni FWER step-down; added scripts/run_oos.py with git tag and date guards; unrelaxed fill count gate (min 300 fills); added MUT-24."
   },
   {
     "id": "W-03",
