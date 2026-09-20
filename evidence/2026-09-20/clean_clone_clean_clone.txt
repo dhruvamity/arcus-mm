@@ -1,0 +1,110 @@
+COMMAND: bash scripts/test_clean_clone.sh 
+GIT_HEAD: 3bd71fabc993ca1c309f6c8b989202ede86f2620
+TIMESTAMP: 2026-09-20T09:24:27Z
+PYTHON_VERSION: Python 3.12.14
+EXIT_CODE: 0
+--- OUTPUT ---
+Cloning repository from /Users/dhruv/Desktop/CodeWithD/arcus-mm into /var/folders/33/6hb_7rkd3v74jmphkh8b96480000gn/T/tmp.EiWJvyQwF3/repo...
+Cloning into '/var/folders/33/6hb_7rkd3v74jmphkh8b96480000gn/T/tmp.EiWJvyQwF3/repo'...
+done.
+Creating fresh virtual environment with Python 3.12...
+Requirement already satisfied: pip in ./.venv/lib/python3.12/site-packages (26.2.1)
+Collecting pyflakes
+  Using cached pyflakes-3.4.0-py2.py3-none-any.whl.metadata (3.5 kB)
+Collecting cryptography>=42.0.0 (from -r requirements.txt (line 1))
+  Using cached cryptography-50.0.1-cp311-abi3-macosx_11_0_arm64.whl.metadata (4.3 kB)
+Collecting httpx>=0.27.0 (from -r requirements.txt (line 2))
+  Using cached httpx-0.28.1-py3-none-any.whl.metadata (7.1 kB)
+Collecting websockets>=12.0 (from -r requirements.txt (line 3))
+  Using cached websockets-17.1-cp312-cp312-macosx_11_0_arm64.whl.metadata (6.3 kB)
+Collecting pydantic>=2.0.0 (from -r requirements.txt (line 4))
+  Using cached pydantic-2.13.5-py3-none-any.whl.metadata (110 kB)
+Collecting pydantic-settings>=2.0.0 (from -r requirements.txt (line 5))
+  Using cached pydantic_settings-2.15.0-py3-none-any.whl.metadata (3.9 kB)
+Collecting python-dotenv>=1.0.0 (from -r requirements.txt (line 6))
+  Using cached python_dotenv-1.2.3-py3-none-any.whl.metadata (29 kB)
+Collecting pandas>=2.0.0 (from -r requirements.txt (line 7))
+  Using cached pandas-3.0.6-cp312-cp312-macosx_11_0_arm64.whl.metadata (79 kB)
+Collecting numpy>=1.24.0 (from -r requirements.txt (line 8))
+  Using cached numpy-2.5.3-cp312-cp312-macosx_14_0_arm64.whl.metadata (6.6 kB)
+Collecting scipy>=1.10.0 (from -r requirements.txt (line 9))
+  Using cached scipy-1.18.1-cp312-cp312-macosx_14_0_arm64.whl.metadata (62 kB)
+Collecting pyarrow>=14.0.0 (from -r requirements.txt (line 10))
+  Using cached pyarrow-25.0.1-cp312-cp312-macosx_12_0_arm64.whl.metadata (3.0 kB)
+Collecting pyyaml>=6.0.0 (from -r requirements.txt (line 11))
+  Using cached pyyaml-6.0.3-cp312-cp312-macosx_11_0_arm64.whl.metadata (2.4 kB)
+Collecting certifi>=2024.0.0 (from -r requirements.txt (line 12))
+  Using cached certifi-2026.7.22-py3-none-any.whl.metadata (2.5 kB)
+Collecting cffi>=2.0.0 (from cryptography>=42.0.0->-r requirements.txt (line 1))
+  Using cached cffi-2.1.1-cp312-cp312-macosx_11_0_arm64.whl.metadata (2.5 kB)
+Collecting anyio (from httpx>=0.27.0->-r requirements.txt (line 2))
+  Using cached anyio-4.15.1-py3-none-any.whl.metadata (4.7 kB)
+Collecting httpcore==1.* (from httpx>=0.27.0->-r requirements.txt (line 2))
+  Using cached httpcore-1.0.9-py3-none-any.whl.metadata (21 kB)
+Collecting idna (from httpx>=0.27.0->-r requirements.txt (line 2))
+  Using cached idna-3.20-py3-none-any.whl.metadata (7.2 kB)
+Collecting h11>=0.16 (from httpcore==1.*->httpx>=0.27.0->-r requirements.txt (line 2))
+  Using cached h11-0.16.0-py3-none-any.whl.metadata (8.3 kB)
+Collecting annotated-types>=0.6.0 (from pydantic>=2.0.0->-r requirements.txt (line 4))
+  Using cached annotated_types-0.8.0-py3-none-any.whl.metadata (15 kB)
+Collecting pydantic-core==2.46.5 (from pydantic>=2.0.0->-r requirements.txt (line 4))
+  Using cached pydantic_core-2.46.5-cp312-cp312-macosx_11_0_arm64.whl.metadata (6.6 kB)
+Collecting typing-extensions>=4.14.1 (from pydantic>=2.0.0->-r requirements.txt (line 4))
+  Using cached typing_extensions-4.16.0-py3-none-any.whl.metadata (3.3 kB)
+Collecting typing-inspection>=0.4.2 (from pydantic>=2.0.0->-r requirements.txt (line 4))
+  Using cached typing_inspection-0.4.4-py3-none-any.whl.metadata (2.6 kB)
+Collecting python-dateutil>=2.8.2 (from pandas>=2.0.0->-r requirements.txt (line 7))
+  Using cached python_dateutil-2.9.0.post0-py2.py3-none-any.whl.metadata (8.4 kB)
+Collecting pycparser (from cffi>=2.0.0->cryptography>=42.0.0->-r requirements.txt (line 1))
+  Using cached pycparser-3.0-py3-none-any.whl.metadata (8.2 kB)
+Collecting six>=1.5 (from python-dateutil>=2.8.2->pandas>=2.0.0->-r requirements.txt (line 7))
+  Using cached six-1.17.0-py2.py3-none-any.whl.metadata (1.7 kB)
+Using cached pyflakes-3.4.0-py2.py3-none-any.whl (63 kB)
+Using cached cryptography-50.0.1-cp311-abi3-macosx_11_0_arm64.whl (4.0 MB)
+Using cached httpx-0.28.1-py3-none-any.whl (73 kB)
+Using cached httpcore-1.0.9-py3-none-any.whl (78 kB)
+Using cached websockets-17.1-cp312-cp312-macosx_11_0_arm64.whl (214 kB)
+Using cached pydantic-2.13.5-py3-none-any.whl (472 kB)
+Using cached pydantic_core-2.46.5-cp312-cp312-macosx_11_0_arm64.whl (1.9 MB)
+Using cached pydantic_settings-2.15.0-py3-none-any.whl (69 kB)
+Using cached python_dotenv-1.2.3-py3-none-any.whl (22 kB)
+Using cached pandas-3.0.6-cp312-cp312-macosx_11_0_arm64.whl (10.1 MB)
+Using cached numpy-2.5.3-cp312-cp312-macosx_14_0_arm64.whl (5.4 MB)
+Using cached scipy-1.18.1-cp312-cp312-macosx_14_0_arm64.whl (20.5 MB)
+Using cached pyarrow-25.0.1-cp312-cp312-macosx_12_0_arm64.whl (35.9 MB)
+Using cached pyyaml-6.0.3-cp312-cp312-macosx_11_0_arm64.whl (173 kB)
+Using cached certifi-2026.7.22-py3-none-any.whl (136 kB)
+Using cached annotated_types-0.8.0-py3-none-any.whl (13 kB)
+Using cached cffi-2.1.1-cp312-cp312-macosx_11_0_arm64.whl (184 kB)
+Using cached h11-0.16.0-py3-none-any.whl (37 kB)
+Using cached python_dateutil-2.9.0.post0-py2.py3-none-any.whl (229 kB)
+Using cached six-1.17.0-py2.py3-none-any.whl (11 kB)
+Using cached typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+Using cached typing_inspection-0.4.4-py3-none-any.whl (14 kB)
+Using cached anyio-4.15.1-py3-none-any.whl (132 kB)
+Using cached idna-3.20-py3-none-any.whl (69 kB)
+Using cached pycparser-3.0-py3-none-any.whl (48 kB)
+Installing collected packages: websockets, typing-extensions, six, pyyaml, python-dotenv, pyflakes, pycparser, pyarrow, numpy, idna, h11, certifi, annotated-types, typing-inspection, scipy, python-dateutil, pydantic-core, httpcore, cffi, anyio, pydantic, pandas, httpx, cryptography, pydantic-settings
+
+Successfully installed annotated-types-0.8.0 anyio-4.15.1 certifi-2026.7.22 cffi-2.1.1 cryptography-50.0.1 h11-0.16.0 httpcore-1.0.9 httpx-0.28.1 idna-3.20 numpy-2.5.3 pandas-3.0.6 pyarrow-25.0.1 pycparser-3.0 pydantic-2.13.5 pydantic-core-2.46.5 pydantic-settings-2.15.0 pyflakes-3.4.0 python-dateutil-2.9.0.post0 python-dotenv-1.2.3 pyyaml-6.0.3 scipy-1.18.1 six-1.17.0 typing-extensions-4.16.0 typing-inspection-0.4.4 websockets-17.1
+Running pyflakes on clean clone...
+Running offline unit tests on clean clone...
+sss......[SOL-USD] Mid-stream sequence gap: expected 104, got 105
+............[BTC-USD] Mid-stream sequence gap: expected 107, got 110
+............................./opt/homebrew/Cellar/python@3.12/3.12.14/Frameworks/Python.framework/Versions/3.12/lib/python3.12/json/decoder.py:354: ResourceWarning: unclosed <socket.socket fd=9, family=30, type=1, proto=6, laddr=('2405:201:48:400f:cd89:2261:c54a:1ac6', 63437, 0, 0), raddr=('2606:4700:83b3:7e86:5a7:0:4c44:e037', 443, 0, 0)>
+  obj, end = self.scan_once(s, idx)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/opt/homebrew/Cellar/python@3.12/3.12.14/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/selector_events.py:879: ResourceWarning: unclosed transport <_SelectorSocketTransport fd=9>
+  _warn(f"unclosed transport {self!r}", ResourceWarning, source=self)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+..................[BTC-USD] Sequence gap in l2OrderbookUpdates: expected 106, got 110. Marking book INVALID and emitting INVALID_BOOK_INTERVAL.
+..[BTC-USD] Sequence gap in l2OrderbookUpdates: expected 106, got 110. Marking book INVALID and emitting INVALID_BOOK_INTERVAL.
+..........................................WATCHDOG TRIGGERED: Heartbeat expired: 0.08s elapsed (limit: 0.05s). Executing emergency cleanup!
+......
+----------------------------------------------------------------------
+Ran 118 tests in 3.713s
+
+OK (skipped=3)
+Running secret scanner on clean clone...
+PASS: No secrets found (0 findings).
+=== CLEAN CLONE TEST SUCCESSFUL ===
