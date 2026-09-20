@@ -3,6 +3,7 @@ from __future__ import annotations
 """Asynchronous REST Client for Arcus Perpetuals."""
 
 import logging
+import os
 from typing import Dict, Any, Optional, List
 from decimal import Decimal
 import httpx
@@ -256,11 +257,14 @@ class ArcusRestClient:
     # --------------------------------------------------------------------------
 
     def _assert_trading_allowed(self) -> None:
-        """Enforces hard trading safety rules."""
-        if self.config.environment == "mainnet" and self.config.mainnet_order_lock:
-            raise PermissionError(
-                "SUBMITTING ORDERS ON MAINNET IS HARD-BLOCKED by safety lock rules!"
-            )
+        """Enforces hard trading safety rules with two-key mainnet guard (Mandate v5 §5.3)."""
+        if self.config.environment == "mainnet":
+            confirmation_token = os.environ.get("ARCUS_MAINNET_MUTATING_CONFIRMATION", "")
+            if self.config.mainnet_order_lock or confirmation_token != "I_ACCEPT_PERMANENT_LOSS_OF_FUNDS":
+                raise PermissionError(
+                    "SUBMITTING ORDERS ON MAINNET IS HARD-BLOCKED by two-key safety guard! "
+                    "Requires both mainnet_order_lock=False and ARCUS_MAINNET_MUTATING_CONFIRMATION='I_ACCEPT_PERMANENT_LOSS_OF_FUNDS'."
+                )
         if not self.signer:
             raise ValueError("Signer not configured with a valid private key")
 

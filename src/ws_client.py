@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import ssl
 from typing import Dict, Any, Optional, Callable, Awaitable, Union, Tuple
 import websockets
@@ -187,10 +188,13 @@ class ArcusWsClient:
         Hard-blocks mutating WebSocket RPCs when mainnet_order_lock is active.
         """
         if method in self.MUTATING_WS_METHODS:
-            if self.config.environment == "mainnet" and self.config.mainnet_order_lock:
-                raise PermissionError(
-                    f"WEBSOCKET {method} ON MAINNET IS HARD-BLOCKED by safety lock!"
-                )
+            if self.config.environment == "mainnet":
+                confirmation_token = os.environ.get("ARCUS_MAINNET_MUTATING_CONFIRMATION", "")
+                if self.config.mainnet_order_lock or confirmation_token != "I_ACCEPT_PERMANENT_LOSS_OF_FUNDS":
+                    raise PermissionError(
+                        f"WEBSOCKET {method} ON MAINNET IS HARD-BLOCKED by two-key safety guard! "
+                        "Requires both mainnet_order_lock=False and ARCUS_MAINNET_MUTATING_CONFIRMATION='I_ACCEPT_PERMANENT_LOSS_OF_FUNDS'."
+                    )
         if not self.signer:
             raise ValueError("Signer required for authenticated WebSocket trading RPC")
 

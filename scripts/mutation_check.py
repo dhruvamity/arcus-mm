@@ -664,6 +664,32 @@ def test_mutation_26_rth_capture_tag_conflation() -> MutationResult:
         sc.classify_rth_capture_tag = orig_func
 
 
+def test_mutation_27_bypass_two_key_mainnet_guard() -> MutationResult:
+    """MUT-27: Disables two-key requirement on mainnet, checking only mainnet_order_lock."""
+    from src.exec import live_engine as le
+    orig_verify = le.LiveExecutionEngine.verify_safety_guards
+
+    def mutated_verify(self):
+        # BUG: Only checks mainnet_order_lock, omitting the second key (confirmation phrase)!
+        if self.config.environment == "mainnet" and self.config.mainnet_order_lock:
+            raise le.TwoKeyMainnetGuardError("Locked")
+
+    le.LiveExecutionEngine.verify_safety_guards = mutated_verify
+    try:
+        from tests.test_live_engine import TestLiveExecutionEngine
+        failed, msg = run_targeted_test(TestLiveExecutionEngine, "test_two_key_mainnet_guard")
+        return MutationResult(
+            "MUT-27",
+            "Bypass Two-Key Mainnet Guard",
+            "TestLiveExecutionEngine.test_two_key_mainnet_guard",
+            "Disables required second key (CLI confirmation phrase) for mainnet mutating calls, checking only mainnet_order_lock",
+            failed,
+            msg,
+        )
+    finally:
+        le.LiveExecutionEngine.verify_safety_guards = orig_verify
+
+
 def main():
     mutations: List[Callable[[], MutationResult]] = [
         test_mutation_1_invert_queue,
@@ -692,6 +718,7 @@ def main():
         test_mutation_24_tautological_metric_regression,
         test_mutation_25_hardcoded_status_ledger_counts,
         test_mutation_26_rth_capture_tag_conflation,
+        test_mutation_27_bypass_two_key_mainnet_guard,
     ]
 
     print("=" * 80)

@@ -569,11 +569,11 @@
     "category": "EXECUTION",
     "summary": "Execution stack is mock-only with no live authenticated order loop or venue acks",
     "reproduction_status": "CONFIRMED",
-    "remediation_status": "OPEN",
-    "evidence_file": "",
-    "test_file": "tests/test_exec_stack.py",
+    "remediation_status": "FIXED",
+    "evidence_file": "evidence/2026-09-20/W-13_live_engine_two_key_guard_post_fix_pass.txt",
+    "test_file": "tests/test_live_engine.py",
     "commit_hash": "-",
-    "notes": "TestnetOrderManager, reconciler, and watchdog operate on dicts; no live signed order loop exists."
+    "notes": "Implemented LiveExecutionEngine with authenticated REST/WS order loop, scheduleCancel dead-man switch heartbeat, two-key mainnet guard, and MUT-27."
   },
   {
     "id": "W-14",
