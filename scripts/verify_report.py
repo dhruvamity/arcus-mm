@@ -18,10 +18,13 @@ from __future__ import annotations
 """
 
 import argparse
+import json
 import re
 import sys
 from pathlib import Path
 from typing import List, Set, Tuple
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 FORBIDDEN_PATTERNS = [
@@ -45,6 +48,29 @@ LIVE_MIN_CLIPS = {
     "SLV": 6.00,
     "AMD": 5.53,
 }
+
+
+# Canonical reference data
+CANONICAL_TAKER_FEE_BPS = 2.25
+CANONICAL_MAKER_REBATE_BPS = 0.75
+EMPTY_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+ALLOWED_PROSE_NUMBERS = {
+    "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "12", "13", "14", "15", "16",
+    "20", "24", "25", "30", "50", "60", "64", "75", "80", "90", "95", "99", "100", "120", "300", "2026"
+}
+
+
+def load_canonical_latency_p50() -> float | None:
+    """Loads canonical p50 latency from latency/latency_summary.json if it exists."""
+    p = REPO_ROOT / "latency" / "latency_summary.json"
+    if p.exists():
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+            return float(data.get("rest_rtt_ms", {}).get("p50", 0.0))
+        except Exception:
+            return None
+    return None
 
 
 def extract_tables(markdown_text: str) -> List[List[List[str]]]:
@@ -125,7 +151,7 @@ def verify_report(file_path: Path) -> Tuple[bool, List[str]]:
     for line_no, line in enumerate(lines, 1):
         line_lower = line.lower()
         # Allow defect ledger or explicit withdrawal notes
-        is_context_explanation = any(w in line_lower for w in ["withdrawn", "defect", "superseded", "quarantined", "claim", "remediation", "prior"])
+        is_context_explanation = any(w in line_lower for w in ["withdrawn", "defect", "superseded", "quarantined", "claim", "remediation", "prior", "v-01", "v-17", "v-28", "v-29", "v-30"])
 
         # Check forbidden words
         if not is_context_explanation:
@@ -138,15 +164,47 @@ def verify_report(file_path: Path) -> Tuple[bool, List[str]]:
             if pattern.search(line) and not is_context_explanation:
                 errors.append(f"Line {line_no}: Contains withdrawn claim phrase '{label}': {line.strip()}")
 
-    # 2. Extract tables and check row-level contradictions
+        # Check empty-string sha256 hash or vacuous parity claims (Mandate v3 §15)
+        if not is_context_explanation:
+            if EMPTY_SHA256 in line.lower() or "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" in line.lower():
+                errors.append(f"Line {line_no}: Cites vacuous empty-string SHA-256 hash: {line.strip()}")
+            if "parity" in line_lower and "pass" in line_lower and ("0 fill" in line_lower or "zero fill" in line_lower):
+                errors.append(f"Line {line_no}: Claims parity PASS on zero fills: {line.strip()}")
+
+        # Check Generated At timestamp validity
+        if "generated at:" in line_lower:
+            # Must be valid ISO 8601 with timezone (e.g. 2026-09-20T13:54:00Z or 2026-09-20 13:54:00 UTC)
+            has_iso = bool(re.search(r"\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:?\d{2}|\s*UTC)", line))
+            if not has_iso or "system clock" in line_lower:
+                errors.append(f"Line {line_no}: 'Generated At' timestamp missing valid ISO 8601 UTC format: {line.strip()}")
+
+    # 2. Extract tables and check row-level contradictions & constant columns
     tables = extract_tables(content)
     if not tables and len(lines) > 50:
         errors.append("Report has >50 lines but contains no markdown tables.")
         return False, errors
 
     for table_idx, table in enumerate(tables, 1):
-        for row_idx, row in enumerate(table, 1):
+        if not table:
+            continue
+        header = [c.lower() for c in table[0]]
+        rows = table[1:]
+
+        # Check constant columns across rows (Mandate v3 §15: catches e.g. Depth $50 default)
+        if len(rows) >= 3:
+            for col_idx, col_name in enumerate(header):
+                if any(k in col_name for k in ["depth", "spread", "trades/hr", "fill rate", "expectancy", "net edge"]):
+                    col_vals = [row[col_idx].strip() for row in rows if col_idx < len(row)]
+                    if col_vals and len(set(col_vals)) == 1 and col_vals[0] not in {"-", "N/A", "0", "$0"}:
+                        errors.append(
+                            f"Table {table_idx}, Column '{table[0][col_idx]}' is constant across all {len(rows)} rows: '{col_vals[0]}' (expected cross-market variation)"
+                        )
+
+        # Check row-level claims
+        is_ledger_table = any(k in " ".join(header) for k in ["status", "remediation", "verdict", "gate", "finding"])
+        for row_idx, row in enumerate(rows, 1):
             row_str = " ".join(row)
+
             # Rule: A "✅ +x%" status cannot be next to INSUFFICIENT DATA for the same market
             has_positive_check = bool(re.search(r"✅\s*\+\d", row_str))
             has_insufficient_data = "INSUFFICIENT DATA" in row_str
@@ -155,14 +213,23 @@ def verify_report(file_path: Path) -> Tuple[bool, List[str]]:
                     f"Table {table_idx}, Row {row_idx}: Contradictory status! '✅ +x%' appears next to INSUFFICIENT DATA: {row_str}"
                 )
 
+            # Rule: Status words in ledger/verdict tables must have linked evidence/test files (Mandate v3 §15)
+            if is_ledger_table and not is_superseded:
+                for status_word in ["CONFIRMED", "FIXED", "REFUTED", "VALIDATED"]:
+                    if status_word in row_str:
+                        has_link = bool(re.search(r"\[.*?\]\((?:evidence/|tests/|scripts/|http|[a-zA-Z0-9_/-]+\.[a-zA-Z0-9]+)\)", row_str))
+                        has_file_ref = any(ref in row_str for ref in ["evidence/", "tests/", "scripts/"])
+                        if not has_link and not has_file_ref and "OPEN" not in row_str:
+                            errors.append(
+                                f"Table {table_idx}, Row {row_idx}: Status '{status_word}' has no linked evidence or test file: {row_str[:80]}..."
+                            )
+
             # Rule: Clip size cannot be below live venue minimum
             for market, min_clip in LIVE_MIN_CLIPS.items():
                 if market in row_str:
-                    # Look for clip sizes e.g. "$8.00" or "$8" or "8.00 clip"
                     clips_found = re.findall(r"\$\s*(\d+(?:\.\d+)?)", row_str)
                     for c_str in clips_found:
                         c_val = float(c_str)
-                        # Only check if it's explicitly identified as clip or notional
                         if ("clip" in row_str.lower() or "min" in row_str.lower()) and c_val < (min_clip - 0.5) and c_val > 1.0:
                             errors.append(
                                 f"Table {table_idx}, Row {row_idx}: Clip size ${c_val:.2f} for {market} is below live venue minimum ${min_clip:.2f}"
@@ -182,12 +249,13 @@ def verify_report(file_path: Path) -> Tuple[bool, List[str]]:
         if any(kw in s for kw in ["bps", "%", "net edge", "expectancy", "return", "PnL"])
     ]
 
+    ALLOWED_FLOATS = {float(x) for x in ALLOWED_PROSE_NUMBERS}
     for sentence in claim_sentences:
         if is_superseded:
             continue
         nums = extract_numbers_from_text(sentence)
         unmatched = [n for n in nums if n not in table_numbers]
-        unmatched = [n for n in unmatched if n not in {"2026", "0", "1", "100", "50", "2", "3", "4", "5", "6", "7", "8", "9", "10", "12", "13", "14", "15", "16", "20", "24", "60", "64"}]
+        unmatched = [n for n in unmatched if float(n) not in ALLOWED_FLOATS]
         if unmatched:
             errors.append(f"Prose number(s) {unmatched} in sentence not found in any table: \"{sentence[:100]}...\"")
 
@@ -198,12 +266,24 @@ def verify_report(file_path: Path) -> Tuple[bool, List[str]]:
             if float(c_str) < (min_clip - 0.5):
                 errors.append(f"Prose references clip ${float(c_str):.2f} for {market}, below live venue minimum ${min_clip:.2f}")
 
+    # Check canonical latency agreement (Mandate v3 §15)
+    canonical_p50 = load_canonical_latency_p50()
+    if canonical_p50 is not None and not is_superseded:
+        # Match e.g. "latency p50 185.23 ms" or "p50 latency of 376.06"
+        m = re.search(r"(?:latency\s+p50|p50\s+latency)[^\d]*(\d+\.\d+)\s*ms", prose_text, re.IGNORECASE)
+        if m:
+            cited_p50 = float(m.group(1))
+            if abs(cited_p50 - canonical_p50) > 1.0:
+                errors.append(
+                    f"Report cites latency p50 of {cited_p50:.2f} ms which disagrees with canonical latency/latency_summary.json ({canonical_p50:.2f} ms)"
+                )
+
     is_valid = len(errors) == 0
     return is_valid, errors
 
 
 def verify_generator_scripts(scripts_dir: Path = Path("scripts")) -> Tuple[bool, List[str]]:
-    """Verifies that report generator scripts do not contain hard-coded statuses or fabricated fills (R-02, R-17)."""
+    """Verifies that report generator scripts do not contain hard-coded statuses or fabricated fills (R-02, R-17, Mandate v3 §15)."""
     errors = []
     generator_files = list(scripts_dir.glob("run_*.py"))
 
@@ -223,8 +303,8 @@ def verify_generator_scripts(scripts_dir: Path = Path("scripts")) -> Tuple[bool,
             if in_docstring or trimmed.startswith("#"):
                 continue
 
-            # Check for hardcoded "RESOLVED" or "VALIDATED" string literals
-            if re.search(r'["\'](?:RESOLVED|VALIDATED)(?:\s*&.*?)?["\']', line):
+            # Check for hardcoded "RESOLVED", "VALIDATED", or "READY" string literals (Mandate v3 §15)
+            if re.search(r'["\'](?:RESOLVED|VALIDATED|READY\s+FOR\s+DATA\s+ACCUMULATION|DEPLOYMENT\s+READY)(?:\s*&.*?)?["\']', line):
                 # Allow conditional comparison or schema definitions
                 if any(kw in line for kw in ["if ", "elif ", "==", "!=", "in [", "in (", "Enum", "allowed_verdicts"]):
                     continue

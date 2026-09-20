@@ -1,6 +1,6 @@
 # Audit v3 Ledger — Ground Truth & Defect Remediation
 
-**Generated At:** `2026-09-20 10:09:24 UTC`  
+**Generated At:** `2026-09-20 13:58:23 UTC`  
 **Evaluation Scope:** All Findings (V-01 through V-32) from Mandate v3 (`prompts/2026-09-20_v3.md`)  
 **Commit Discrepancy Note:** Prior reports referenced commit hash `23a03f3` which does not exist on the remote GitHub repository. This occurred because the initial repository setup was committed and pushed via a squashed root commit (`0905008`), obliterating local scratch commit IDs. From this point forward, strict verifiable linear Git history is maintained with one commit per defect/milestone.  
 
@@ -37,11 +37,11 @@
 | **V-25** | `BLOCKER` | RESEARCH | Power analysis is statistically wrong (n formula gives 50% power, ignores clustering) | **CONFIRMED** | **OPEN** | [`evidence/2026-09-20/V-25_no_bootstrap_walk_forward.txt`](evidence/2026-09-20/V-25_no_bootstrap_walk_forward.txt) | [`tests/test_walk_forward_protocol.py`](tests/test_walk_forward_protocol.py) | - |
 | **V-26** | `MAJOR` | RESEARCH | Pre-registration v3 is not ready to lock | **CONFIRMED** | **OPEN** | - | [`tests/test_walk_forward_protocol.py`](tests/test_walk_forward_protocol.py) | - |
 | **V-27** | `MAJOR` | LATENCY | Latency evidence far below spec (5 samples in 4 seconds on REST) | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/V-27_latency_alignment.txt`](evidence/2026-09-20/V-27_latency_alignment.txt) | [`tests/test_harness_integrity.py`](tests/test_harness_integrity.py) | `5cd6837` |
-| **V-28** | `MAJOR` | DOCS | followup_gate_report.md overclaims ready for accumulation with broken criteria | **CONFIRMED** | **OPEN** | - | [`tests/test_harness_integrity.py`](tests/test_harness_integrity.py) | - |
-| **V-29** | `MAJOR` | DOCS | Ledger status column was handwritten rather than machine-attested | **CONFIRMED** | **OPEN** | - | [`tests/test_harness_integrity.py`](tests/test_harness_integrity.py) | - |
-| **V-30** | `MAJOR` | DOCS | verify_report.py cannot catch fabricated generator data or invalid claims | **CONFIRMED** | **OPEN** | - | [`tests/test_harness_integrity.py`](tests/test_harness_integrity.py) | - |
-| **V-31** | `MINOR` | DOCS | Time labels are unreliable (IST labeled as UTC in reports) | **CONFIRMED** | **OPEN** | - | [`tests/test_calendar_regimes.py`](tests/test_calendar_regimes.py) | - |
-| **V-32** | `MINOR` | DOCS | Repo clutter and duplicates (~70 stale/duplicate files) | **CONFIRMED** | **OPEN** | - | [`tests/test_storage_manager.py`](tests/test_storage_manager.py) | - |
+| **V-28** | `MAJOR` | DOCS | followup_gate_report.md overclaims ready for accumulation with broken criteria | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/V-28_status_report_generated.txt`](evidence/2026-09-20/V-28_status_report_generated.txt) | [`tests/test_report_provenance.py`](tests/test_report_provenance.py) | `7b949b6` |
+| **V-29** | `MAJOR` | DOCS | Ledger status column was handwritten rather than machine-attested | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/V-29_audit_report_machine_generated.txt`](evidence/2026-09-20/V-29_audit_report_machine_generated.txt) | [`tests/test_report_provenance.py`](tests/test_report_provenance.py) | `ab9c03b` |
+| **V-30** | `MAJOR` | DOCS | verify_report.py cannot catch fabricated generator data or invalid claims | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/V-30_verify_report_enhancements.txt`](evidence/2026-09-20/V-30_verify_report_enhancements.txt) | [`tests/test_report_provenance.py`](tests/test_report_provenance.py) | `HEAD` |
+| **V-31** | `MINOR` | DOCS | Time labels are unreliable (IST labeled as UTC in reports) | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/V-31_timezone_integrity.txt`](evidence/2026-09-20/V-31_timezone_integrity.txt) | [`tests/test_calendar_regimes.py`](tests/test_calendar_regimes.py) | `HEAD` |
+| **V-32** | `MINOR` | DOCS | Repo clutter and duplicates (~70 stale/duplicate files) | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/V-32_repo_cleanup_verified.txt`](evidence/2026-09-20/V-32_repo_cleanup_verified.txt) | [`tests/test_storage_manager.py`](tests/test_storage_manager.py) | `5010f91` |
 
 ---
 
@@ -58,7 +58,7 @@ All referenced evidence and test suites are machine-validated to exist on disk:
 - **Total Findings Audited:** 32
 - **Confirmed Defects:** 32
 - **Refuted Defects:** 0
-- **Remediated (FIXED):** 24
+- **Remediated (FIXED):** 29
 - **In Progress:** 0
-- **Open:** 8
+- **Open:** 3
 

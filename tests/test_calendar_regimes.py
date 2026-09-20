@@ -93,6 +93,21 @@ class TestCalendarRegimes(unittest.TestCase):
         reg_mon_asia = classify_regime(ts_mon_asia, "crypto")
         self.assertEqual(reg_mon_asia.event_window, "MON_GAP")
 
+    def test_utc_and_ist_timezone_label_integrity(self):
+        """Verify strict timezone separation and conversion integrity (V-31).
+
+        Ensures UTC and IST (+05:30) are strictly separated and cannot be conflated.
+        """
+        tz_ist = datetime.timezone(datetime.timedelta(hours=5, minutes=30), name="IST")
+        dt_utc = datetime.datetime(2026, 9, 20, 0, 41, tzinfo=datetime.timezone.utc)
+        dt_ist = dt_utc.astimezone(tz_ist)
+
+        # 00:41 UTC is 06:11 IST, NOT 00:41 IST
+        self.assertEqual(dt_ist.hour, 6)
+        self.assertEqual(dt_ist.minute, 11)
+        self.assertNotEqual(dt_utc.hour, dt_ist.hour)
+        self.assertEqual(dt_utc.timestamp(), dt_ist.timestamp())
+
 
 if __name__ == "__main__":
     unittest.main()

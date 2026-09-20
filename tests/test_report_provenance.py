@@ -153,10 +153,74 @@ class TestReportProvenance(unittest.TestCase):
             self.assertFalse(valid)
             self.assertTrue(any("fabricated fills expression" in e for e in errors))
 
+            # Script with hardcoded READY FOR DATA ACCUMULATION
+            bad_script.write_text("verdict = 'READY FOR DATA ACCUMULATION'\n", encoding="utf-8")
+            valid, errors = verify_generator_scripts(tmp_path)
+            self.assertFalse(valid)
+            self.assertTrue(any("hardcoded status literal" in e for e in errors))
+
             # Clean script
             bad_script.write_text("fills = len(sim_engine.fills)\nif verdict == 'VALIDATED': pass\n", encoding="utf-8")
             valid, errors = verify_generator_scripts(tmp_path)
             self.assertTrue(valid)
+
+    def test_verify_report_v30_enhancements(self):
+        """Verify report validator catches empty-string hashes, constant columns, unlinked statuses, and latency divergence (V-30)."""
+        import tempfile
+        from scripts.verify_report import verify_report
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+
+            # 1. Empty string SHA-256 hash
+            rep_empty_hash = tmp_path / "rep_empty_hash.md"
+            rep_empty_hash.write_text(
+                "# Title\n\n**Generated At:** `2026-09-20T10:00:00Z`\n\nHash: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\n\n| A | B |\n|---|---|\n| 1 | 2 |\n",
+                encoding="utf-8",
+            )
+            valid, errors = verify_report(rep_empty_hash)
+            self.assertFalse(valid)
+            self.assertTrue(any("vacuous empty-string SHA-256" in e for e in errors))
+
+            # 2. Constant column where variation is expected (Depth $50 across markets)
+            rep_const_col = tmp_path / "rep_const_col.md"
+            rep_const_col.write_text(
+                "# Title\n\n**Generated At:** `2026-09-20T10:00:00Z`\n\n| Market | Depth | Trades |\n|---|---|---|\n| BTC | $50 | 100 |\n| ETH | $50 | 200 |\n| SOL | $50 | 300 |\n",
+                encoding="utf-8",
+            )
+            valid, errors = verify_report(rep_const_col)
+            self.assertFalse(valid)
+            self.assertTrue(any("constant across all 3 rows" in e for e in errors))
+
+            # 3. Unlinked status in ledger
+            rep_unlinked = tmp_path / "rep_unlinked.md"
+            rep_unlinked.write_text(
+                "# Title\n\n**Generated At:** `2026-09-20T10:00:00Z`\n\n| ID | Status | Verdict |\n|---|---|---|\n| V-99 | CONFIRMED | FIXED |\n| V-98 | CONFIRMED | FIXED |\n| V-97 | CONFIRMED | FIXED |\n",
+                encoding="utf-8",
+            )
+            valid, errors = verify_report(rep_unlinked)
+            self.assertFalse(valid)
+            self.assertTrue(any("has no linked evidence or test file" in e for e in errors))
+
+            # 4. Latency divergence against canonical summary
+            rep_divergent_lat = tmp_path / "rep_divergent_lat.md"
+            rep_divergent_lat.write_text(
+                "# Title\n\n**Generated At:** `2026-09-20T10:00:00Z`\n\nAudited live sample exhibits latency p50 of 376.06 ms across REST samples.\n\n| A | B |\n|---|---|\n| 1 | 2 |\n",
+                encoding="utf-8",
+            )
+            valid, errors = verify_report(rep_divergent_lat)
+            self.assertFalse(valid)
+            self.assertTrue(any("disagrees with canonical" in e for e in errors))
+
+            # 5. Invalid Generated At
+            rep_bad_ts = tmp_path / "rep_bad_ts.md"
+            rep_bad_ts.write_text(
+                "# Title\n\n**Generated At:** System Clock UTC\n\n| A | B |\n|---|---|\n| 1 | 2 |\n",
+                encoding="utf-8",
+            )
+            valid, errors = verify_report(rep_bad_ts)
+            self.assertFalse(valid)
+            self.assertTrue(any("missing valid ISO 8601 UTC format" in e for e in errors))
 
 
 if __name__ == "__main__":

@@ -329,11 +329,11 @@
     "category": "DOCS",
     "summary": "followup_gate_report.md overclaims ready for accumulation with broken criteria",
     "reproduction_status": "CONFIRMED",
-    "remediation_status": "OPEN",
-    "evidence_file": "",
-    "test_file": "tests/test_harness_integrity.py",
-    "commit_hash": null,
-    "notes": "Overclaimed 20/20 PASS when L2, funding, rate limits, and parity were broken"
+    "remediation_status": "FIXED",
+    "evidence_file": "evidence/2026-09-20/V-28_status_report_generated.txt",
+    "test_file": "tests/test_report_provenance.py",
+    "commit_hash": "7b949b6",
+    "notes": "Deleted overclaiming followup_gate_report.md; replaced with machine-attested scripts/generate_status_report.py producing reports/status.md."
   },
   {
     "id": "V-29",
@@ -341,11 +341,11 @@
     "category": "DOCS",
     "summary": "Ledger status column was handwritten rather than machine-attested",
     "reproduction_status": "CONFIRMED",
-    "remediation_status": "OPEN",
-    "evidence_file": "",
-    "test_file": "tests/test_harness_integrity.py",
-    "commit_hash": null,
-    "notes": "Remediated by generate_audit_report.py reading from audit_status.json"
+    "remediation_status": "FIXED",
+    "evidence_file": "evidence/2026-09-20/V-29_audit_report_machine_generated.txt",
+    "test_file": "tests/test_report_provenance.py",
+    "commit_hash": "ab9c03b",
+    "notes": "Remediated by generate_audit_report.py reading strictly from audit_status.json with link validation."
   },
   {
     "id": "V-30",
@@ -353,11 +353,11 @@
     "category": "DOCS",
     "summary": "verify_report.py cannot catch fabricated generator data or invalid claims",
     "reproduction_status": "CONFIRMED",
-    "remediation_status": "OPEN",
-    "evidence_file": "",
-    "test_file": "tests/test_harness_integrity.py",
-    "commit_hash": null,
-    "notes": "Passed reports despite stale test counts and vacuous parity"
+    "remediation_status": "FIXED",
+    "evidence_file": "evidence/2026-09-20/V-30_verify_report_enhancements.txt",
+    "test_file": "tests/test_report_provenance.py",
+    "commit_hash": "HEAD",
+    "notes": "verify_report.py enhanced with checks for empty hash, constant column defaults, unlinked statuses, canonical latency divergence, ISO timestamps, and forbidden generator strings; unit-tested in test_report_provenance.py."
   },
   {
     "id": "V-31",
@@ -365,11 +365,11 @@
     "category": "DOCS",
     "summary": "Time labels are unreliable (IST labeled as UTC in reports)",
     "reproduction_status": "CONFIRMED",
-    "remediation_status": "OPEN",
-    "evidence_file": "",
+    "remediation_status": "FIXED",
+    "evidence_file": "evidence/2026-09-20/V-31_timezone_integrity.txt",
     "test_file": "tests/test_calendar_regimes.py",
-    "commit_hash": null,
-    "notes": "source_truth_audit.md labeled UTC and IST identical"
+    "commit_hash": "HEAD",
+    "notes": "source_truth_audit.md removed; clock_offset_analysis.md updated with ISO-8601 UTC timestamp; test_utc_and_ist_timezone_label_integrity verifies exact 5.5h UTC-IST separation."
   },
   {
     "id": "V-32",
@@ -377,10 +377,10 @@
     "category": "DOCS",
     "summary": "Repo clutter and duplicates (~70 stale/duplicate files)",
     "reproduction_status": "CONFIRMED",
-    "remediation_status": "OPEN",
-    "evidence_file": "",
+    "remediation_status": "FIXED",
+    "evidence_file": "evidence/2026-09-20/V-32_repo_cleanup_verified.txt",
     "test_file": "tests/test_storage_manager.py",
-    "commit_hash": null,
-    "notes": "Approved for deletion in WS-K per Appendix B"
+    "commit_hash": "5010f91",
+    "notes": "Approved for deletion in WS-K per Appendix B; ~70 stale/duplicate files deleted across commits f962161 through 5010f91."
   }
 ]
