@@ -1,7 +1,7 @@
 # Arcus MM — Active System & Verification Status
 
-**Generated At:** `2026-09-20T17:16:01Z`  
-**Git Commit:** `4e8d2b5`  
+**Generated At:** `2026-09-20T18:31:47Z`  
+**Git Commit:** `d851f91`  
 **Headline Status:** `INCONCLUSIVE — no strategy validated`  
 
 ## 1. Governance & Operating Constraints
@@ -26,12 +26,12 @@
 
 | Subsystem | Metric | Current Value | Specification / Health |
 |---|---|---|---|
-| **Defect Ledger** | Total Findings | 33 | V-01 through V-33 |
-| **Defect Remediation** | Fixed / Open | 33 / 0 | Verified via `scripts/generate_audit_report.py` |
-| **Recorder PID 11661** | Uptime | 25.4 hours (91,603 s) | Status: ACTIVE / HEALTHY |
-| **Data Ingestion** | Recorded Messages | 32,295,005 frames | Free Disk: 155.8 GB |
+| **Defect Ledger** | Total Findings | 34 | V-01 through V-34 |
+| **Defect Remediation** | Fixed / Open | 34 / 0 | Verified via `scripts/generate_audit_report.py` |
+| **Recorder PID 11661** | Uptime | 26.7 hours (96,149 s) | Status: ACTIVE / HEALTHY |
+| **Data Ingestion** | Recorded Messages | 34,269,647 frames | Free Disk: 153.4 GB |
 | **Wire Latency** | REST /v1/time p50 | 173.99 ms | Status: `PROVISIONAL` |
 
 ## 4. Key Takeaway
 
-All 33 findings (V-01 through V-33) from Mandate v3 are remediated and machine-attested with deterministic evidence. Gates G0, G1, G1b, and G2 have passed cleanly with explicit human sign-off. The pilot microstructure analysis (WS-G) and pre-registration protocol v3.1 draft (WS-H) are complete. The Monday operational sequence (12:00 UTC universe re-scan -> 12:30-16:30 UTC primary paper session) is armed and ready.
+All 34 findings (V-01 through V-34) from Mandate v3 are remediated and machine-attested with deterministic evidence. Gates G0, G1, G1b, and G2 have passed cleanly with explicit human sign-off. The pilot microstructure analysis (WS-G) and pre-registration protocol v3.1 draft (WS-H) are complete. The Monday operational sequence (12:00 UTC universe re-scan -> 12:30-16:30 UTC primary paper session) is armed and ready.

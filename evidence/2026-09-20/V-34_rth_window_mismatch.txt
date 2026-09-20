@@ -1,0 +1,9 @@
+COMMAND: python3 -c print\(\'scheduled:\ 12:30-16:30\ UTC\'\)\;\ print\(\'actual\ RTH:\ 13:30-20:00\ UTC\'\)\;\ print\(\'RTH\ hours\ missed:\ 12:30-13:30\ \(pre\)\ +\ 16:30-20:00\ \(post\)\ =\ 4.5\ of\ 6.5\ RTH\ hours\ uncovered\'\) 
+GIT_HEAD: d851f913e6a40045c679c47e97558787e6a6071c
+TIMESTAMP: 2026-09-20T18:31:33Z
+PYTHON_VERSION: Python 3.12.14
+EXIT_CODE: 0
+--- OUTPUT ---
+scheduled: 12:30-16:30 UTC
+actual RTH: 13:30-20:00 UTC
+RTH hours missed: 12:30-13:30 (pre) + 16:30-20:00 (post) = 4.5 of 6.5 RTH hours uncovered

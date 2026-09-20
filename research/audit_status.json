@@ -394,5 +394,17 @@
     "test_file": "tests/test_live_paper_trader.py",
     "commit_hash": "HEAD",
     "notes": "Committed tests/fixtures/markets_snapshot_sample.json and patched test_live_paper_trader.py to use fixture, making suite 100% hermetic on clean checkouts with empty data/ directory."
+  },
+  {
+    "id": "V-34",
+    "severity": "MAJOR",
+    "category": "METHODOLOGY",
+    "summary": "Primary paper session window (12:30-16:30 UTC) misses 4.5 of 6.5 NYSE RTH hours",
+    "reproduction_status": "CONFIRMED",
+    "remediation_status": "FIXED",
+    "evidence_file": "evidence/2026-09-20/V-34_rth_window_mismatch.txt",
+    "test_file": "tests/test_calendar_regimes.py",
+    "commit_hash": "HEAD",
+    "notes": "Mandate v4 §1 confirms RTH mismatch. Fixed by splitting into immediate 24/7 crypto execution and expanding RTH paper session to 13:00-20:30 UTC spanning full market open to close."
   }
 ]
