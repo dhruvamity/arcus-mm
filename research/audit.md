@@ -1,6 +1,6 @@
 # Master Audit Ledger — Ground Truth & Defect Remediation
 
-**Generated At:** `2026-09-20 20:30:52 UTC`  
+**Generated At:** `2026-09-20 20:31:15 UTC`  
 **Evaluation Scope:** All Findings (V-01 through V-35, W-01 through W-14) from Mandates v3, v4, and v5  
 **Commit Discrepancy Note:** Prior reports referenced commit hash `23a03f3` which does not exist on the remote GitHub repository. This occurred because the initial repository setup was committed and pushed via a squashed root commit (`0905008`), obliterating local scratch commit IDs. From this point forward, strict verifiable linear Git history is maintained with one commit per defect/milestone.  
 
@@ -57,7 +57,7 @@
 | **W-10** | `MINOR` | BOOKKEEPING | Ledger count discrepancy between reports/status.md (34) and research/audit_status.json (35) | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/W-10_status_ledger_counts_post_fix_pass.txt`](evidence/2026-09-20/W-10_status_ledger_counts_post_fix_pass.txt) | [`tests/test_report_provenance.py`](tests/test_report_provenance.py) | `5ff7730` |
 | **W-11** | `MINOR` | METHODOLOGY | RTH definitions differ between paper capture window (13:00-20:30) and NYSE cash hours (13:30-20:00) | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/W-11_rth_definition_post_fix_pass.txt`](evidence/2026-09-20/W-11_rth_definition_post_fix_pass.txt) | [`tests/test_calendar_regimes.py`](tests/test_calendar_regimes.py) | `5ff7730` |
 | **W-12** | `MINOR` | TESTS | test_storage_manager.py non-hermetic on fresh checkout with uncommitted data/ directory | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/W-12_clean_clone_post_fix_pass.txt`](evidence/2026-09-20/W-12_clean_clone_post_fix_pass.txt) | [`tests/test_storage_manager.py`](tests/test_storage_manager.py) | `643d9d9` |
-| **W-13** | `MAJOR` | EXECUTION | Execution stack is mock-only with no live authenticated order loop or venue acks | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/W-13_live_engine_two_key_guard_post_fix_pass.txt`](evidence/2026-09-20/W-13_live_engine_two_key_guard_post_fix_pass.txt) | [`tests/test_live_engine.py`](tests/test_live_engine.py) | - |
+| **W-13** | `MAJOR` | EXECUTION | Execution stack is mock-only with no live authenticated order loop or venue acks | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/W-13_live_engine_two_key_guard_post_fix_pass.txt`](evidence/2026-09-20/W-13_live_engine_two_key_guard_post_fix_pass.txt) | [`tests/test_live_engine.py`](tests/test_live_engine.py) | `82e9476` |
 | **W-14** | `MINOR` | SECURITY | Credential hygiene requirement to rotate API keys if earlier bundle containing .env was exposed | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/W-14_key_rotation_advisory_post_fix_pass.txt`](evidence/2026-09-20/W-14_key_rotation_advisory_post_fix_pass.txt) | [`tests/test_report_provenance.py`](tests/test_report_provenance.py) | `5ff7730` |
 
 ---

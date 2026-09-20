@@ -572,7 +572,7 @@
     "remediation_status": "FIXED",
     "evidence_file": "evidence/2026-09-20/W-13_live_engine_two_key_guard_post_fix_pass.txt",
     "test_file": "tests/test_live_engine.py",
-    "commit_hash": "-",
+    "commit_hash": "82e9476",
     "notes": "Implemented LiveExecutionEngine with authenticated REST/WS order loop, scheduleCancel dead-man switch heartbeat, two-key mainnet guard, and MUT-27."
   },
   {
