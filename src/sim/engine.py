@@ -588,7 +588,7 @@ class SimEngine:
                     bid_order = ctx.active_bid[fm]
                     if bid_order and bid_order.status in (OrderStatus.RESTING, OrderStatus.CANCEL_REQUESTED):
                         was_in_flight = (bid_order.status == OrderStatus.CANCEL_REQUESTED)
-                        fill_qty = self._evaluate_fill_quantity(fm, bid_order, trade_side, trade_p, trade_s)
+                        fill_qty = self._evaluate_fill_quantity(fm, bid_order, trade_side, trade_p, trade_s, venue.tick_size)
                         if fill_qty > 0:
                             fee = pnl_eng.record_fill("BUY", bid_order.price, fill_qty, venue.current_mid, is_taker=False, ts_ns=ts_ns)
                             self.subaccount_rate_limiter.record_fill(fill_qty * bid_order.price)
@@ -613,8 +613,8 @@ class SimEngine:
                                 "fee": fee,
                                 "ts_ns": ts_ns,
                                 "was_in_flight_cancel": was_in_flight,
-                                "quote_hash": quote_hash,
                                 "observation_key": obs_key,
+                                "quote_hash": quote_hash,
                             }
                             fills_generated.append(fill_rec)
                             ctx.fill_records.append(fill_rec)
@@ -624,7 +624,7 @@ class SimEngine:
                     ask_order = ctx.active_ask[fm]
                     if ask_order and ask_order.status in (OrderStatus.RESTING, OrderStatus.CANCEL_REQUESTED):
                         was_in_flight = (ask_order.status == OrderStatus.CANCEL_REQUESTED)
-                        fill_qty = self._evaluate_fill_quantity(fm, ask_order, trade_side, trade_p, trade_s)
+                        fill_qty = self._evaluate_fill_quantity(fm, ask_order, trade_side, trade_p, trade_s, venue.tick_size)
                         if fill_qty > 0:
                             fee = pnl_eng.record_fill("SELL", ask_order.price, fill_qty, venue.current_mid, is_taker=False, ts_ns=ts_ns)
                             self.subaccount_rate_limiter.record_fill(fill_qty * ask_order.price)
@@ -665,8 +665,10 @@ class SimEngine:
         trade_side: str,
         trade_price: float,
         trade_size: float,
+        tick_size: float = 0.0,
     ) -> float:
-        """Applies exact fill model semantics: Model A (touch), Model B (queue), Model C (trade-through)."""
+        """Applies exact fill model semantics: Model A (touch), Model B (queue), Model C (trade-through by >= 1 tick)."""
+        tick = tick_size if tick_size > 0 else 1e-6
         if order.side == "BUY":
             if trade_side != "SELL":
                 return 0.0
@@ -675,7 +677,8 @@ class SimEngine:
                 return min(order.remaining_size, trade_size) if trade_price <= order.price else 0.0
 
             elif fill_model == FillModelType.MODEL_C_CONSERVATIVE:
-                return min(order.remaining_size, trade_size) if trade_price < order.price - 1e-6 else 0.0
+                # W-09: Trade strictly through resting order price by at least 1 tick
+                return min(order.remaining_size, trade_size) if trade_price <= (order.price - tick + 1e-6) else 0.0
 
             elif fill_model == FillModelType.MODEL_B_MODERATE:
                 if trade_price < order.price - 1e-6:
@@ -698,7 +701,8 @@ class SimEngine:
                 return min(order.remaining_size, trade_size) if trade_price >= order.price else 0.0
 
             elif fill_model == FillModelType.MODEL_C_CONSERVATIVE:
-                return min(order.remaining_size, trade_size) if trade_price > order.price + 1e-6 else 0.0
+                # W-09: Trade strictly through resting order price by at least 1 tick
+                return min(order.remaining_size, trade_size) if trade_price >= (order.price + tick - 1e-6) else 0.0
 
             elif fill_model == FillModelType.MODEL_B_MODERATE:
                 if trade_price > order.price + 1e-6:

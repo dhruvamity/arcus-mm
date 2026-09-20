@@ -77,12 +77,12 @@ def test_mutation_1_invert_queue() -> MutationResult:
     """Mutation 1: Invert Queue Priority in Model B (instant jump to front of queue)."""
     orig_eval = SimEngine._evaluate_fill_quantity
 
-    def mutated_eval(self, fill_model, order, trade_side, trade_price, trade_size):
+    def mutated_eval(self, fill_model, order, trade_side, trade_price, trade_size, tick_size=0.0):
         if fill_model == FillModelType.MODEL_B_MODERATE and order.side == "BUY" and trade_side == "SELL":
             # BUG: Ignore queue ahead entirely!
             order.queue_ahead_size = 0.0
             return min(order.remaining_size, trade_size)
-        return orig_eval(self, fill_model, order, trade_side, trade_price, trade_size)
+        return orig_eval(self, fill_model, order, trade_side, trade_price, trade_size, tick_size=tick_size)
 
     SimEngine._evaluate_fill_quantity = mutated_eval
     try:
@@ -157,10 +157,10 @@ def test_mutation_5_trade_side_inversion() -> MutationResult:
     """Mutation 5: Invert trade side semantics (expect BUY aggressor to hit BUY maker order)."""
     orig_eval = SimEngine._evaluate_fill_quantity
 
-    def mutated_eval(self, fill_model, order, trade_side, trade_price, trade_size):
+    def mutated_eval(self, fill_model, order, trade_side, trade_price, trade_size, tick_size=0.0):
         # BUG: Invert side semantics
         inv_side = "BUY" if trade_side == "SELL" else "SELL"
-        return orig_eval(self, fill_model, order, inv_side, trade_price, trade_size)
+        return orig_eval(self, fill_model, order, inv_side, trade_price, trade_size, tick_size=tick_size)
 
     SimEngine._evaluate_fill_quantity = mutated_eval
     try:
@@ -463,6 +463,28 @@ def test_mutation_19_drop_ofi_microprice_argument() -> MutationResult:
         SimEngine._evaluate_strategies_quoting = orig_eval
 
 
+def test_mutation_20_model_c_sub_tick_fills() -> MutationResult:
+    """MUT-20: Model C fills on any strictly-worse print, ignoring >= 1 tick requirement."""
+    orig_eval = SimEngine._evaluate_fill_quantity
+
+    def mutated_eval(self, fill_model, order, trade_side, trade_price, trade_size, tick_size=0.0):
+        return orig_eval(self, fill_model, order, trade_side, trade_price, trade_size, tick_size=0.0)
+
+    SimEngine._evaluate_fill_quantity = mutated_eval
+    try:
+        failed, msg = run_targeted_test(TestSimEngine, "test_23_w09_model_c_trade_strictly_through_by_tick")
+        return MutationResult(
+            "MUT-20",
+            "Model C Sub-Tick Fills",
+            "TestSimEngine.test_23_w09_model_c_trade_strictly_through_by_tick",
+            "Reverts Model C to fill on sub-tick prints rather than strictly through by >= 1 tick",
+            failed,
+            msg,
+        )
+    finally:
+        SimEngine._evaluate_fill_quantity = orig_eval
+
+
 def main():
     mutations: List[Callable[[], MutationResult]] = [
         test_mutation_1_invert_queue,
@@ -484,6 +506,7 @@ def main():
         test_mutation_17_c_world_from_b_inventory,
         test_mutation_18_mid_based_min_clip_check,
         test_mutation_19_drop_ofi_microprice_argument,
+        test_mutation_20_model_c_sub_tick_fills,
     ]
 
     print("=" * 80)

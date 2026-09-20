@@ -521,11 +521,11 @@
     "category": "ENGINE",
     "summary": "Model C definition discrepancy between spec (trade through by >=1 tick) and code (< price - 1e-6)",
     "reproduction_status": "CONFIRMED",
-    "remediation_status": "OPEN",
-    "evidence_file": "",
+    "remediation_status": "FIXED",
+    "evidence_file": "evidence/2026-09-20/W-09_model_c_tick_post_fix_pass.txt",
     "test_file": "tests/test_sim_engine.py",
-    "commit_hash": "-",
-    "notes": "Spec requires trade strictly through by >=1 tick; code checked strictly worse print. Align to exact spec."
+    "commit_hash": "HEAD",
+    "notes": "Aligned Model C fill condition with pre-reg specification: fills strictly when trade prints through resting quote price by at least 1 tick (trade_price <= order.price - tick_size for BUY, trade_price >= order.price + tick_size for SELL). Added MUT-20."
   },
   {
     "id": "W-10",

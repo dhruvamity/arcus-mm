@@ -726,6 +726,58 @@ class TestSimEngine(unittest.TestCase):
             f"Bid price must shift upwards under positive trade flow imbalance (was {p_bid_neutral}, got {bid_trade_skewed.price})",
         )
 
+    def test_23_w09_model_c_trade_strictly_through_by_tick(self):
+        """W-09: Verifies Model C fills only when trades strictly print through resting price by >= 1 tick."""
+        strat = FixedSpreadStrategy(
+            market=self.market,
+            tick_size=0.1,
+            step_size=0.0001,
+            spread_bps=20.0,
+            clip_notional=10.0,
+            min_notional=5.0,
+        )
+        engine = SimEngine(
+            markets=self.specs,
+            strategies={"strat": strat},
+            fill_models=[FillModelType.MODEL_C_CONSERVATIVE],
+            paired_common_quotes=False,
+            latency_config=LatencyConfig(order_entry_latency_ms=0.0, cancel_latency_ms=0.0),
+        )
+        ctx = engine.contexts["strat"]
+        t0 = 1_000_000_000
+
+        # Resting quotes at mid 100.0: Bid at 99.9, Ask at 100.1
+        engine.on_event(SimEvent(SimEventType.BBO, t0, self.market, {
+            "bid_price": 99.9, "ask_price": 100.1, "bid_size": 1.0, "ask_size": 1.0
+        }))
+        engine.on_event(SimEvent(SimEventType.CLOCK_TICK, t0 + int(20e6), self.market, {}))
+
+        bid_order = ctx.active_bid[FillModelType.MODEL_C_CONSERVATIVE]
+        self.assertIsNotNone(bid_order)
+        self.assertEqual(bid_order.price, 99.9)
+
+        # 1. Trade prints at 99.85 (which is 0.05 worse, but LESS than 1 tick of 0.1 through 99.9)
+        t_sub_tick = t0 + int(30e6)
+        fills_sub_tick = engine.on_event(SimEvent(SimEventType.TRADE, t_sub_tick, self.market, {
+            "side": "SELL", "price": 99.85, "size": 1.0
+        }))
+        self.assertEqual(
+            len(fills_sub_tick),
+            0,
+            "Model C must NOT fill when trade does not clear resting quote by at least 1 full tick (99.85 vs 99.9 - 0.1 = 99.8)",
+        )
+
+        # 2. Trade prints at 99.80 (which is strictly through by 1 full tick: 99.9 - 0.1 = 99.80)
+        t_full_tick = t0 + int(40e6)
+        fills_full_tick = engine.on_event(SimEvent(SimEventType.TRADE, t_full_tick, self.market, {
+            "side": "SELL", "price": 99.80, "size": 1.0
+        }))
+        self.assertEqual(
+            len(fills_full_tick),
+            1,
+            "Model C MUST fill when trade clears resting quote by >= 1 full tick",
+        )
+
     def test_13_mutation_tests(self):
         """Test 13: Mutation tests (at least 16 mutations applied to the engine fail test suite)."""
         from scripts.mutation_check import (
@@ -748,6 +800,7 @@ class TestSimEngine(unittest.TestCase):
             test_mutation_17_c_world_from_b_inventory,
             test_mutation_18_mid_based_min_clip_check,
             test_mutation_19_drop_ofi_microprice_argument,
+            test_mutation_20_model_c_sub_tick_fills,
         )
         mutations = [
             test_mutation_1_invert_queue,
@@ -769,10 +822,11 @@ class TestSimEngine(unittest.TestCase):
             test_mutation_17_c_world_from_b_inventory,
             test_mutation_18_mid_based_min_clip_check,
             test_mutation_19_drop_ofi_microprice_argument,
+            test_mutation_20_model_c_sub_tick_fills,
         ]
         results = [m() for m in mutations]
         caught = sum(1 for r in results if r.caught)
-        self.assertGreaterEqual(caught, 19, f"Must catch at least 19 mutations, caught {caught}")
+        self.assertGreaterEqual(caught, 20, f"Must catch at least 20 mutations, caught {caught}")
 
 
 if __name__ == "__main__":
