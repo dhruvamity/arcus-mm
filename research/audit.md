@@ -1,12 +1,12 @@
-# Audit v3 Ledger — Ground Truth & Defect Remediation
+# Master Audit Ledger — Ground Truth & Defect Remediation
 
-**Generated At:** `2026-09-20 18:36:14 UTC`  
-**Evaluation Scope:** All Findings (V-01 through V-32) from Mandate v3 (`prompts/2026-09-20_v3.md`)  
+**Generated At:** `2026-09-20 19:35:28 UTC`  
+**Evaluation Scope:** All Findings (V-01 through V-35, W-01 through W-14) from Mandates v3, v4, and v5  
 **Commit Discrepancy Note:** Prior reports referenced commit hash `23a03f3` which does not exist on the remote GitHub repository. This occurred because the initial repository setup was committed and pushed via a squashed root commit (`0905008`), obliterating local scratch commit IDs. From this point forward, strict verifiable linear Git history is maintained with one commit per defect/milestone.  
 
 ---
 
-## 1. Master Audit Ledger (V-01 through V-32)
+## 1. Master Audit Ledger (V-01 through V-35, W-01 through W-14)
 
 | ID | Severity | Category | Finding Summary | Repro Status | Remediation | Evidence File | Verification Test | Commit |
 |---|---|---|---|---|---|---|---|---|
@@ -23,7 +23,7 @@
 | **V-11** | `MAJOR` | LATENCY | Latency is constant jitter rather than empirical distribution sampling | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/V-11_empirical_latency_model.txt`](evidence/2026-09-20/V-11_empirical_latency_model.txt) | [`tests/test_sim_engine.py`](tests/test_sim_engine.py) | `83dc4eb` |
 | **V-12** | `MAJOR` | ENGINE | Three fill model worlds not independent (Model C quotes keyed to Model B inventory) | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/V-12_independent_fill_worlds.txt`](evidence/2026-09-20/V-12_independent_fill_worlds.txt) | [`tests/test_sim_engine.py`](tests/test_sim_engine.py) | `26448af` |
 | **V-13** | `BLOCKER` | RESEARCH | Machine-enforced gates not pre-registered criteria (no bootstrap) | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/V-25_no_bootstrap_walk_forward.txt`](evidence/2026-09-20/V-25_no_bootstrap_walk_forward.txt) | [`tests/test_walk_forward_protocol.py`](tests/test_walk_forward_protocol.py) | `f4ca526` |
-| **V-14** | `MAJOR` | EXECUTION | Missing venue mechanics (mark price PnL mark, margin liquidation checks, off-hours bands) | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/V-06_l2_sequence_gap_recovery.txt`](evidence/2026-09-20/V-06_l2_sequence_gap_recovery.txt) | [`tests/test_sim_engine.py`](tests/test_sim_engine.py) | `26448af` |
+| **V-14** | `MAJOR` | EXECUTION | Missing venue mechanics (mark price PnL mark, margin liquidation checks, off-hours bands) | **CONFIRMED** | **OPEN** | [`evidence/2026-09-20/V-06_l2_sequence_gap_recovery.txt`](evidence/2026-09-20/V-06_l2_sequence_gap_recovery.txt) | [`tests/test_sim_engine.py`](tests/test_sim_engine.py) | - |
 | **V-15** | `BLOCKER` | PAPER | Dynamic metadata never loads due to operator precedence bug in paper trader | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/V-15_fixed_paper_trader_metadata.txt`](evidence/2026-09-20/V-15_fixed_paper_trader_metadata.txt) | [`tests/test_live_paper_trader.py`](tests/test_live_paper_trader.py) | `f04f466` |
 | **V-16** | `MAJOR` | PAPER | Pause logic starves engine during OPEN_30 / CLOSE_30 pauses | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/V-15_fixed_paper_trader_metadata.txt`](evidence/2026-09-20/V-15_fixed_paper_trader_metadata.txt) | [`tests/test_live_paper_trader.py`](tests/test_live_paper_trader.py) | `f04f466` |
 | **V-17** | `BLOCKER` | PARITY | Replay parity PASS is vacuous (empty fill hash comparison on 0 fills) | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/V-17_empty_hash_parity.txt`](evidence/2026-09-20/V-17_empty_hash_parity.txt) | [`tests/test_sim_engine.py`](tests/test_sim_engine.py) | `15a50e8` |
@@ -45,6 +45,20 @@
 | **V-33** | `MINOR` | TESTS | Live paper trader tests non-hermetic without pre-existing data/raw snapshots | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/V-33_hermetic_live_paper_fixture.txt`](evidence/2026-09-20/V-33_hermetic_live_paper_fixture.txt) | [`tests/test_live_paper_trader.py`](tests/test_live_paper_trader.py) | `HEAD` |
 | **V-34** | `MAJOR` | METHODOLOGY | Primary paper session window (12:30-16:30 UTC) misses 4.5 of 6.5 NYSE RTH hours | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/V-34_rth_window_mismatch.txt`](evidence/2026-09-20/V-34_rth_window_mismatch.txt) | [`tests/test_calendar_regimes.py`](tests/test_calendar_regimes.py) | `HEAD` |
 | **V-35** | `MAJOR` | METHODOLOGY | Asset ranking rested solely on short-window weekend pilot tape without historical depth validation | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/V-35_deep_history_pull.txt`](evidence/2026-09-20/V-35_deep_history_pull.txt) | [`scripts/verify_report.py`](scripts/verify_report.py) | `HEAD` |
+| **W-01** | `BLOCKER` | SIMULATION | Minimum-size bids silently rejected (target_size x target_price vs mid clip) | **CONFIRMED** | **OPEN** | - | [`tests/test_sim_engine.py`](tests/test_sim_engine.py) | - |
+| **W-02** | `BLOCKER` | STATISTICS | Walk-forward significance test is tautological (spread at fill instant vs mid) | **CONFIRMED** | **OPEN** | - | [`tests/test_walk_forward_protocol.py`](tests/test_walk_forward_protocol.py) | - |
+| **W-03** | `MAJOR` | STRATEGY | Adaptive (OFI/microprice) strategy never receives microprice/OFI signal from engine | **CONFIRMED** | **OPEN** | - | [`tests/test_sim_engine.py`](tests/test_sim_engine.py) | - |
+| **W-04** | `MAJOR` | ECONOMICS | A +0.75 bps maker rebate assumed across pilot, prereg, and verify_report does not exist at base tier | **CONFIRMED** | **OPEN** | - | [`tests/test_pnl_accounting.py`](tests/test_pnl_accounting.py) | - |
+| **W-05** | `MAJOR` | ENGINE | Two items marked FIXED are not implemented in code (cross-margin/liquidation and 50ms speed bump) | **CONFIRMED** | **OPEN** | - | [`tests/test_sim_engine.py`](tests/test_sim_engine.py) | - |
+| **W-06** | `MAJOR` | REPORTING | Sunday rehearsal artifacts mislabeled as Monday and contain an impossible +$238.76 PnL | **CONFIRMED** | **OPEN** | - | [`tests/test_sim_engine.py`](tests/test_sim_engine.py) | - |
+| **W-07** | `MAJOR` | METHODOLOGY | Fill counts inflated by duplicate strategy instances (c50 and c100 produce identical executions) | **CONFIRMED** | **OPEN** | - | [`tests/test_sim_engine.py`](tests/test_sim_engine.py) | - |
+| **W-08** | `MAJOR` | LATENCY | Latency evidence is inconsistent and sourced from REST time pings rather than order round trips | **CONFIRMED** | **OPEN** | - | [`tests/test_harness_integrity.py`](tests/test_harness_integrity.py) | - |
+| **W-09** | `MINOR` | ENGINE | Model C definition discrepancy between spec (trade through by >=1 tick) and code (< price - 1e-6) | **CONFIRMED** | **OPEN** | - | [`tests/test_sim_engine.py`](tests/test_sim_engine.py) | - |
+| **W-10** | `MINOR` | BOOKKEEPING | Ledger count discrepancy between reports/status.md (34) and research/audit_status.json (35) | **CONFIRMED** | **OPEN** | - | [`scripts/generate_status_report.py`](scripts/generate_status_report.py) | - |
+| **W-11** | `MINOR` | METHODOLOGY | RTH definitions differ between paper capture window (13:00-20:30) and NYSE cash hours (13:30-20:00) | **CONFIRMED** | **OPEN** | - | [`tests/test_calendar_regimes.py`](tests/test_calendar_regimes.py) | - |
+| **W-12** | `MINOR` | TESTS | test_storage_manager.py non-hermetic on fresh checkout with uncommitted data/ directory | **CONFIRMED** | **OPEN** | - | [`tests/test_storage_manager.py`](tests/test_storage_manager.py) | - |
+| **W-13** | `MAJOR` | EXECUTION | Execution stack is mock-only with no live authenticated order loop or venue acks | **CONFIRMED** | **OPEN** | - | [`tests/test_exec_stack.py`](tests/test_exec_stack.py) | - |
+| **W-14** | `MINOR` | SECURITY | Credential hygiene requirement to rotate API keys if earlier bundle containing .env was exposed | **CONFIRMED** | **OPEN** | - | [`scripts/secret_scan.py`](scripts/secret_scan.py) | - |
 
 ---
 
@@ -58,10 +72,10 @@ All referenced evidence and test suites are machine-validated to exist on disk:
 
 ## 3. Progress Metrics
 
-- **Total Findings Audited:** 35
-- **Confirmed Defects:** 35
+- **Total Findings Audited:** 49
+- **Confirmed Defects:** 49
 - **Refuted Defects:** 0
-- **Remediated (FIXED):** 35
+- **Remediated (FIXED):** 34
 - **In Progress:** 0
-- **Open:** 0
+- **Open:** 15
 

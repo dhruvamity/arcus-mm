@@ -43,15 +43,15 @@ def generate_audit_markdown(status_data: list[dict], output_file: Path) -> None:
     now_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
     md = [
-        "# Audit v3 Ledger — Ground Truth & Defect Remediation",
+        "# Master Audit Ledger — Ground Truth & Defect Remediation",
         "",
         f"**Generated At:** `{now_utc}`  ",
-        "**Evaluation Scope:** All Findings (V-01 through V-32) from Mandate v3 (`prompts/2026-09-20_v3.md`)  ",
+        "**Evaluation Scope:** All Findings (V-01 through V-35, W-01 through W-14) from Mandates v3, v4, and v5  ",
         "**Commit Discrepancy Note:** Prior reports referenced commit hash `23a03f3` which does not exist on the remote GitHub repository. This occurred because the initial repository setup was committed and pushed via a squashed root commit (`0905008`), obliterating local scratch commit IDs. From this point forward, strict verifiable linear Git history is maintained with one commit per defect/milestone.  ",
         "",
         "---",
         "",
-        "## 1. Master Audit Ledger (V-01 through V-32)",
+        "## 1. Master Audit Ledger (V-01 through V-35, W-01 through W-14)",
         "",
         "| ID | Severity | Category | Finding Summary | Repro Status | Remediation | Evidence File | Verification Test | Commit |",
         "|---|---|---|---|---|---|---|---|---|",

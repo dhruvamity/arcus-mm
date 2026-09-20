@@ -1,7 +1,7 @@
 # Arcus MM — Active System & Verification Status
 
-**Generated At:** `2026-09-20T18:31:47Z`  
-**Git Commit:** `d851f91`  
+**Generated At:** `2026-09-20T19:35:47Z`  
+**Git Commit:** `f3fa854`  
 **Headline Status:** `INCONCLUSIVE — no strategy validated`  
 
 ## 1. Governance & Operating Constraints
@@ -26,12 +26,19 @@
 
 | Subsystem | Metric | Current Value | Specification / Health |
 |---|---|---|---|
-| **Defect Ledger** | Total Findings | 34 | V-01 through V-34 |
-| **Defect Remediation** | Fixed / Open | 34 / 0 | Verified via `scripts/generate_audit_report.py` |
-| **Recorder PID 11661** | Uptime | 26.7 hours (96,149 s) | Status: ACTIVE / HEALTHY |
-| **Data Ingestion** | Recorded Messages | 34,269,647 frames | Free Disk: 153.4 GB |
+| **Defect Ledger** | Total Findings | 49 | V-01..V-35 (35) + W-01..W-14 (14) |
+| **Defect Remediation** | Fixed / Open | 34 / 15 | Verified via `scripts/generate_audit_report.py` |
+| **Recorder PID 11661** | Uptime | 27.8 hours (99,990 s) | Status: ACTIVE / HEALTHY |
+| **Data Ingestion** | Recorded Messages | 35,592,503 frames | Free Disk: 152.1 GB |
 | **Wire Latency** | REST /v1/time p50 | 173.99 ms | Status: `PROVISIONAL` |
 
-## 4. Key Takeaway
+## 4. Credential Hygiene Advisory (W-14)
 
-All 34 findings (V-01 through V-34) from Mandate v3 are remediated and machine-attested with deterministic evidence. Gates G0, G1, G1b, and G2 have passed cleanly with explicit human sign-off. The pilot microstructure analysis (WS-G) and pre-registration protocol v3.1 draft (WS-H) are complete. The Monday operational sequence (12:00 UTC universe re-scan -> 12:30-16:30 UTC primary paper session) is armed and ready.
+> [!IMPORTANT]
+> If any historical repository bundle containing an unredacted `.env` was previously shared externally,
+> the master Ethereum wallet address and subaccount API keys must be immediately rotated on Arcus venue.
+> Key material is never logged, printed, or committed in the repository.
+
+## 5. Key Takeaway
+
+Audit status tracks 49 findings across Mandates v3, v4, and v5. 34 findings stand verified and remediated; 15 findings are currently open for remediation under Mandate v5 Workstream A. Live execution is operating under PRE-FIX status with zero real orders placed. Tape recorder PID 11661 remains continuously active.
