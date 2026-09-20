@@ -1,0 +1,9 @@
+=== POST-FIX PASSING DEMONSTRATION FOR W-02 (MUT-24) ===
+Command: .venv/bin/python -m unittest tests/test_walk_forward_protocol.py -k test_w02
+Target Test: TestWalkForwardProtocol.test_w02_day_level_paired_t_test_and_bootstrap
+
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.001s
+
+OK

@@ -145,5 +145,8 @@ For any candidate $(M, S)$ to achieve a verdict of `VALIDATED`, all of the follo
   7. *Canonical Latency Pinning*: Updated latency figures to canonical empirical measurements ($p50 = 173.99\text{ ms}$, $p95 = 386.86\text{ ms}$, stress $= 886.86\text{ ms}$) from `latency/latency_summary.json` (V-27).
   8. *OOS Assurance Statement*: **Zero Out-of-Sample (OOS) data has been collected or evaluated. The OOS test window remains strictly in the future (Sep 28 – Oct 2, 2026).**
   9. *Maker Rebate Elimination (Mandate v5 §2 W-04)*: Removed +0.75 bps maker rebate assumption. Verified base fee tier charges 0.0 bps maker fee with 0.0 bps rebate. Net fee drag under taker-exit assumptions updated to 2.25 bps (2.25 bps taker fee, 0.0 bps maker rebate). All candidate feasibility evaluations recalculated without maker rebate.
+  10. *Elimination of Tautological Metric (Mandate v5 §1.2 W-02 / WS-B)*: Replaced fill-instant half-spread scoring with day-level net equity change:
+     $$\Delta \text{Equity}_d = \text{Realized PnL}_d + \text{MTM}_d + \text{Funding}_d - \text{Fees}_d - \text{Forced Exit Haircut}_d$$
+     where Forced Exit Haircut models liquidating remaining inventory at day-end via conservative taker fill with 2.25 bps fee. Formalized paired t-test against `DoNothing` and `RandomSide`, block bootstrap with 10,000 resamples, Holm-Bonferroni FWER step-down ($\alpha=0.05$), conservative power analysis ($n_{\text{req}} = 495$), and executable runner `scripts/run_oos.py` with freeze deadline gating.
 - **2026-09-20 (Pre-Registration v3)**: Initial v3 draft incorporating pilot analysis.
 - **2026-09-19 (Corrective Pass 2)**: Expanded OOS window to 5 days; corrected multi-day stability criteria.

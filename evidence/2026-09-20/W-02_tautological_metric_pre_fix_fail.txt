@@ -1,0 +1,18 @@
+=== PRE-FIX FAILURE DEMONSTRATION FOR W-02 (MUT-24) ===
+Command: .venv/bin/python -m unittest tests/test_walk_forward_protocol.py -k test_w02
+Target Test: TestWalkForwardProtocol.test_w02_day_level_paired_t_test_and_bootstrap
+
+Before implementing day-level net equity change with forced exit haircut (simulated via MUT-24 removing conservative exit haircut):
+======================================================================
+FAIL: test_w02_day_level_paired_t_test_and_bootstrap (test_walk_forward_protocol.TestWalkForwardProtocol.test_w02_day_level_paired_t_test_and_bootstrap)
+W-02 / Mandate v5 §4: Day-level net equity change, paired t-test, bootstrap, and unrelaxed gates.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/dhruv/Desktop/CodeWithD/arcus-mm/tests/test_walk_forward_protocol.py", line 112, in test_w02_day_level_paired_t_test_and_bootstrap
+    self.assertAlmostEqual(delta, 5.319, places=3)
+AssertionError: 5.5 != 5.319 within 3 places (0.18100000000000005 difference)
+
+----------------------------------------------------------------------
+Ran 1 test in 0.001s
+
+FAILED (failures=1)

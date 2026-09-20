@@ -93,6 +93,109 @@ class TestWalkForwardProtocol(unittest.TestCase):
         self.assertFalse(corrected[2]["is_statistically_significant"])
         self.assertFalse(corrected[3]["is_statistically_significant"])
 
+    def test_w02_day_level_paired_t_test_and_bootstrap(self):
+        """W-02 / Mandate v5 §4: Day-level net equity change, paired t-test, bootstrap, and unrelaxed gates."""
+        # 1. Day-level net equity change with conservative end-of-day haircut on unhedged position
+        pnl_summary = {
+            "realized_pnl": 5.0,
+            "unrealized_mtm": 2.0,
+            "funding_pnl": -0.5,
+            "fee_costs": 1.0,
+            "open_position_units": 0.01,
+            "final_mid": 80000.0,
+        }
+        # notional = 0.01 * 80000 = 800.0
+        # haircut = (800.0 * 2.25 / 10_000) + (0.01 * 0.1) = 0.18 + 0.001 = 0.181
+        # delta_equity = 5.0 + 2.0 - 0.5 - 1.0 - 0.181 = 5.319
+        delta = WalkForwardValidator.compute_daily_net_equity_change(pnl_summary, tick_size=0.1, taker_fee_bps=2.25)
+        self.assertAlmostEqual(delta, 5.319, places=3)
+
+        # Haircut must be strictly greater than 0 if open inventory exists
+        pnl_flat = dict(pnl_summary, open_position_units=0.0)
+        delta_flat = WalkForwardValidator.compute_daily_net_equity_change(pnl_flat, tick_size=0.1, taker_fee_bps=2.25)
+        self.assertEqual(delta_flat, 5.5)  # 5 + 2 - 0.5 - 1 = 5.5 (no haircut)
+        self.assertLess(delta, delta_flat, "Haircut must penalize holding unhedged inventory into day close")
+
+        # 2. Paired t-test comparing daily net equity changes vs DoNothing (0.0)
+        daily_mm = [1.20, 1.45, 0.95, 1.60, 1.10]
+        daily_dn = [0.0, 0.0, 0.0, 0.0, 0.0]
+        t_stat, p_val, mean_diff, std_diff = WalkForwardValidator.compute_paired_t_test(daily_mm, daily_dn)
+        self.assertGreater(t_stat, 0.0)
+        self.assertLess(p_val, 0.01)
+        self.assertAlmostEqual(mean_diff, 1.26, places=2)
+
+        # Zero difference gives p-value 1.0
+        _, p_val_zero, _, _ = WalkForwardValidator.compute_paired_t_test(daily_dn, daily_dn)
+        self.assertEqual(p_val_zero, 1.0)
+
+        # 3. Block bootstrap (sample with replacement) over daily diffs
+        diffs = [a - b for a, b in zip(daily_mm, daily_dn)]
+        p_boot, (ci_lower, ci_upper) = WalkForwardValidator.run_block_bootstrap(diffs, n_bootstrap=2000, seed=42)
+        self.assertLess(p_boot, 0.05)
+        self.assertGreater(ci_lower, 0.0)
+        self.assertGreater(ci_upper, ci_lower)
+
+        # 4. Machine-checkable gates: Fill count gate must NOT be relaxed to 100
+        from src.sim.engine import BacktestRunResult
+        res_mock_100 = BacktestRunResult(
+            market="BTC-USD",
+            strategy_name="FixedSpread",
+            fill_model="MODEL_B",
+            fidelity="HIGH",
+            latency_ms=50.0,
+            pnl_summary={"total_trades_count": 100, "net_pnl": 5.0, "max_drawdown_pct": 1.0, "open_position_notional": 10.0, "initial_capital": 100.0},
+            rate_limit_metrics={},
+            markout_metrics={},
+            event_count=1000,
+            duration_hours=1.0,
+        )
+        res_mock_350 = BacktestRunResult(
+            market="BTC-USD",
+            strategy_name="FixedSpread",
+            fill_model="MODEL_B",
+            fidelity="HIGH",
+            latency_ms=50.0,
+            pnl_summary={"total_trades_count": 350, "net_pnl": 5.0, "max_drawdown_pct": 1.0, "open_position_notional": 10.0, "initial_capital": 100.0},
+            rate_limit_metrics={},
+            markout_metrics={},
+            event_count=1000,
+            duration_hours=1.0,
+        )
+        res_dn_mock = BacktestRunResult(
+            market="BTC-USD",
+            strategy_name="DoNothing",
+            fill_model="MODEL_B",
+            fidelity="HIGH",
+            latency_ms=50.0,
+            pnl_summary={"net_pnl": 0.0},
+            rate_limit_metrics={},
+            markout_metrics={},
+            event_count=1000,
+            duration_hours=1.0,
+        )
+        res_rnd_mock = BacktestRunResult(
+            market="BTC-USD",
+            strategy_name="RandomSide",
+            fill_model="MODEL_B",
+            fidelity="HIGH",
+            latency_ms=50.0,
+            pnl_summary={"net_pnl": -1.0},
+            rate_limit_metrics={},
+            markout_metrics={},
+            event_count=1000,
+            duration_hours=1.0,
+        )
+
+        # 100 fills must FAIL gate when min_required_fills=300 (W-02 unrelaxed rule)
+        gates_100 = self.validator.evaluate_gates(res_mock_100, res_mock_100, res_dn_mock, res_rnd_mock, p_value=0.01, min_required_fills=300)
+        self.assertFalse(gates_100["gate_fill_count"]["passed"], "100 fills must fail unrelaxed fill count gate")
+        self.assertFalse(gates_100["passed_all_gates"])
+
+        # 350 fills must PASS gate when min_required_fills=300
+        gates_350 = self.validator.evaluate_gates(res_mock_350, res_mock_350, res_dn_mock, res_rnd_mock, p_value=0.01, min_required_fills=300)
+        self.assertTrue(gates_350["gate_fill_count"]["passed"], "350 fills must pass unrelaxed fill count gate")
+        self.assertTrue(gates_350["passed_all_gates"])
+
 
 if __name__ == "__main__":
     unittest.main()

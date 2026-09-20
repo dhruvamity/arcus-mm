@@ -1,5 +1,5 @@
 ARCUS SIMENGINE MUTATION VERIFICATION REPORT
-Generated: 2026-09-20 | Total Mutations: 23 | Caught: 23
+Generated: 2026-09-20 | Total Mutations: 24 | Caught: 24
 
 | ID | Mutation Name | Target Test | Status | Defect Description |
 |---|---|---|---|---|
@@ -26,6 +26,7 @@ Generated: 2026-09-20 | Total Mutations: 23 | Caught: 23
 | MUT-21 | Manifest Missing Target Dir | `TestStorageManager.test_w12_hermetic_manifest_generation_on_fresh_clone` | **CAUGHT** | Removes target directory creation, re-breaking manifest generation on clean clones |
 | MUT-22 | Uncalibrated Latency Sensitivity Grid | `TestSimEngine.test_24_w08_latency_calibration_and_canonical_grid` | **CAUGHT** | Mutates pre-declared latency sensitivity grid to [10.0, 50.0], violating pre-registered WS-A specification |
 | MUT-23 | Bypass Maintenance Margin Liquidation | `TestSimEngine.test_25_w05_margin_liquidation_and_speed_bump` | **CAUGHT** | Disables maintenance margin liquidation check, allowing underwater positions to avoid forced flatten |
+| MUT-24 | Tautological Metric Regression | `TestWalkForwardProtocol.test_w02_day_level_paired_t_test_and_bootstrap` | **CAUGHT** | Eliminates conservative forced-exit haircut on unhedged inventory, allowing positions to bypass taker fee and slippage penalties |
 
 Detailed Failure Traces:
 
@@ -153,7 +154,7 @@ Test Exception Message: AssertionError: 1 != 0 : Model C must NOT fill when trad
 Description: Removes target directory creation, re-breaking manifest generation on clean clones
 Target: TestStorageManager.test_w12_hermetic_manifest_generation_on_fresh_clone
 Outcome: CAUGHT BY TEST
-Test Exception Message: FileNotFoundError: [Errno 2] No such file or directory: '/var/folders/33/6hb_7rkd3v74jmphkh8b96480000gn/T/tmp2i0lfjml/fresh_clone_repo/data/MANIFEST_2026-09-19.sha256'
+Test Exception Message: FileNotFoundError: [Errno 2] No such file or directory: '/var/folders/33/6hb_7rkd3v74jmphkh8b96480000gn/T/tmpcublzn66/fresh_clone_repo/data/MANIFEST_2026-09-19.sha256'
 
 --- MUT-22: Uncalibrated Latency Sensitivity Grid ---
 Description: Mutates pre-declared latency sensitivity grid to [10.0, 50.0], violating pre-registered WS-A specification
@@ -166,3 +167,9 @@ Description: Disables maintenance margin liquidation check, allowing underwater 
 Target: TestSimEngine.test_25_w05_margin_liquidation_and_speed_bump
 Outcome: CAUGHT BY TEST
 Test Exception Message: AssertionError: <RiskState.PAUSED_ANOMALY: 'PAUSED_ANOMALY'> != <RiskState.FLATTENED_LIQUIDATION: 'FLATTENED_LIQUIDATION'> : Strategy must transition to FLATTENED_LIQUIDATION when equity <= maintenance margin
+
+--- MUT-24: Tautological Metric Regression ---
+Description: Eliminates conservative forced-exit haircut on unhedged inventory, allowing positions to bypass taker fee and slippage penalties
+Target: TestWalkForwardProtocol.test_w02_day_level_paired_t_test_and_bootstrap
+Outcome: CAUGHT BY TEST
+Test Exception Message: AssertionError: 5.5 != 5.319 within 3 places (0.18100000000000005 difference)

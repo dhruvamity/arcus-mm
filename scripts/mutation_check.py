@@ -579,6 +579,35 @@ def test_mutation_23_margin_liquidation_bypass() -> MutationResult:
         se.SimEngine._evaluate_strategies_quoting = orig_eval
 
 
+def test_mutation_24_tautological_metric_regression() -> MutationResult:
+    """MUT-24: Eliminates conservative forced-exit haircut in compute_daily_net_equity_change."""
+    from src.walk_forward import WalkForwardValidator
+    orig_func = WalkForwardValidator.compute_daily_net_equity_change
+
+    def mutated_daily_net_equity(pnl_summary, tick_size=0.01, taker_fee_bps=2.25):
+        realized = float(pnl_summary.get("realized_pnl", 0.0))
+        mtm = float(pnl_summary.get("unrealized_mtm", 0.0))
+        funding = float(pnl_summary.get("funding_pnl", 0.0))
+        fees = float(pnl_summary.get("fee_costs", 0.0))
+        # BUG: Haircut on unhedged overnight inventory omitted!
+        return realized + mtm + funding - fees
+
+    WalkForwardValidator.compute_daily_net_equity_change = mutated_daily_net_equity
+    try:
+        from tests.test_walk_forward_protocol import TestWalkForwardProtocol
+        failed, msg = run_targeted_test(TestWalkForwardProtocol, "test_w02_day_level_paired_t_test_and_bootstrap")
+        return MutationResult(
+            "MUT-24",
+            "Tautological Metric Regression",
+            "TestWalkForwardProtocol.test_w02_day_level_paired_t_test_and_bootstrap",
+            "Eliminates conservative forced-exit haircut on unhedged inventory, allowing positions to bypass taker fee and slippage penalties",
+            failed,
+            msg,
+        )
+    finally:
+        WalkForwardValidator.compute_daily_net_equity_change = orig_func
+
+
 def main():
     mutations: List[Callable[[], MutationResult]] = [
         test_mutation_1_invert_queue,
@@ -604,6 +633,7 @@ def main():
         test_mutation_21_manifest_missing_target_dir,
         test_mutation_22_latency_uncalibrated_grid,
         test_mutation_23_margin_liquidation_bypass,
+        test_mutation_24_tautological_metric_regression,
     ]
 
     print("=" * 80)

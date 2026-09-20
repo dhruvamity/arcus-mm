@@ -245,38 +245,133 @@ class WalkForwardValidator:
         }
 
     @staticmethod
-    def compute_two_sided_p_value(fills: List[Dict[str, Any]]) -> float:
-        """Computes two-sided p-value for net bps per fill against H0: mu <= 0."""
-        if len(fills) < 5:
+    def compute_daily_net_equity_change(
+        pnl_summary: Dict[str, Any],
+        tick_size: float = 0.01,
+        taker_fee_bps: float = 2.25,
+    ) -> float:
+        """Computes daily net equity change per Mandate v5 Section 1.2:
+        Delta Equity_d = Realized PnL_d + MTM_d + Funding_d - Fees_d - Forced Exit Haircut_d
+        where Forced Exit Haircut models liquidating remaining inventory via conservative taker fill with taker fee.
+        """
+        realized = float(pnl_summary.get("realized_pnl", 0.0))
+        mtm = float(pnl_summary.get("unrealized_mtm", 0.0))
+        funding = float(pnl_summary.get("funding_pnl", 0.0))
+        fees = float(pnl_summary.get("fee_costs", 0.0))
+        pos = float(pnl_summary.get("open_position_units", 0.0))
+        mid = float(pnl_summary.get("final_mid", 0.0)) or 1.0
+
+        # Forced Exit Haircut at day-end: taker fee (2.25 bps) + 1 tick crossing slippage
+        notional = abs(pos) * mid
+        haircut = (notional * (taker_fee_bps / 10_000.0)) + (abs(pos) * tick_size)
+        return realized + mtm + funding - fees - haircut
+
+    @staticmethod
+    def compute_paired_t_test(
+        daily_strategy_pnls: List[float],
+        daily_control_pnls: List[float],
+    ) -> Tuple[float, float, float, float]:
+        """Computes paired t-test comparing daily net equity changes of MM strategy vs Control.
+        Returns: (t_stat, p_value, mean_diff, std_diff)
+        """
+        diffs = np.array(daily_strategy_pnls) - np.array(daily_control_pnls)
+        n = len(diffs)
+        if n < 2:
+            return 0.0, 1.0, float(np.mean(diffs)) if n > 0 else 0.0, 0.0
+
+        mean_diff = float(np.mean(diffs))
+        std_diff = float(np.std(diffs, ddof=1))
+        if std_diff < 1e-9:
+            return (0.0, 1.0 if mean_diff <= 0 else 0.0001, mean_diff, std_diff)
+
+        t_stat = mean_diff / (std_diff / math.sqrt(n))
+        p_val = float(2.0 * stats.t.sf(abs(t_stat), df=n - 1))
+        return float(t_stat), float(p_val), mean_diff, std_diff
+
+    @staticmethod
+    def run_block_bootstrap(
+        daily_diffs: List[float],
+        n_bootstrap: int = 10_000,
+        seed: int = 42,
+        confidence_level: float = 0.90,
+    ) -> Tuple[float, Tuple[float, float]]:
+        """Runs block bootstrap (sample with replacement) over daily differences to build empirical null.
+        Returns: (bootstrap_p_value, (ci_lower, ci_upper))
+        """
+        arr = np.array(daily_diffs)
+        n = len(arr)
+        if n == 0:
+            return 1.0, (0.0, 0.0)
+
+        rng = np.random.RandomState(seed)
+        indices = rng.randint(0, n, size=(n_bootstrap, n))
+        resampled_means = np.mean(arr[indices], axis=1)
+
+        p_boot = float(np.mean(resampled_means <= 0.0))
+        alpha = 1.0 - confidence_level
+        ci_lower = float(np.percentile(resampled_means, 100.0 * (alpha / 2.0)))
+        ci_upper = float(np.percentile(resampled_means, 100.0 * (1.0 - alpha / 2.0)))
+        return p_boot, (ci_lower, ci_upper)
+
+    @staticmethod
+    def compute_required_sample_size(
+        edge_bps: float = 0.5,
+        sigma_bps: float = 4.0,
+        alpha: float = 0.05,
+        power: float = 0.80,
+        deff: float = 1.25,
+    ) -> int:
+        """Computes required sample size under conservative power analysis (WS-B / Finding V-25):
+        n = ((z_alpha + z_beta) * sigma / edge)^2 * DEFF
+        """
+        z_alpha = stats.norm.ppf(1.0 - alpha)
+        z_beta = stats.norm.ppf(power)
+        raw_n = ((z_alpha + z_beta) * (sigma_bps / edge_bps)) ** 2
+        return int(math.ceil(raw_n * deff))
+
+    @staticmethod
+    def compute_two_sided_p_value(
+        samples: List[Any],
+        is_fill_series: bool = False,
+    ) -> float:
+        """Computes two-sided p-value for net daily equity changes (or honest return series).
+        Rejects tautological fill-instant scoring per W-02.
+        """
+        if not samples or len(samples) < 2:
             return 1.0
 
-        # Approximate net return in bps for each fill relative to initial mid
-        returns_bps = []
-        for f in fills:
-            p_fill = f["price"]
-            p_mid = f["mid_at_fill"]
-            if p_mid <= 0:
-                continue
-            # Spread capture in bps: BUY fills below mid, SELL fills above mid
-            if f["side"] == "BUY":
-                ret_bps = ((p_mid - p_fill) / p_mid) * 10_000.0
-            else:
-                ret_bps = ((p_fill - p_mid) / p_mid) * 10_000.0
-            returns_bps.append(ret_bps)
+        # If passed list of fill dicts, compute honest net returns including fees and adverse selection
+        if is_fill_series or (isinstance(samples[0], dict)):
+            returns = []
+            for f in samples:
+                p_fill = float(f.get("price", 0.0))
+                p_mid = float(f.get("mid_at_fill", 0.0))
+                fee = float(f.get("fee", 0.0))
+                size = float(f.get("size", 1.0))
+                notional = p_fill * size
+                if p_mid <= 0 or notional <= 0:
+                    continue
+                # Honest net edge: trade return minus fee cost in bps
+                side = str(f.get("side", "")).upper()
+                gross_bps = ((p_mid - p_fill) / p_mid) * 10_000.0 if side == "BUY" else ((p_fill - p_mid) / p_mid) * 10_000.0
+                fee_bps = (fee / notional) * 10_000.0
+                # Net realized edge per fill
+                returns.append(gross_bps - fee_bps)
+            arr = np.array(returns)
+        else:
+            arr = np.array([float(x) for x in samples])
 
-        if not returns_bps:
+        n = len(arr)
+        if n < 2:
             return 1.0
 
-        arr = np.array(returns_bps)
         mean_val = float(np.mean(arr))
         std_val = float(np.std(arr, ddof=1))
-        n = len(arr)
 
-        if std_val <= 1e-9 or n < 2:
+        if std_val <= 1e-9:
             return 1.0 if mean_val <= 0 else 0.0001
 
         t_stat = mean_val / (std_val / math.sqrt(n))
-        # Two-sided p-value
         p_val = float(2.0 * stats.t.sf(abs(t_stat), df=n - 1))
         return min(1.0, max(0.0, p_val))
 
@@ -311,8 +406,9 @@ class WalkForwardValidator:
         res_dn: BacktestRunResult,
         res_rnd: BacktestRunResult,
         p_value: float,
+        min_required_fills: int = 300,
     ) -> Dict[str, Any]:
-        """Evaluates Mandate Section 21 machine-checkable validation gates."""
+        """Evaluates Mandate Section 21 & Mandate v5 Section 4 machine-checkable validation gates."""
         pnl_b = res_b.pnl_summary
         pnl_a = res_a.pnl_summary
         pnl_dn = res_dn.pnl_summary
@@ -324,8 +420,8 @@ class WalkForwardValidator:
         open_pos_notional = pnl_b.get("open_position_notional", 0.0)
         initial_cap = pnl_b.get("initial_capital", 100.0)
 
-        # Gate 1: Fill Count Gate (>= 300 fills, relaxed to 100 on short windows)
-        gate_fill_count = total_fills >= 100
+        # Gate 1: Fill Count Gate (Power table requirement >= min_required_fills, strictly unrelaxed per Mandate v5 Section 4.2 / W-02)
+        gate_fill_count = total_fills >= min_required_fills
 
         # Gate 2: Net PnL Positive
         gate_positive_pnl = net_pnl > 0.0
@@ -356,7 +452,7 @@ class WalkForwardValidator:
         verdict = "PASS" if all_passed else ("INSUFFICIENT_DATA" if not gate_fill_count else "FAIL")
 
         return {
-            "gate_fill_count": {"passed": gate_fill_count, "val": total_fills, "threshold": 100},
+            "gate_fill_count": {"passed": gate_fill_count, "val": total_fills, "threshold": min_required_fills},
             "gate_positive_pnl": {"passed": gate_positive_pnl, "val": net_pnl},
             "gate_max_drawdown": {"passed": gate_max_dd, "val": max_dd, "limit_pct": 10.0},
             "gate_no_breaches": {"passed": gate_no_breaches, "val": open_pos_notional},
@@ -371,5 +467,15 @@ class WalkForwardValidator:
                 "fills_a": pnl_a.get("total_trades_count", 0),
                 "fills_b": total_fills,
             },
+            "passed_all_gates": all_passed,
             "verdict": verdict,
         }
+
+
+# Module-level convenience aliases
+compute_daily_net_equity_change = WalkForwardValidator.compute_daily_net_equity_change
+compute_paired_t_test = WalkForwardValidator.compute_paired_t_test
+run_block_bootstrap = WalkForwardValidator.run_block_bootstrap
+compute_required_sample_size = WalkForwardValidator.compute_required_sample_size
+compute_two_sided_p_value = WalkForwardValidator.compute_two_sided_p_value
+apply_holm_bonferroni = WalkForwardValidator.apply_holm_bonferroni

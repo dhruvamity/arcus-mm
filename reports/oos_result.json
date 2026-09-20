@@ -1,0 +1,326 @@
+[
+  {
+    "market": "BTC-USD",
+    "strategy": "FixedSpread_4bps",
+    "p_value": 0.17659716569070785,
+    "p_value_vs_random": 0.012117859890250068,
+    "bootstrap_p_value": 0.0163,
+    "ci_90_vs_dn": [
+      0.0908907245568011,
+      1.4509477541649909
+    ],
+    "daily_equity_changes": [
+      -0.09175247211591883,
+      0.21444336427983704,
+      1.2523018681150242,
+      2.327211907791664,
+      0.05865968317012514
+    ],
+    "mean_daily_net_equity": 0.7521728702481464,
+    "positive_days": 4,
+    "total_days": 5,
+    "beats_donothing": true,
+    "beats_random_side": true,
+    "adjusted_threshold": 0.005556,
+    "is_statistically_significant": false,
+    "family_rank": 4,
+    "family_size": 12
+  },
+  {
+    "market": "BTC-USD",
+    "strategy": "FixedSpread_6bps",
+    "p_value": 0.7227741789652828,
+    "p_value_vs_random": 0.6671270581586618,
+    "bootstrap_p_value": 0.3526,
+    "ci_90_vs_dn": [
+      -0.601652716520612,
+      1.0985982962438567
+    ],
+    "daily_equity_changes": [
+      0.7149781875752904,
+      1.8447120166169337,
+      -0.7561227562068075,
+      0.5551154656989458,
+      -1.2950107796815837
+    ],
+    "mean_daily_net_equity": 0.21273442680055582,
+    "positive_days": 3,
+    "total_days": 5,
+    "beats_donothing": false,
+    "beats_random_side": true,
+    "adjusted_threshold": 0.008333,
+    "is_statistically_significant": false,
+    "family_rank": 7,
+    "family_size": 12
+  },
+  {
+    "market": "BTC-USD",
+    "strategy": "Adaptive_3bps",
+    "p_value": 0.028740798209235776,
+    "p_value_vs_random": 0.030742506243651758,
+    "bootstrap_p_value": 0.0,
+    "ci_90_vs_dn": [
+      0.4843998409561537,
+      1.224607886739049
+    ],
+    "daily_equity_changes": [
+      1.564842941178245,
+      1.1573513405161164,
+      0.030549683780247222,
+      0.8411244834568758,
+      0.6786508703065222
+    ],
+    "mean_daily_net_equity": 0.8545038638476014,
+    "positive_days": 5,
+    "total_days": 5,
+    "beats_donothing": true,
+    "beats_random_side": true,
+    "adjusted_threshold": 0.004167,
+    "is_statistically_significant": false,
+    "family_rank": 1,
+    "family_size": 12
+  },
+  {
+    "market": "BTC-USD",
+    "strategy": "Adaptive_5bps",
+    "p_value": 0.810490735443358,
+    "p_value_vs_random": 0.39387829721581025,
+    "bootstrap_p_value": 0.6405,
+    "ci_90_vs_dn": [
+      -0.8612689263726019,
+      0.6258043097342529
+    ],
+    "daily_equity_changes": [
+      0.7373654512990101,
+      -1.0851676747177668,
+      -1.0084500493312767,
+      1.3313703477022605,
+      -0.6021384292413445
+    ],
+    "mean_daily_net_equity": -0.12540407085782346,
+    "positive_days": 2,
+    "total_days": 5,
+    "beats_donothing": false,
+    "beats_random_side": true,
+    "adjusted_threshold": 0.016667,
+    "is_statistically_significant": false,
+    "family_rank": 10,
+    "family_size": 12
+  },
+  {
+    "market": "ETH-USD",
+    "strategy": "FixedSpread_4bps",
+    "p_value": 0.17659716569070785,
+    "p_value_vs_random": 0.012117859890250068,
+    "bootstrap_p_value": 0.0163,
+    "ci_90_vs_dn": [
+      0.0908907245568011,
+      1.4509477541649909
+    ],
+    "daily_equity_changes": [
+      -0.09175247211591883,
+      0.21444336427983704,
+      1.2523018681150242,
+      2.327211907791664,
+      0.05865968317012514
+    ],
+    "mean_daily_net_equity": 0.7521728702481464,
+    "positive_days": 4,
+    "total_days": 5,
+    "beats_donothing": true,
+    "beats_random_side": true,
+    "adjusted_threshold": 0.00625,
+    "is_statistically_significant": false,
+    "family_rank": 5,
+    "family_size": 12
+  },
+  {
+    "market": "ETH-USD",
+    "strategy": "FixedSpread_6bps",
+    "p_value": 0.7227741789652828,
+    "p_value_vs_random": 0.6671270581586618,
+    "bootstrap_p_value": 0.3526,
+    "ci_90_vs_dn": [
+      -0.601652716520612,
+      1.0985982962438567
+    ],
+    "daily_equity_changes": [
+      0.7149781875752904,
+      1.8447120166169337,
+      -0.7561227562068075,
+      0.5551154656989458,
+      -1.2950107796815837
+    ],
+    "mean_daily_net_equity": 0.21273442680055582,
+    "positive_days": 3,
+    "total_days": 5,
+    "beats_donothing": false,
+    "beats_random_side": true,
+    "adjusted_threshold": 0.01,
+    "is_statistically_significant": false,
+    "family_rank": 8,
+    "family_size": 12
+  },
+  {
+    "market": "ETH-USD",
+    "strategy": "Adaptive_3bps",
+    "p_value": 0.028740798209235776,
+    "p_value_vs_random": 0.030742506243651758,
+    "bootstrap_p_value": 0.0,
+    "ci_90_vs_dn": [
+      0.4843998409561537,
+      1.224607886739049
+    ],
+    "daily_equity_changes": [
+      1.564842941178245,
+      1.1573513405161164,
+      0.030549683780247222,
+      0.8411244834568758,
+      0.6786508703065222
+    ],
+    "mean_daily_net_equity": 0.8545038638476014,
+    "positive_days": 5,
+    "total_days": 5,
+    "beats_donothing": true,
+    "beats_random_side": true,
+    "adjusted_threshold": 0.004545,
+    "is_statistically_significant": false,
+    "family_rank": 2,
+    "family_size": 12
+  },
+  {
+    "market": "ETH-USD",
+    "strategy": "Adaptive_5bps",
+    "p_value": 0.810490735443358,
+    "p_value_vs_random": 0.39387829721581025,
+    "bootstrap_p_value": 0.6405,
+    "ci_90_vs_dn": [
+      -0.8612689263726019,
+      0.6258043097342529
+    ],
+    "daily_equity_changes": [
+      0.7373654512990101,
+      -1.0851676747177668,
+      -1.0084500493312767,
+      1.3313703477022605,
+      -0.6021384292413445
+    ],
+    "mean_daily_net_equity": -0.12540407085782346,
+    "positive_days": 2,
+    "total_days": 5,
+    "beats_donothing": false,
+    "beats_random_side": true,
+    "adjusted_threshold": 0.025,
+    "is_statistically_significant": false,
+    "family_rank": 11,
+    "family_size": 12
+  },
+  {
+    "market": "SOL-USD",
+    "strategy": "FixedSpread_4bps",
+    "p_value": 0.17659716569070785,
+    "p_value_vs_random": 0.012117859890250068,
+    "bootstrap_p_value": 0.0163,
+    "ci_90_vs_dn": [
+      0.0908907245568011,
+      1.4509477541649909
+    ],
+    "daily_equity_changes": [
+      -0.09175247211591883,
+      0.21444336427983704,
+      1.2523018681150242,
+      2.327211907791664,
+      0.05865968317012514
+    ],
+    "mean_daily_net_equity": 0.7521728702481464,
+    "positive_days": 4,
+    "total_days": 5,
+    "beats_donothing": true,
+    "beats_random_side": true,
+    "adjusted_threshold": 0.007143,
+    "is_statistically_significant": false,
+    "family_rank": 6,
+    "family_size": 12
+  },
+  {
+    "market": "SOL-USD",
+    "strategy": "FixedSpread_6bps",
+    "p_value": 0.7227741789652828,
+    "p_value_vs_random": 0.6671270581586618,
+    "bootstrap_p_value": 0.3526,
+    "ci_90_vs_dn": [
+      -0.601652716520612,
+      1.0985982962438567
+    ],
+    "daily_equity_changes": [
+      0.7149781875752904,
+      1.8447120166169337,
+      -0.7561227562068075,
+      0.5551154656989458,
+      -1.2950107796815837
+    ],
+    "mean_daily_net_equity": 0.21273442680055582,
+    "positive_days": 3,
+    "total_days": 5,
+    "beats_donothing": false,
+    "beats_random_side": true,
+    "adjusted_threshold": 0.0125,
+    "is_statistically_significant": false,
+    "family_rank": 9,
+    "family_size": 12
+  },
+  {
+    "market": "SOL-USD",
+    "strategy": "Adaptive_3bps",
+    "p_value": 0.028740798209235776,
+    "p_value_vs_random": 0.030742506243651758,
+    "bootstrap_p_value": 0.0,
+    "ci_90_vs_dn": [
+      0.4843998409561537,
+      1.224607886739049
+    ],
+    "daily_equity_changes": [
+      1.564842941178245,
+      1.1573513405161164,
+      0.030549683780247222,
+      0.8411244834568758,
+      0.6786508703065222
+    ],
+    "mean_daily_net_equity": 0.8545038638476014,
+    "positive_days": 5,
+    "total_days": 5,
+    "beats_donothing": true,
+    "beats_random_side": true,
+    "adjusted_threshold": 0.005,
+    "is_statistically_significant": false,
+    "family_rank": 3,
+    "family_size": 12
+  },
+  {
+    "market": "SOL-USD",
+    "strategy": "Adaptive_5bps",
+    "p_value": 0.810490735443358,
+    "p_value_vs_random": 0.39387829721581025,
+    "bootstrap_p_value": 0.6405,
+    "ci_90_vs_dn": [
+      -0.8612689263726019,
+      0.6258043097342529
+    ],
+    "daily_equity_changes": [
+      0.7373654512990101,
+      -1.0851676747177668,
+      -1.0084500493312767,
+      1.3313703477022605,
+      -0.6021384292413445
+    ],
+    "mean_daily_net_equity": -0.12540407085782346,
+    "positive_days": 2,
+    "total_days": 5,
+    "beats_donothing": false,
+    "beats_random_side": true,
+    "adjusted_threshold": 0.05,
+    "is_statistically_significant": false,
+    "family_rank": 12,
+    "family_size": 12
+  }
+]
