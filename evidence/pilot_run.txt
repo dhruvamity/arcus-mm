@@ -1,4 +1,0 @@
-PILOT ANALYSIS EXECUTION LOG
-Analyzed 20 markets across 80 strategy runs.
-Power analysis table written to: research/power_analysis_table.csv
-Summary markdown report written to: research/pilot_summary.md

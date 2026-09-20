@@ -1,7 +1,0 @@
-=== HISTORICAL R-01 AUDIT CHECK (commit 0905008) ===
-FOUND IN 0905008:
-243:                                adverse_selection_bps=1.0,  # Empirical conservative baseline
-265:                                adverse_selection_bps=1.0,
-
-=== CURRENT STATE RUN (commit c86984e) ===
-STATUS: CONFIRMED HISTORICALLY (broken in 0905008), FIXED in c86984e. Fills count = 1
