@@ -11,7 +11,7 @@ import datetime
 import hashlib
 import sys
 from pathlib import Path
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = REPO_ROOT / "data"
