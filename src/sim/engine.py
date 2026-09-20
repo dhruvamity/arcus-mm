@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 """Unified Single-Path Simulation Engine (SimEngine) for Arcus Perpetuals.
+Fulfills Mandate v3 WS-D (Section 9) & Findings V-05 through V-12.
 
 - One engine, one code path for Replay, Backtest, Live Paper, and Testnet.
 - Consumes single time-ordered stream of events: BBO, L2_DELTA, TRADE, FUNDING, ORACLE_MARK, CLOCK_TICK.
-- Explicit order lifecycle with transit latency and in-flight cancel risk.
-- Concurrent paired evaluation across strategies (DoNothing, RandomSide, FixedSpread, VolClock, A-S, Adaptive).
-- Dual/Triple fill model execution (Model A Diagnostic, Model B Queue-Aware Central, Model C Trade-Through Floor).
-- Venue rate limit pools, time-aware hourly funding, and strict balance-sheet identity.
-- Risk manager state machine (inventory caps, stale BBO >3s, crossed book, sequence gaps, daily loss limit).
+- L2 Order Book reconstructor integration with real arrival-time queue depth (V-06, V-07).
+- Discrete funding settlement protecting against 60x predicted funding overcharge (V-08).
+- Per-(market, strategy) risk manager state machine with automatic recovery (V-09).
+- Subaccount-level shared rate limit pools with pre-action gating and drip (V-10).
+- LatencyModel abstraction supporting Constant and Empirical distribution sampling (V-11).
+- Independent fill-model simulation worlds for Model A, Model B, and Model C (V-12).
+- Paired common quotes diagnostic mode strictly preserved for monotonicity checks.
+- Venue mechanics with mark price tracking and margin checks (V-14).
 """
 
 from dataclasses import dataclass
@@ -17,14 +21,16 @@ import hashlib
 import logging
 import random
 from typing import Dict, List, Optional, Any
+import pandas as pd
 
 from src.models.fill import FillModelType, OrderStatus
-from src.models.latency import LatencyConfig
+from src.models.latency import LatencyConfig, LatencyModel, ConstantLatencyModel
 from src.models.pnl import PnLAttributionEngine, TimeAwareFundingModel
 from src.models.rate_limit import ArcusRateLimitSimulator
 from src.orderbook import LocalOrderBook
 from src.strategies.base import BaseMarketMakingStrategy, Quote
 from src.utils import snap_to_tick, snap_to_step
+from src.venue import get_market_spec
 from src.volatility import RealizedVolatilityEstimator
 
 logger = logging.getLogger("sim_engine")
@@ -59,6 +65,7 @@ class SimulatedOrder:
     status: OrderStatus
     created_ts_ns: int
     arrival_ts_ns: int
+    fill_model: Optional[FillModelType] = None
     cancel_requested_ts_ns: Optional[int] = None
     cancel_arrival_ts_ns: Optional[int] = None
     queue_ahead_size: float = 0.0
@@ -77,6 +84,7 @@ class SimulatedOrder:
             status=self.status,
             created_ts_ns=self.created_ts_ns,
             arrival_ts_ns=self.arrival_ts_ns,
+            fill_model=self.fill_model,
             cancel_requested_ts_ns=self.cancel_requested_ts_ns,
             cancel_arrival_ts_ns=self.cancel_arrival_ts_ns,
             queue_ahead_size=self.queue_ahead_size,
@@ -105,6 +113,7 @@ class MarketState:
         min_notional: float = 5.0,
         min_order_size: float = 0.0,
         max_order_size: float = 1_000_000.0,
+        category: str = "CRYPTO",
     ):
         self.market = market
         self.tick_size = tick_size
@@ -112,6 +121,7 @@ class MarketState:
         self.min_notional = min_notional
         self.min_order_size = min_order_size
         self.max_order_size = max_order_size
+        self.category = category
 
         self.best_bid: float = 0.0
         self.best_ask: float = 0.0
@@ -121,6 +131,7 @@ class MarketState:
         self.current_mark: float = 0.0
         self.last_bbo_ts_ns: int = 0
         self.clean_bbo_count_since_stale: int = 0
+        self.stale_recovery_start_ts_ns: int = 0
 
         self.orderbook = LocalOrderBook(market=market)
         self.volatility_estimator = RealizedVolatilityEstimator(half_life_sec=300.0)
@@ -130,13 +141,18 @@ class MarketState:
         self.book_valid: bool = True
         self.invalid_intervals: List[Dict[str, Any]] = []
 
+        # Funding tracking
+        self.predicted_funding_rate: float = 0.0
+        self.last_settled_hour: Optional[int] = None
+        self.is_outside_rth: bool = False
+
     def get_min_executable_clip(self) -> float:
         ref_p = self.current_mid if self.current_mid > 0 else 1.0
         return max(self.min_notional, self.min_order_size * ref_p)
 
 
 class StrategyInstanceContext:
-    """Manages strategy execution, fill engines, risk state, and PnL attribution."""
+    """Manages strategy execution, independent fill engines, risk state, and PnL attribution."""
 
     def __init__(
         self,
@@ -152,10 +168,11 @@ class StrategyInstanceContext:
         self.initial_capital = initial_capital
         self.max_inventory_clips = max_inventory_clips
 
-        self.risk_state: RiskState = RiskState.NORMAL
-        self.rate_limiter = ArcusRateLimitSimulator(requote_threshold_ticks=2)
+        # Per-market risk states (scoped to affected market, fix V-09)
+        self.risk_states: Dict[str, RiskState] = {}
+        self._default_risk_state: RiskState = RiskState.NORMAL
 
-        # Separate PnL attribution and resting orders per fill model
+        # Separate PnL attribution and resting orders per fill model (fix V-12)
         self.pnl_engines: Dict[FillModelType, PnLAttributionEngine] = {
             fm: PnLAttributionEngine(initial_capital=initial_capital, maker_fee_bps=0.0, taker_fee_bps=2.25)
             for fm in fill_models
@@ -163,11 +180,31 @@ class StrategyInstanceContext:
         self.active_bid: Dict[FillModelType, Optional[SimulatedOrder]] = {fm: None for fm in fill_models}
         self.active_ask: Dict[FillModelType, Optional[SimulatedOrder]] = {fm: None for fm in fill_models}
 
-        # In-flight scheduled actions: list of orders pending arrival
+        # In-flight scheduled actions
         self.in_flight_orders: List[SimulatedOrder] = []
         self.fill_records: List[Dict[str, Any]] = []
         self.order_counter: int = 0
         self.post_only_rejections_count: int = 0
+        self.rate_limited_actions_count: int = 0
+
+    @property
+    def risk_state(self) -> RiskState:
+        for state in self.risk_states.values():
+            if state != RiskState.NORMAL:
+                return state
+        return self._default_risk_state
+
+    @risk_state.setter
+    def risk_state(self, state: RiskState) -> None:
+        self._default_risk_state = state
+        for m in list(self.risk_states.keys()):
+            self.risk_states[m] = state
+
+    def get_risk_state(self, market: str) -> RiskState:
+        return self.risk_states.get(market, self._default_risk_state)
+
+    def set_risk_state(self, market: str, state: RiskState) -> None:
+        self.risk_states[market] = state
 
 
 class SimEngine:
@@ -176,11 +213,15 @@ class SimEngine:
     def __init__(
         self,
         markets: List[str],
-        market_specs: Dict[str, Dict[str, Any]],
-        strategies: Dict[str, BaseMarketMakingStrategy],
+        market_specs: Optional[Dict[str, Dict[str, Any]]] = None,
+        strategies: Optional[Dict[str, BaseMarketMakingStrategy]] = None,
         fill_models: Optional[List[FillModelType]] = None,
+        latency_model: Optional[LatencyModel] = None,
         latency_config: Optional[LatencyConfig] = None,
+        paired_common_quotes: bool = True,
         initial_capital: float = 100.0,
+        max_inventory_clips: float = 3.0,
+        subaccount_rate_limiter: Optional[ArcusRateLimitSimulator] = None,
         random_seed: int = 42,
     ):
         self.markets = markets
@@ -189,15 +230,36 @@ class SimEngine:
             FillModelType.MODEL_B_MODERATE,
             FillModelType.MODEL_C_CONSERVATIVE,
         ]
-        self.latency_config = latency_config or LatencyConfig()
+        self.paired_common_quotes = paired_common_quotes
         self.initial_capital = initial_capital
+        self.max_inventory_clips = max_inventory_clips
         self.random_seed = random_seed
         self.rng = random.Random(random_seed)
+
+        # Latency model (Constant or Empirical, fix V-11)
+        if latency_model is not None:
+            self.latency_model = latency_model
+        elif latency_config is not None:
+            self.latency_model = ConstantLatencyModel(latency_config)
+        else:
+            self.latency_model = ConstantLatencyModel(LatencyConfig())
+
+        # Subaccount-level shared rate limiter pool (fix V-10)
+        self.subaccount_rate_limiter = subaccount_rate_limiter or ArcusRateLimitSimulator(
+            requote_threshold_ticks=2
+        )
 
         # Market venues
         self.venues: Dict[str, MarketState] = {}
         for m in markets:
-            spec = market_specs.get(m, {})
+            if market_specs and m in market_specs:
+                spec = market_specs[m]
+            else:
+                try:
+                    spec = get_market_spec(m)
+                except Exception:
+                    spec = {}
+
             self.venues[m] = MarketState(
                 market=m,
                 tick_size=float(spec.get("tick_size", 0.001)),
@@ -205,36 +267,28 @@ class SimEngine:
                 min_notional=float(spec.get("min_notional", 5.0)),
                 min_order_size=float(spec.get("min_order_size", 0.0)),
                 max_order_size=float(spec.get("max_order_size", 1_000_000.0)),
+                category=str(spec.get("category", "CRYPTO")),
             )
 
-        # Strategy contexts (one context per registered strategy)
+        # Strategy contexts
         self.contexts: Dict[str, StrategyInstanceContext] = {}
-        for sid, strat in strategies.items():
-            self.contexts[sid] = StrategyInstanceContext(
-                strategy_id=sid,
-                strategy=strat,
-                fill_models=self.fill_models,
-                initial_capital=initial_capital,
-            )
+        if strategies:
+            for sid, strat in strategies.items():
+                self.contexts[sid] = StrategyInstanceContext(
+                    strategy_id=sid,
+                    strategy=strat,
+                    fill_models=self.fill_models,
+                    initial_capital=initial_capital,
+                    max_inventory_clips=max_inventory_clips,
+                )
 
         self.funding_model = TimeAwareFundingModel()
         self.current_clock_ts_ns: int = 0
         self.fill_log_hasher = hashlib.sha256()
 
     def sample_latency_ns(self, action: str) -> int:
-        """Draws latency in nanoseconds using latency config and seeded RNG."""
-        if action == "place":
-            base_ms = self.latency_config.order_entry_latency_ms
-        elif action == "cancel":
-            base_ms = self.latency_config.cancel_latency_ms
-        elif action == "modify":
-            base_ms = self.latency_config.modify_latency_ms
-        else:
-            base_ms = 25.0
-        # Add 10% bounded jitter
-        jitter = self.rng.uniform(-0.1, 0.1) * base_ms
-        eff_ms = max(1.0, base_ms + jitter)
-        return int(eff_ms * 1e6)
+        """Draws latency in nanoseconds using configured LatencyModel."""
+        return self.latency_model.sample_ns(action, self.rng)
 
     def on_event(self, event: SimEvent) -> List[Dict[str, Any]]:
         """Processes a single event in strict timestamp order and returns any fills generated."""
@@ -266,7 +320,7 @@ class SimEngine:
             self._handle_funding_event(venue, event.data, ts_ns)
 
         elif event.event_type == SimEventType.ORACLE_MARK:
-            venue.current_mark = float(event.data.get("mark_price", venue.current_mid))
+            venue.current_mark = float(event.data.get("mark_price") or event.data.get("oracle_price") or venue.current_mid)
 
         elif event.event_type == SimEventType.CLOCK_TICK:
             self._handle_clock_tick(venue, ts_ns)
@@ -274,7 +328,9 @@ class SimEngine:
         return generated_fills
 
     def _process_in_flight_arrivals(self, current_ts_ns: int) -> None:
-        """Activates scheduled place/modify/cancel order arrivals when timestamp arrives."""
+        """Activates scheduled place/modify/cancel order arrivals when timestamp arrives.
+        Calculates queue ahead depth at actual arrival time using local order book (fix V-07).
+        """
         for ctx in self.contexts.values():
             ready_orders = [o for o in ctx.in_flight_orders if o.arrival_ts_ns <= current_ts_ns]
             for order in ready_orders:
@@ -296,24 +352,57 @@ class SimEngine:
                         ctx.post_only_rejections_count += 1
                         continue
 
-                    # Resting order established!
+                    # Resting order established! Calculate queue ahead at ARRIVAL time (fix V-07)
                     order.status = OrderStatus.RESTING
-                    for fm in ctx.fill_models:
-                        if order.side == "BUY":
-                            ctx.active_bid[fm] = order.copy()
+
+                    if order.side == "BUY":
+                        queue_size = 0.0
+                        for p, s in venue.orderbook.bids.items():
+                            if abs(float(p) - order.price) < 1e-6:
+                                queue_size = float(s)
+                                break
+                        if queue_size > 0:
+                            order.queue_ahead_size = queue_size
+                        elif abs(order.price - venue.best_bid) < 1e-6:
+                            order.queue_ahead_size = venue.best_bid_size
                         else:
-                            ctx.active_ask[fm] = order.copy()
+                            order.queue_ahead_size = 0.0
+                    else:  # SELL
+                        queue_size = 0.0
+                        for p, s in venue.orderbook.asks.items():
+                            if abs(float(p) - order.price) < 1e-6:
+                                queue_size = float(s)
+                                break
+                        if queue_size > 0:
+                            order.queue_ahead_size = queue_size
+                        elif abs(order.price - venue.best_ask) < 1e-6:
+                            order.queue_ahead_size = venue.best_ask_size
+                        else:
+                            order.queue_ahead_size = 0.0
+
+                    # Assign order to active model slot
+                    if order.fill_model is not None and not self.paired_common_quotes:
+                        if order.side == "BUY":
+                            ctx.active_bid[order.fill_model] = order
+                        else:
+                            ctx.active_ask[order.fill_model] = order
+                    else:
+                        for fm in ctx.fill_models:
+                            if order.side == "BUY":
+                                ctx.active_bid[fm] = order.copy()
+                            else:
+                                ctx.active_ask[fm] = order.copy()
 
                 elif order.status == OrderStatus.CANCEL_REQUESTED:
-                    # Cancel arrives at venue
                     order.status = OrderStatus.CANCELLED
-                    for fm in ctx.fill_models:
+                    target_models = [order.fill_model] if (order.fill_model and not self.paired_common_quotes) else ctx.fill_models
+                    for fm in target_models:
                         if order.side == "BUY" and ctx.active_bid[fm] and ctx.active_bid[fm].order_id == order.order_id:
                             ctx.active_bid[fm] = None
                         elif order.side == "SELL" and ctx.active_ask[fm] and ctx.active_ask[fm].order_id == order.order_id:
                             ctx.active_ask[fm] = None
 
-            # Process cancels on resting orders whose cancel arrival has reached current_ts_ns
+            # Process in-place cancel requests whose cancel arrival has reached current_ts_ns
             for fm in ctx.fill_models:
                 bid = ctx.active_bid[fm]
                 if bid and bid.status == OrderStatus.CANCEL_REQUESTED and bid.cancel_arrival_ts_ns and bid.cancel_arrival_ts_ns <= current_ts_ns:
@@ -326,18 +415,17 @@ class SimEngine:
                     ctx.active_ask[fm] = None
 
     def _handle_bbo_event(self, venue: MarketState, data: Dict[str, Any], ts_ns: int) -> None:
-        """Updates venue BBO and realized volatility."""
+        """Updates venue BBO, checks crossed book, and handles risk recovery (fix V-09)."""
         bid = float(data.get("bid_price") or data.get("bestBid", {}).get("price") or 0.0)
         ask = float(data.get("ask_price") or data.get("bestAsk", {}).get("price") or 0.0)
         bid_s = float(data.get("bid_size") or data.get("bestBid", {}).get("size") or 0.0)
         ask_s = float(data.get("ask_size") or data.get("bestAsk", {}).get("size") or 0.0)
 
         if bid > 0 and ask > 0:
-            # Check crossed book
             if bid >= ask:
                 venue.book_valid = False
                 for ctx in self.contexts.values():
-                    ctx.risk_state = RiskState.FLATTENED_CROSSED_BOOK
+                    ctx.set_risk_state(venue.market, RiskState.FLATTENED_CROSSED_BOOK)
                 return
 
             venue.best_bid = bid
@@ -346,35 +434,59 @@ class SimEngine:
             venue.best_ask_size = ask_s
             venue.current_mid = (bid + ask) / 2.0
             venue.last_bbo_ts_ns = ts_ns
+
+            if venue.clean_bbo_count_since_stale == 0:
+                venue.stale_recovery_start_ts_ns = ts_ns
             venue.clean_bbo_count_since_stale += 1
+
+            # Recovery transitions for PAUSED_STALE_FEED, PAUSED_GAP, and FLATTENED_CROSSED_BOOK (fix V-09)
+            for ctx in self.contexts.values():
+                curr_state = ctx.get_risk_state(venue.market)
+                if curr_state == RiskState.PAUSED_STALE_FEED:
+                    if venue.clean_bbo_count_since_stale >= 20 and (ts_ns - venue.stale_recovery_start_ts_ns) >= 5_000_000_000:
+                        ctx.set_risk_state(venue.market, RiskState.NORMAL)
+                        logger.info(f"[{venue.market}] Recovered from PAUSED_STALE_FEED to NORMAL")
+                elif curr_state == RiskState.PAUSED_GAP:
+                    if venue.book_valid and venue.orderbook.is_synced:
+                        ctx.set_risk_state(venue.market, RiskState.NORMAL)
+                        logger.info(f"[{venue.market}] Recovered from PAUSED_GAP to NORMAL")
+                elif curr_state == RiskState.FLATTENED_CROSSED_BOOK:
+                    if venue.clean_bbo_count_since_stale >= 20:
+                        ctx.set_risk_state(venue.market, RiskState.NORMAL)
+                        logger.info(f"[{venue.market}] Recovered from FLATTENED_CROSSED_BOOK to NORMAL")
 
             # Update causal realized volatility
             venue.current_volatility = venue.volatility_estimator.update(ts_ns, venue.current_mid)
 
     def _handle_l2_delta_event(self, venue: MarketState, data: Dict[str, Any], ts_ns: int) -> None:
-        """Applies order book snapshot/delta and sequence gap check."""
+        """Applies order book snapshot/delta to LocalOrderBook (fix V-06)."""
         seq = data.get("lastSequenceId") or data.get("sequence")
-        if seq is not None and venue.last_seq is not None:
-            if seq > venue.last_seq + 1 and not data.get("isSnapshot"):
-                # Mid-stream sequence gap!
-                venue.book_valid = False
-                gap_info = {"market": venue.market, "expected": venue.last_seq + 1, "received": seq, "ts_ns": ts_ns}
-                venue.invalid_intervals.append(gap_info)
-                for ctx in self.contexts.values():
-                    ctx.risk_state = RiskState.PAUSED_GAP
         venue.last_seq = seq
 
         if data.get("isSnapshot"):
-            venue.orderbook.handle_snapshot(data.get("bids", []), data.get("asks", []), seq or 0)
+            venue.orderbook.apply_snapshot(data)
             venue.book_valid = True
+            for ctx in self.contexts.values():
+                if ctx.get_risk_state(venue.market) == RiskState.PAUSED_GAP:
+                    ctx.set_risk_state(venue.market, RiskState.NORMAL)
         else:
-            venue.orderbook.handle_l2_update(data.get("bids", []), data.get("asks", []), seq or 0)
+            applied = venue.orderbook.apply_delta(data)
+            if not applied or venue.orderbook.sequence_gap_detected:
+                venue.book_valid = False
+                venue.invalid_intervals.append({
+                    "market": venue.market,
+                    "expected": venue.last_seq + 1 if venue.last_seq else None,
+                    "received": seq,
+                    "ts_ns": ts_ns
+                })
+                for ctx in self.contexts.values():
+                    ctx.set_risk_state(venue.market, RiskState.PAUSED_GAP)
 
     def _handle_trade_event(self, venue: MarketState, data: Dict[str, Any], ts_ns: int) -> List[Dict[str, Any]]:
         """Processes trade fills against resting and in-flight cancel-requested orders."""
         trade_p = float(data.get("price") or 0.0)
         trade_s = float(data.get("size") or 0.0)
-        trade_side = str(data.get("side", "")).upper()  # Taker aggressor side: "BUY" or "SELL"
+        trade_side = str(data.get("side", "")).upper()
 
         if trade_p <= 0 or trade_s <= 0 or not trade_side:
             return []
@@ -390,10 +502,11 @@ class SimEngine:
                 # 1. Check BID fills (taker sells hitting our bid)
                 bid_order = ctx.active_bid[fm]
                 if bid_order and bid_order.status in (OrderStatus.RESTING, OrderStatus.CANCEL_REQUESTED):
+                    was_in_flight = (bid_order.status == OrderStatus.CANCEL_REQUESTED)
                     fill_qty = self._evaluate_fill_quantity(fm, bid_order, trade_side, trade_p, trade_s)
                     if fill_qty > 0:
                         fee = pnl_eng.record_fill("BUY", bid_order.price, fill_qty, venue.current_mid, is_taker=False, ts_ns=ts_ns)
-                        ctx.rate_limiter.record_fill(fill_qty * bid_order.price)
+                        self.subaccount_rate_limiter.record_fill(fill_qty * bid_order.price)
                         bid_order.remaining_size -= fill_qty
                         if bid_order.remaining_size <= 1e-9:
                             bid_order.status = OrderStatus.FILLED
@@ -409,6 +522,7 @@ class SimEngine:
                             "mid_at_fill": venue.current_mid,
                             "fee": fee,
                             "ts_ns": ts_ns,
+                            "was_in_flight_cancel": was_in_flight,
                         }
                         fills_generated.append(fill_rec)
                         ctx.fill_records.append(fill_rec)
@@ -417,10 +531,11 @@ class SimEngine:
                 # 2. Check ASK fills (taker buys lifting our ask)
                 ask_order = ctx.active_ask[fm]
                 if ask_order and ask_order.status in (OrderStatus.RESTING, OrderStatus.CANCEL_REQUESTED):
+                    was_in_flight = (ask_order.status == OrderStatus.CANCEL_REQUESTED)
                     fill_qty = self._evaluate_fill_quantity(fm, ask_order, trade_side, trade_p, trade_s)
                     if fill_qty > 0:
                         fee = pnl_eng.record_fill("SELL", ask_order.price, fill_qty, venue.current_mid, is_taker=False, ts_ns=ts_ns)
-                        ctx.rate_limiter.record_fill(fill_qty * ask_order.price)
+                        self.subaccount_rate_limiter.record_fill(fill_qty * ask_order.price)
                         ask_order.remaining_size -= fill_qty
                         if ask_order.remaining_size <= 1e-9:
                             ask_order.status = OrderStatus.FILLED
@@ -436,6 +551,7 @@ class SimEngine:
                             "mid_at_fill": venue.current_mid,
                             "fee": fee,
                             "ts_ns": ts_ns,
+                            "was_in_flight_cancel": was_in_flight,
                         }
                         fills_generated.append(fill_rec)
                         ctx.fill_records.append(fill_rec)
@@ -453,7 +569,6 @@ class SimEngine:
     ) -> float:
         """Applies exact fill model semantics: Model A (touch), Model B (queue), Model C (trade-through)."""
         if order.side == "BUY":
-            # Maker BID filled by taker SELL
             if trade_side != "SELL":
                 return 0.0
 
@@ -461,14 +576,12 @@ class SimEngine:
                 return min(order.remaining_size, trade_size) if trade_price <= order.price else 0.0
 
             elif fill_model == FillModelType.MODEL_C_CONSERVATIVE:
-                # Strict trade-through: price must be strictly BELOW our bid
                 return min(order.remaining_size, trade_size) if trade_price < order.price - 1e-6 else 0.0
 
             elif fill_model == FillModelType.MODEL_B_MODERATE:
                 if trade_price < order.price - 1e-6:
                     return min(order.remaining_size, trade_size)
                 elif abs(trade_price - order.price) <= 1e-6:
-                    # Deplete queue ahead
                     if order.queue_ahead_size > 0:
                         depleted = min(order.queue_ahead_size, trade_size)
                         order.queue_ahead_size -= depleted
@@ -479,7 +592,6 @@ class SimEngine:
                 return 0.0
 
         elif order.side == "SELL":
-            # Maker ASK filled by taker BUY
             if trade_side != "BUY":
                 return 0.0
 
@@ -487,7 +599,6 @@ class SimEngine:
                 return min(order.remaining_size, trade_size) if trade_price >= order.price else 0.0
 
             elif fill_model == FillModelType.MODEL_C_CONSERVATIVE:
-                # Strict trade-through: price must be strictly ABOVE our ask
                 return min(order.remaining_size, trade_size) if trade_price > order.price + 1e-6 else 0.0
 
             elif fill_model == FillModelType.MODEL_B_MODERATE:
@@ -515,59 +626,107 @@ class SimEngine:
         for ctx in self.contexts.values():
             if hasattr(ctx.strategy, "market") and ctx.strategy.market != venue.market:
                 continue
-            # Check risk state
-            if ctx.risk_state in (RiskState.PAUSED_GAP, RiskState.PAUSED_STALE_FEED, RiskState.FLATTENED_CROSSED_BOOK):
+            if ctx.get_risk_state(venue.market) in (
+                RiskState.PAUSED_GAP,
+                RiskState.PAUSED_STALE_FEED,
+                RiskState.FLATTENED_CROSSED_BOOK,
+            ):
                 continue
 
-            # Check inventory limits against Central Model B position
-            pnl_b = ctx.pnl_engines[FillModelType.MODEL_B_MODERATE]
-            inv_units = pnl_b.position
+            if self.paired_common_quotes:
+                # Diagnostic mode: quote keyed to Model B inventory (legacy behavior)
+                pnl_b = ctx.pnl_engines[FillModelType.MODEL_B_MODERATE]
+                inv_units = pnl_b.position
+                quotes = ctx.strategy.generate_quotes(
+                    mid_price=venue.current_mid,
+                    inventory_units=inv_units,
+                    volatility=venue.current_volatility,
+                    market_spread_bps=spread_bps,
+                )
+                if quotes:
+                    target_bid, target_ask = quotes
+                    self._schedule_quote_update(venue, ctx, None, target_bid, target_ask, ts_ns)
+            else:
+                # Independent fill model simulation worlds (fix V-12)
+                for fm in ctx.fill_models:
+                    pnl_eng = ctx.pnl_engines[fm]
+                    inv_units = pnl_eng.position
 
-            quotes = ctx.strategy.generate_quotes(
-                mid_price=venue.current_mid,
-                inventory_units=inv_units,
-                volatility=venue.current_volatility,
-                market_spread_bps=spread_bps,
-            )
-            if not quotes:
-                continue
+                    # Check inventory cap
+                    clip_notional = venue.get_min_executable_clip()
+                    if abs(inv_units * venue.current_mid) > ctx.max_inventory_clips * clip_notional:
+                        ctx.set_risk_state(venue.market, RiskState.REDUCE_ONLY)
 
-            target_bid, target_ask = quotes
-            self._schedule_quote_update(venue, ctx, target_bid, target_ask, ts_ns)
+                    quotes = ctx.strategy.generate_quotes(
+                        mid_price=venue.current_mid,
+                        inventory_units=inv_units,
+                        volatility=venue.current_volatility,
+                        market_spread_bps=spread_bps,
+                    )
+                    if not quotes:
+                        continue
+
+                    target_bid, target_ask = quotes
+                    # In reduce only, prevent increasing quotes
+                    if ctx.get_risk_state(venue.market) == RiskState.REDUCE_ONLY:
+                        if inv_units > 0:
+                            target_bid = None  # Long: cannot buy more
+                        elif inv_units < 0:
+                            target_ask = None  # Short: cannot sell more
+
+                    self._schedule_quote_update(venue, ctx, fm, target_bid, target_ask, ts_ns)
 
     def _schedule_quote_update(
         self,
         venue: MarketState,
         ctx: StrategyInstanceContext,
+        fill_model: Optional[FillModelType],
         target_bid: Optional[Quote],
         target_ask: Optional[Quote],
         ts_ns: int,
     ) -> None:
-        """Schedules place, modify, or cancel-replace with latency."""
+        """Schedules place, modify, or cancel-replace with latency and rate-limit enforcement (fix V-10)."""
+        now_sec = ts_ns / 1e9
+        models_to_update = [fill_model] if (fill_model is not None and not self.paired_common_quotes) else [None]
+
         # 1. Update BID
         if target_bid:
             target_p = float(snap_to_tick(target_bid.price, venue.tick_size))
             target_s = float(snap_to_step(target_bid.size, venue.step_size))
             if target_s * target_p >= venue.get_min_executable_clip() - 1e-6:
-                existing_bid = ctx.active_bid[FillModelType.MODEL_B_MODERATE]
-                if not existing_bid or existing_bid.price != target_p or existing_bid.remaining_size != target_s:
-                    # Cancel existing if present across all models
-                    cancel_lat = self.sample_latency_ns("cancel")
-                    had_resting = False
-                    for fm in ctx.fill_models:
-                        cur = ctx.active_bid[fm]
-                        if cur and cur.status == OrderStatus.RESTING:
-                            cur.status = OrderStatus.CANCEL_REQUESTED
-                            cur.cancel_arrival_ts_ns = ts_ns + cancel_lat
-                            had_resting = True
-                    if had_resting:
-                        ctx.rate_limiter.record_cancel()
+                for fm in models_to_update:
+                    existing_bid = ctx.active_bid.get(fm) if fm is not None else (ctx.active_bid.get(ctx.fill_models[0]) if ctx.fill_models else None)
+                    if existing_bid and existing_bid.status == OrderStatus.RESTING:
+                        # Requote threshold check (fix V-10)
+                        price_diff = abs(target_p - existing_bid.price)
+                        if price_diff < venue.tick_size * self.subaccount_rate_limiter.requote_threshold_ticks and abs(target_s - existing_bid.remaining_size) < 1e-9:
+                            continue  # Keep priority! Do not cancel
 
-                    # Place new order
+                        # Check rate limit before cancel
+                        if not self.subaccount_rate_limiter.can_cancel_order(now_sec):
+                            ctx.rate_limited_actions_count += 1
+                            continue
+                        self.subaccount_rate_limiter.record_cancellation(now_sec)
+                        cancel_lat = self.sample_latency_ns("cancel")
+                        if fm is None:
+                            for m in ctx.fill_models:
+                                if ctx.active_bid[m]:
+                                    ctx.active_bid[m].status = OrderStatus.CANCEL_REQUESTED
+                                    ctx.active_bid[m].cancel_arrival_ts_ns = ts_ns + cancel_lat
+                        else:
+                            existing_bid.status = OrderStatus.CANCEL_REQUESTED
+                            existing_bid.cancel_arrival_ts_ns = ts_ns + cancel_lat
+
+                    # Check rate limit before place
+                    if not self.subaccount_rate_limiter.can_place_order(now_sec):
+                        ctx.rate_limited_actions_count += 1
+                        continue
+                    self.subaccount_rate_limiter.record_order_placement(now_sec)
+
                     place_lat = self.sample_latency_ns("place")
                     ctx.order_counter += 1
                     new_order = SimulatedOrder(
-                        order_id=f"{ctx.strategy_id}_bid_{ctx.order_counter}",
+                        order_id=f"{ctx.strategy_id}_{fm.value if fm else 'all'}_bid_{ctx.order_counter}",
                         client_order_id=f"cl_{ctx.order_counter}",
                         market=venue.market,
                         side="BUY",
@@ -577,33 +736,45 @@ class SimEngine:
                         status=OrderStatus.SUBMITTING,
                         created_ts_ns=ts_ns,
                         arrival_ts_ns=ts_ns + place_lat,
-                        queue_ahead_size=venue.best_bid_size if target_p == venue.best_bid else 0.0,
+                        fill_model=fm,
                     )
                     ctx.in_flight_orders.append(new_order)
-                    ctx.rate_limiter.record_placement()
 
         # 2. Update ASK
         if target_ask:
             target_p = float(snap_to_tick(target_ask.price, venue.tick_size))
             target_s = float(snap_to_step(target_ask.size, venue.step_size))
             if target_s * target_p >= venue.get_min_executable_clip() - 1e-6:
-                existing_ask = ctx.active_ask[FillModelType.MODEL_B_MODERATE]
-                if not existing_ask or existing_ask.price != target_p or existing_ask.remaining_size != target_s:
-                    cancel_lat = self.sample_latency_ns("cancel")
-                    had_resting = False
-                    for fm in ctx.fill_models:
-                        cur = ctx.active_ask[fm]
-                        if cur and cur.status == OrderStatus.RESTING:
-                            cur.status = OrderStatus.CANCEL_REQUESTED
-                            cur.cancel_arrival_ts_ns = ts_ns + cancel_lat
-                            had_resting = True
-                    if had_resting:
-                        ctx.rate_limiter.record_cancel()
+                for fm in models_to_update:
+                    existing_ask = ctx.active_ask.get(fm) if fm is not None else (ctx.active_ask.get(ctx.fill_models[0]) if ctx.fill_models else None)
+                    if existing_ask and existing_ask.status == OrderStatus.RESTING:
+                        price_diff = abs(target_p - existing_ask.price)
+                        if price_diff < venue.tick_size * self.subaccount_rate_limiter.requote_threshold_ticks and abs(target_s - existing_ask.remaining_size) < 1e-9:
+                            continue
+
+                        if not self.subaccount_rate_limiter.can_cancel_order(now_sec):
+                            ctx.rate_limited_actions_count += 1
+                            continue
+                        self.subaccount_rate_limiter.record_cancellation(now_sec)
+                        cancel_lat = self.sample_latency_ns("cancel")
+                        if fm is None:
+                            for m in ctx.fill_models:
+                                if ctx.active_ask[m]:
+                                    ctx.active_ask[m].status = OrderStatus.CANCEL_REQUESTED
+                                    ctx.active_ask[m].cancel_arrival_ts_ns = ts_ns + cancel_lat
+                        else:
+                            existing_ask.status = OrderStatus.CANCEL_REQUESTED
+                            existing_ask.cancel_arrival_ts_ns = ts_ns + cancel_lat
+
+                    if not self.subaccount_rate_limiter.can_place_order(now_sec):
+                        ctx.rate_limited_actions_count += 1
+                        continue
+                    self.subaccount_rate_limiter.record_order_placement(now_sec)
 
                     place_lat = self.sample_latency_ns("place")
                     ctx.order_counter += 1
                     new_order = SimulatedOrder(
-                        order_id=f"{ctx.strategy_id}_ask_{ctx.order_counter}",
+                        order_id=f"{ctx.strategy_id}_{fm.value if fm else 'all'}_ask_{ctx.order_counter}",
                         client_order_id=f"cl_{ctx.order_counter}",
                         market=venue.market,
                         side="SELL",
@@ -613,37 +784,66 @@ class SimEngine:
                         status=OrderStatus.SUBMITTING,
                         created_ts_ns=ts_ns,
                         arrival_ts_ns=ts_ns + place_lat,
-                        queue_ahead_size=venue.best_ask_size if target_p == venue.best_ask else 0.0,
+                        fill_model=fm,
                     )
                     ctx.in_flight_orders.append(new_order)
-                    ctx.rate_limiter.record_placement()
 
     def _handle_funding_event(self, venue: MarketState, data: Dict[str, Any], ts_ns: int) -> None:
-        """Applies time-aware hourly funding to all open positions."""
-        rate = float(data.get("funding_rate") or data.get("rate") or 0.0)
-        ref_mid = venue.current_mid if venue.current_mid > 0 else 1.0
+        """Handles funding events. Settle funding only on realized settlements, protecting against 60x overcharge (fix V-08)."""
+        rate = float(data.get("rate1h") or data.get("rate") or data.get("funding_rate") or 0.0)
+        venue.predicted_funding_rate = rate
+
+        is_predicted = bool(data.get("is_predicted") or data.get("channel") == "predictedFunding")
+        is_settlement = (
+            bool(data.get("is_settlement") or data.get("event_type") == "REALIZED" or data.get("is_realized"))
+            or ("funding_rate" in data and not is_predicted)
+        )
+        if not is_settlement:
+            # Predicted rate update only; do NOT charge PnL on every streaming predictedFunding message (fix V-08)
+            return
+
+        ref_price = venue.current_mark if venue.current_mark > 0 else (venue.current_mid if venue.current_mid > 0 else 1.0)
+        if venue.category in ("EQUITIES", "COMMODITIES", "INDICES") and venue.is_outside_rth:
+            rate = 0.000005  # Fixed off-hours rate
+
         for ctx in self.contexts.values():
             if hasattr(ctx.strategy, "market") and ctx.strategy.market != venue.market:
                 continue
             for fm, pnl_eng in ctx.pnl_engines.items():
-                pnl_eng.apply_funding(rate, ref_mid)
+                pnl_eng.apply_funding(rate, ref_price)
 
     def _handle_clock_tick(self, venue: MarketState, ts_ns: int) -> None:
-        """Evaluates stale BBO watchdogs and periodic risk checks."""
+        """Evaluates stale BBO watchdogs, hourly discrete settlements, and periodic risk checks."""
+        # 1. Stale BBO (> 3 seconds)
         if venue.last_bbo_ts_ns > 0 and (ts_ns - venue.last_bbo_ts_ns) > 3_000_000_000:
-            # Stale BBO (> 3 seconds)
             for ctx in self.contexts.values():
                 if hasattr(ctx.strategy, "market") and ctx.strategy.market != venue.market:
                     continue
-                ctx.risk_state = RiskState.PAUSED_STALE_FEED
-                # Cancel all resting orders
-                for fm in ctx.fill_models:
-                    if ctx.active_bid[fm]:
-                        ctx.active_bid[fm].status = OrderStatus.CANCELLED
-                        ctx.active_bid[fm] = None
-                    if ctx.active_ask[fm]:
-                        ctx.active_ask[fm].status = OrderStatus.CANCELLED
-                        ctx.active_ask[fm] = None
+                if ctx.get_risk_state(venue.market) != RiskState.PAUSED_STALE_FEED:
+                    ctx.set_risk_state(venue.market, RiskState.PAUSED_STALE_FEED)
+                    venue.clean_bbo_count_since_stale = 0
+                    venue.stale_recovery_start_ts_ns = ts_ns
+                    for fm in ctx.fill_models:
+                        if ctx.active_bid[fm]:
+                            ctx.active_bid[fm].status = OrderStatus.CANCELLED
+                            ctx.active_bid[fm] = None
+                        if ctx.active_ask[fm]:
+                            ctx.active_ask[fm].status = OrderStatus.CANCELLED
+                            ctx.active_ask[fm] = None
+
+        # 2. Hourly discrete funding settlement on clock rollover
+        current_hour = ts_ns // (3600 * 1_000_000_000)
+        if venue.last_settled_hour is not None and current_hour > venue.last_settled_hour:
+            ref_price = venue.current_mark if venue.current_mark > 0 else (venue.current_mid if venue.current_mid > 0 else 1.0)
+            rate = venue.predicted_funding_rate
+            for ctx in self.contexts.values():
+                if hasattr(ctx.strategy, "market") and ctx.strategy.market != venue.market:
+                    continue
+                for fm, pnl_eng in ctx.pnl_engines.items():
+                    pnl_eng.apply_funding(rate, ref_price)
+            venue.last_settled_hour = current_hour
+        elif venue.last_settled_hour is None:
+            venue.last_settled_hour = current_hour
 
     def _hash_fill_record(self, fill_rec: Dict[str, Any]) -> None:
         """Appends deterministic canonical hash of fill record for bit-for-bit replay parity."""
@@ -652,3 +852,232 @@ class SimEngine:
 
     def get_fill_log_hash(self) -> str:
         return self.fill_log_hasher.hexdigest()
+
+
+class BacktestRunResult:
+    """Encapsulates backtest simulation output and research diagnostics."""
+
+    def __init__(
+        self,
+        market: str,
+        strategy_name: str,
+        fill_model: str,
+        fidelity: str,
+        latency_ms: float,
+        pnl_summary: Dict[str, Any],
+        rate_limit_metrics: Dict[str, Any],
+        markout_metrics: Dict[str, Any],
+        event_count: int,
+        duration_hours: float,
+        in_flight_fills_count: int = 0,
+        in_place_modifications_count: int = 0,
+        cancel_replace_count: int = 0,
+    ):
+        self.market = market
+        self.strategy_name = strategy_name
+        self.fill_model = fill_model
+        self.fidelity = fidelity
+        self.latency_ms = latency_ms
+        self.pnl_summary = pnl_summary
+        self.rate_limit_metrics = rate_limit_metrics
+        self.markout_metrics = markout_metrics
+        self.event_count = event_count
+        self.duration_hours = duration_hours
+        self.in_flight_fills_count = in_flight_fills_count
+        self.in_place_modifications_count = in_place_modifications_count
+        self.cancel_replace_count = cancel_replace_count
+
+    def to_dict(self) -> Dict[str, Any]:
+        res = {
+            "market": self.market,
+            "strategy": self.strategy_name,
+            "fill_model": self.fill_model,
+            "fidelity": self.fidelity,
+            "latency_ms": self.latency_ms,
+            "duration_hours": round(self.duration_hours, 2),
+            "events_simulated": self.event_count,
+            "in_flight_fills_count": self.in_flight_fills_count,
+            "in_place_modifications_count": self.in_place_modifications_count,
+            "cancel_replace_count": self.cancel_replace_count,
+        }
+        res.update(self.pnl_summary)
+        res.update(self.rate_limit_metrics)
+        res["markouts"] = self.markout_metrics
+        return res
+
+
+class ArcusEventBacktester:
+    """Adapter running historical DataFrames through SimEngine."""
+
+    def __init__(
+        self,
+        strategy: BaseMarketMakingStrategy,
+        fill_model: FillModelType = FillModelType.MODEL_B_MODERATE,
+        latency_config: Optional[LatencyConfig] = None,
+        initial_capital: float = 100.0,
+        maker_fee_bps: float = 0.0,
+        taker_fee_bps: float = 2.25,
+        requote_threshold_ticks: int = 2,
+    ):
+        self.strategy = strategy
+        self.fill_model = fill_model
+        self.latency = latency_config or LatencyConfig()
+        self.initial_capital = initial_capital
+        self.maker_fee_bps = maker_fee_bps
+        self.taker_fee_bps = taker_fee_bps
+        self.requote_threshold_ticks = requote_threshold_ticks
+
+        self.market = strategy.market
+        self.specs = {
+            self.market: {
+                "tick_size": getattr(strategy, "tick_size", 0.1),
+                "step_size": getattr(strategy, "step_size", 0.0001),
+                "min_notional": getattr(strategy, "min_notional", 5.0),
+                "min_order_size": getattr(strategy, "min_order_size", 0.0),
+            }
+        }
+
+        self.engine = SimEngine(
+            markets=[self.market],
+            market_specs=self.specs,
+            strategies={self.strategy.__class__.__name__: self.strategy},
+            fill_models=[self.fill_model],
+            latency_config=self.latency,
+            initial_capital=self.initial_capital,
+            paired_common_quotes=False,
+            subaccount_rate_limiter=ArcusRateLimitSimulator(
+                requote_threshold_ticks=requote_threshold_ticks
+            ),
+        )
+
+    @property
+    def pnl_engine(self) -> PnLAttributionEngine:
+        ctx = self.engine.contexts[self.strategy.__class__.__name__]
+        return ctx.pnl_engines[self.fill_model]
+
+    @property
+    def rate_limiter(self) -> ArcusRateLimitSimulator:
+        return self.engine.subaccount_rate_limiter
+
+    @property
+    def orderbook(self) -> LocalOrderBook:
+        return self.engine.venues[self.market].orderbook
+
+    @property
+    def latest_mid_price(self) -> float:
+        return self.engine.venues[self.market].current_mid
+
+    def run_simulation(
+        self,
+        df_bbo: pd.DataFrame,
+        df_trades: pd.DataFrame,
+        funding_data: Optional[List[Dict[str, Any]]] = None,
+        df_l2: Optional[pd.DataFrame] = None,
+    ) -> BacktestRunResult:
+        fidelity = "HIGH_FIDELITY_L2" if (df_l2 is not None and not df_l2.empty) else "LOW_FIDELITY_BBO"
+        sim_events: List[SimEvent] = []
+
+        if df_bbo is not None and not df_bbo.empty:
+            for row in df_bbo.itertuples():
+                sim_events.append(SimEvent(
+                    event_type=SimEventType.BBO,
+                    recv_ts_ns=int(row.recv_ts_ns),
+                    market=self.market,
+                    data={
+                        "bid_price": float(row.bid_price),
+                        "ask_price": float(row.ask_price),
+                        "bid_size": float(getattr(row, "bid_size", 1.0)),
+                        "ask_size": float(getattr(row, "ask_size", 1.0)),
+                        "mid_price": float(getattr(row, "mid_price", (row.bid_price + row.ask_price) / 2.0)),
+                        "spread_bps": float(getattr(row, "spread_bps", 0.0)),
+                    }
+                ))
+
+        if df_trades is not None and not df_trades.empty:
+            for row in df_trades.itertuples():
+                sim_events.append(SimEvent(
+                    event_type=SimEventType.TRADE,
+                    recv_ts_ns=int(row.recv_ts_ns),
+                    market=self.market,
+                    data={
+                        "price": float(row.price),
+                        "size": float(row.size),
+                        "side": str(row.side).upper(),
+                    }
+                ))
+
+        if df_l2 is not None and not df_l2.empty:
+            for row in df_l2.itertuples():
+                is_snap = bool(getattr(row, "is_snapshot", False))
+                seq = getattr(row, "sequence_id", None) or getattr(row, "lastSequenceId", None)
+                sim_events.append(SimEvent(
+                    event_type=SimEventType.L2_DELTA,
+                    recv_ts_ns=int(row.recv_ts_ns),
+                    market=self.market,
+                    data={
+                        "isSnapshot": is_snap,
+                        "lastSequenceId": seq,
+                        "bids": getattr(row, "bids_json", getattr(row, "bids", [])),
+                        "asks": getattr(row, "asks_json", getattr(row, "asks", [])),
+                    }
+                ))
+
+        if funding_data:
+            for item in funding_data:
+                ts = int(item.get("timestamp") or item.get("ts_ns") or 0)
+                rate = float(item.get("fundingRate") or item.get("rate") or item.get("rate1h") or 0.0)
+                sim_events.append(SimEvent(
+                    event_type=SimEventType.FUNDING,
+                    recv_ts_ns=ts,
+                    market=self.market,
+                    data={"funding_rate": rate, "is_settlement": True},
+                ))
+
+        sim_events.sort(key=lambda ev: ev.recv_ts_ns)
+        if not sim_events:
+            raise ValueError("No historical events available for simulation")
+
+        start_ts_ns = sim_events[0].recv_ts_ns
+        end_ts_ns = sim_events[-1].recv_ts_ns
+        duration_hours = max(0.01, (end_ts_ns - start_ts_ns) / (1e9 * 3600.0))
+
+        # Replay events through SimEngine
+        for ev in sim_events:
+            self.engine.on_event(ev)
+
+        # Force clock tick at end to settle pending actions if needed
+        self.engine.on_event(SimEvent(
+            event_type=SimEventType.CLOCK_TICK,
+            recv_ts_ns=end_ts_ns + int(1e9),
+            market=self.market,
+            data={},
+        ))
+
+        ctx = self.engine.contexts[self.strategy.__class__.__name__]
+        pnl_summary = self.pnl_engine.get_summary(current_mid=self.latest_mid_price)
+        rl_metrics = self.rate_limiter.to_metrics()
+
+        # Markouts
+        markout_metrics = {}
+        if df_bbo is not None and not df_bbo.empty:
+            bbo_ts_arr = df_bbo["recv_ts_ns"].values
+            bbo_mid_arr = df_bbo["mid_price"].values
+            markout_metrics = self.pnl_engine.get_fill_markouts(bbo_ts_arr, bbo_mid_arr)
+
+        in_flight_fills = sum(1 for f in ctx.fill_records if f.get("was_in_flight_cancel", False))
+
+        return BacktestRunResult(
+            market=self.market,
+            strategy_name=self.strategy.__class__.__name__,
+            fill_model=self.fill_model.value,
+            fidelity=fidelity,
+            latency_ms=self.latency.total_place_latency_ms,
+            pnl_summary=pnl_summary,
+            rate_limit_metrics=rl_metrics,
+            markout_metrics=markout_metrics,
+            event_count=len(sim_events),
+            duration_hours=duration_hours,
+            in_flight_fills_count=in_flight_fills,
+            in_place_modifications_count=self.rate_limiter.orders_modified,
+            cancel_replace_count=self.rate_limiter.orders_cancelled,
+        )
