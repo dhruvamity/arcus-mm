@@ -416,10 +416,13 @@ class SimEngine:
 
     def _handle_bbo_event(self, venue: MarketState, data: Dict[str, Any], ts_ns: int) -> None:
         """Updates venue BBO, checks crossed book, and handles risk recovery (fix V-09)."""
-        bid = float(data.get("bid_price") or data.get("bestBid", {}).get("price") or 0.0)
-        ask = float(data.get("ask_price") or data.get("bestAsk", {}).get("price") or 0.0)
-        bid_s = float(data.get("bid_size") or data.get("bestBid", {}).get("size") or 0.0)
-        ask_s = float(data.get("ask_size") or data.get("bestAsk", {}).get("size") or 0.0)
+        contents = data.get("contents") if isinstance(data.get("contents"), dict) else data
+        best_bid = contents.get("bestBid") or data.get("bestBid") or {}
+        best_ask = contents.get("bestAsk") or data.get("bestAsk") or {}
+        bid = float(data.get("bid_price") or contents.get("bid_price") or best_bid.get("price") or 0.0)
+        ask = float(data.get("ask_price") or contents.get("ask_price") or best_ask.get("price") or 0.0)
+        bid_s = float(data.get("bid_size") or contents.get("bid_size") or best_bid.get("size") or 0.0)
+        ask_s = float(data.get("ask_size") or contents.get("ask_size") or best_ask.get("size") or 0.0)
 
         if bid > 0 and ask > 0:
             if bid >= ask:
@@ -460,10 +463,17 @@ class SimEngine:
 
     def _handle_l2_delta_event(self, venue: MarketState, data: Dict[str, Any], ts_ns: int) -> None:
         """Applies order book snapshot/delta to LocalOrderBook (fix V-06)."""
-        seq = data.get("lastSequenceId") or data.get("sequence")
+        contents = data.get("contents") if isinstance(data.get("contents"), dict) else data
+        seq = contents.get("lastSequenceId") or contents.get("sequence") or data.get("lastSequenceId")
         venue.last_seq = seq
 
-        if data.get("isSnapshot"):
+        is_snapshot = (
+            bool(data.get("isSnapshot"))
+            or data.get("type") == "subscribed"
+            or (isinstance(contents, dict) and len(contents.get("bids", [])) > 5 and len(contents.get("asks", [])) > 5)
+        )
+
+        if is_snapshot:
             venue.orderbook.apply_snapshot(data)
             venue.book_valid = True
             for ctx in self.contexts.values():
@@ -484,78 +494,90 @@ class SimEngine:
 
     def _handle_trade_event(self, venue: MarketState, data: Dict[str, Any], ts_ns: int) -> List[Dict[str, Any]]:
         """Processes trade fills against resting and in-flight cancel-requested orders."""
-        trade_p = float(data.get("price") or 0.0)
-        trade_s = float(data.get("size") or 0.0)
-        trade_side = str(data.get("side", "")).upper()
+        trades_list: List[Dict[str, Any]] = []
+        if isinstance(data.get("contents"), list):
+            trades_list = data["contents"]
+        elif isinstance(data.get("contents"), dict) and "price" in data["contents"]:
+            trades_list = [data["contents"]]
+        elif isinstance(data, dict) and "price" in data:
+            trades_list = [data]
 
-        if trade_p <= 0 or trade_s <= 0 or not trade_side:
+        if not trades_list:
             return []
 
         fills_generated: List[Dict[str, Any]] = []
 
-        for ctx in self.contexts.values():
-            if hasattr(ctx.strategy, "market") and ctx.strategy.market != venue.market:
+        for single_trade in trades_list:
+            trade_p = float(single_trade.get("price") or 0.0)
+            trade_s = float(single_trade.get("size") or 0.0)
+            trade_side = str(single_trade.get("side", "")).upper()
+
+            if trade_p <= 0 or trade_s <= 0 or not trade_side:
                 continue
-            for fm in ctx.fill_models:
-                pnl_eng = ctx.pnl_engines[fm]
 
-                # 1. Check BID fills (taker sells hitting our bid)
-                bid_order = ctx.active_bid[fm]
-                if bid_order and bid_order.status in (OrderStatus.RESTING, OrderStatus.CANCEL_REQUESTED):
-                    was_in_flight = (bid_order.status == OrderStatus.CANCEL_REQUESTED)
-                    fill_qty = self._evaluate_fill_quantity(fm, bid_order, trade_side, trade_p, trade_s)
-                    if fill_qty > 0:
-                        fee = pnl_eng.record_fill("BUY", bid_order.price, fill_qty, venue.current_mid, is_taker=False, ts_ns=ts_ns)
-                        self.subaccount_rate_limiter.record_fill(fill_qty * bid_order.price)
-                        bid_order.remaining_size -= fill_qty
-                        if bid_order.remaining_size <= 1e-9:
-                            bid_order.status = OrderStatus.FILLED
-                            ctx.active_bid[fm] = None
+            for ctx in self.contexts.values():
+                if hasattr(ctx.strategy, "market") and ctx.strategy.market != venue.market:
+                    continue
+                for fm in ctx.fill_models:
+                    pnl_eng = ctx.pnl_engines[fm]
 
-                        fill_rec = {
-                            "strategy_id": ctx.strategy_id,
-                            "fill_model": fm.value,
-                            "market": venue.market,
-                            "side": "BUY",
-                            "price": bid_order.price,
-                            "size": fill_qty,
-                            "mid_at_fill": venue.current_mid,
-                            "fee": fee,
-                            "ts_ns": ts_ns,
-                            "was_in_flight_cancel": was_in_flight,
-                        }
-                        fills_generated.append(fill_rec)
-                        ctx.fill_records.append(fill_rec)
-                        self._hash_fill_record(fill_rec)
+                    # 1. Check BID fills (taker sells hitting our bid)
+                    bid_order = ctx.active_bid[fm]
+                    if bid_order and bid_order.status in (OrderStatus.RESTING, OrderStatus.CANCEL_REQUESTED):
+                        was_in_flight = (bid_order.status == OrderStatus.CANCEL_REQUESTED)
+                        fill_qty = self._evaluate_fill_quantity(fm, bid_order, trade_side, trade_p, trade_s)
+                        if fill_qty > 0:
+                            fee = pnl_eng.record_fill("BUY", bid_order.price, fill_qty, venue.current_mid, is_taker=False, ts_ns=ts_ns)
+                            self.subaccount_rate_limiter.record_fill(fill_qty * bid_order.price)
+                            bid_order.remaining_size -= fill_qty
+                            if bid_order.remaining_size <= 1e-9:
+                                bid_order.status = OrderStatus.FILLED
+                                ctx.active_bid[fm] = None
 
-                # 2. Check ASK fills (taker buys lifting our ask)
-                ask_order = ctx.active_ask[fm]
-                if ask_order and ask_order.status in (OrderStatus.RESTING, OrderStatus.CANCEL_REQUESTED):
-                    was_in_flight = (ask_order.status == OrderStatus.CANCEL_REQUESTED)
-                    fill_qty = self._evaluate_fill_quantity(fm, ask_order, trade_side, trade_p, trade_s)
-                    if fill_qty > 0:
-                        fee = pnl_eng.record_fill("SELL", ask_order.price, fill_qty, venue.current_mid, is_taker=False, ts_ns=ts_ns)
-                        self.subaccount_rate_limiter.record_fill(fill_qty * ask_order.price)
-                        ask_order.remaining_size -= fill_qty
-                        if ask_order.remaining_size <= 1e-9:
-                            ask_order.status = OrderStatus.FILLED
-                            ctx.active_ask[fm] = None
+                            fill_rec = {
+                                "strategy_id": ctx.strategy_id,
+                                "fill_model": fm.value,
+                                "market": venue.market,
+                                "side": "BUY",
+                                "price": bid_order.price,
+                                "size": fill_qty,
+                                "mid_at_fill": venue.current_mid,
+                                "fee": fee,
+                                "ts_ns": ts_ns,
+                                "was_in_flight_cancel": was_in_flight,
+                            }
+                            fills_generated.append(fill_rec)
+                            ctx.fill_records.append(fill_rec)
+                            self._hash_fill_record(fill_rec)
 
-                        fill_rec = {
-                            "strategy_id": ctx.strategy_id,
-                            "fill_model": fm.value,
-                            "market": venue.market,
-                            "side": "SELL",
-                            "price": ask_order.price,
-                            "size": fill_qty,
-                            "mid_at_fill": venue.current_mid,
-                            "fee": fee,
-                            "ts_ns": ts_ns,
-                            "was_in_flight_cancel": was_in_flight,
-                        }
-                        fills_generated.append(fill_rec)
-                        ctx.fill_records.append(fill_rec)
-                        self._hash_fill_record(fill_rec)
+                    # 2. Check ASK fills (taker buys lifting our ask)
+                    ask_order = ctx.active_ask[fm]
+                    if ask_order and ask_order.status in (OrderStatus.RESTING, OrderStatus.CANCEL_REQUESTED):
+                        was_in_flight = (ask_order.status == OrderStatus.CANCEL_REQUESTED)
+                        fill_qty = self._evaluate_fill_quantity(fm, ask_order, trade_side, trade_p, trade_s)
+                        if fill_qty > 0:
+                            fee = pnl_eng.record_fill("SELL", ask_order.price, fill_qty, venue.current_mid, is_taker=False, ts_ns=ts_ns)
+                            self.subaccount_rate_limiter.record_fill(fill_qty * ask_order.price)
+                            ask_order.remaining_size -= fill_qty
+                            if ask_order.remaining_size <= 1e-9:
+                                ask_order.status = OrderStatus.FILLED
+                                ctx.active_ask[fm] = None
+
+                            fill_rec = {
+                                "strategy_id": ctx.strategy_id,
+                                "fill_model": fm.value,
+                                "market": venue.market,
+                                "side": "SELL",
+                                "price": ask_order.price,
+                                "size": fill_qty,
+                                "mid_at_fill": venue.current_mid,
+                                "fee": fee,
+                                "ts_ns": ts_ns,
+                                "was_in_flight_cancel": was_in_flight,
+                            }
+                            fills_generated.append(fill_rec)
+                            ctx.fill_records.append(fill_rec)
+                            self._hash_fill_record(fill_rec)
 
         return fills_generated
 

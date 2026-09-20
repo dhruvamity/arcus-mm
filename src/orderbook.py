@@ -53,9 +53,10 @@ class LocalOrderBook:
     def apply_snapshot(self, snapshot_data: Dict[str, Any]) -> None:
         """Applies an L2 snapshot and initializes book state."""
         self.reset()
+        data = snapshot_data.get("contents") if isinstance(snapshot_data.get("contents"), dict) else snapshot_data
 
-        raw_bids = snapshot_data.get("bids", [])
-        raw_asks = snapshot_data.get("asks", [])
+        raw_bids = data.get("bids", [])
+        raw_asks = data.get("asks", [])
 
         for item in raw_bids:
             p, s = self._parse_level(item)
@@ -67,8 +68,8 @@ class LocalOrderBook:
             if s > 0:
                 self.asks[p] = s
 
-        self.last_sequence_id = snapshot_data.get("lastSequenceId")
-        self.global_sequence_id = snapshot_data.get("globalSequenceId")
+        self.last_sequence_id = data.get("lastSequenceId")
+        self.global_sequence_id = data.get("globalSequenceId")
         self.is_synced = True
         self.has_received_first_delta = False
         self.sequence_gap_detected = False
@@ -82,7 +83,9 @@ class LocalOrderBook:
             logger.warning(f"[{self.market}] Delta received while orderbook is not synchronized")
             return False
 
-        seq = delta_data.get("lastSequenceId")
+        data = delta_data.get("contents") if isinstance(delta_data.get("contents"), dict) else delta_data
+
+        seq = data.get("lastSequenceId")
         if seq is None:
             return False
 
@@ -110,10 +113,10 @@ class LocalOrderBook:
                     return False
 
         self.last_sequence_id = seq
-        self.global_sequence_id = delta_data.get("globalSequenceId", self.global_sequence_id)
+        self.global_sequence_id = data.get("globalSequenceId", self.global_sequence_id)
 
         # Apply bids in frame order
-        for item in delta_data.get("bids", []):
+        for item in data.get("bids", []):
             p, s = self._parse_level(item)
             if s <= 0:
                 self.bids.pop(p, None)
@@ -121,7 +124,7 @@ class LocalOrderBook:
                 self.bids[p] = s
 
         # Apply asks in frame order
-        for item in delta_data.get("asks", []):
+        for item in data.get("asks", []):
             p, s = self._parse_level(item)
             if s <= 0:
                 self.asks.pop(p, None)

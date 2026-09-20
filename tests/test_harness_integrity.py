@@ -306,7 +306,7 @@ class TestHarnessIntegrity(unittest.TestCase):
     def test_latency_model_and_summary_alignment(self):
         """Mandate v3 WS-I / Finding V-27: Latency summary is canonical, provisional, and model-compatible."""
         from pathlib import Path
-        from src.models.latency import EmpiricalLatencyModel, ConstantLatencyModel
+        from src.models.latency import EmpiricalLatencyModel
 
         repo_root = Path(__file__).resolve().parent.parent
         summary_path = repo_root / "latency" / "latency_summary.json"
