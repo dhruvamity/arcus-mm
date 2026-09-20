@@ -317,11 +317,11 @@
     "category": "LATENCY",
     "summary": "Latency evidence far below spec (5 samples in 4 seconds on REST)",
     "reproduction_status": "CONFIRMED",
-    "remediation_status": "OPEN",
-    "evidence_file": "",
+    "remediation_status": "FIXED",
+    "evidence_file": "evidence/2026-09-20/V-27_latency_alignment.txt",
     "test_file": "tests/test_harness_integrity.py",
-    "commit_hash": null,
-    "notes": "Discrepancy across YAML (158ms), reports (185ms), and live sample (376ms)"
+    "commit_hash": "5cd6837",
+    "notes": "Replaced heavy /v1/markets REST polling with lightweight /v1/time (weight 1); output written to canonical latency/latency_summary.json (p50: 173.99ms) and latency/latency_samples.jsonl; flagged PROVISIONAL pending testnet faucet funding."
   },
   {
     "id": "V-28",

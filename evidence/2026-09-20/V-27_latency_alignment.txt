@@ -1,0 +1,11 @@
+COMMAND: .venv/bin/python -m unittest tests/test_harness_integrity.py 
+GIT_HEAD: c44019d4eada5d0aab4c0438eafcabc9568c92dc
+TIMESTAMP: 2026-09-20T10:08:31Z
+PYTHON_VERSION: Python 3.12.14
+EXIT_CODE: 0
+--- OUTPUT ---
+.........
+----------------------------------------------------------------------
+Ran 9 tests in 0.004s
+
+OK

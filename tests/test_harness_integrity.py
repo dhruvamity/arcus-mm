@@ -303,6 +303,39 @@ class TestHarnessIntegrity(unittest.TestCase):
         )
         self.assertEqual(res2["horizons"]["0.1s"]["N"], 1)
 
+    def test_latency_model_and_summary_alignment(self):
+        """Mandate v3 WS-I / Finding V-27: Latency summary is canonical, provisional, and model-compatible."""
+        from pathlib import Path
+        from src.models.latency import EmpiricalLatencyModel, ConstantLatencyModel
+
+        repo_root = Path(__file__).resolve().parent.parent
+        summary_path = repo_root / "latency" / "latency_summary.json"
+        samples_path = repo_root / "latency" / "latency_samples.jsonl"
+
+        self.assertTrue(summary_path.exists(), "latency/latency_summary.json must exist")
+        self.assertTrue(samples_path.exists(), "latency/latency_samples.jsonl must exist")
+
+        with open(summary_path, "r", encoding="utf-8") as f:
+            summary = json.load(f)
+
+        self.assertEqual(summary.get("status"), "PROVISIONAL")
+        self.assertIn("provisional_reason", summary)
+        self.assertEqual(summary.get("endpoint"), "/v1/time")
+        self.assertIn("rest_rtt_ms", summary)
+        self.assertIn("ws_ping_rtt_ms", summary)
+        self.assertIn("p50", summary["rest_rtt_ms"])
+        self.assertGreater(summary["rest_rtt_ms"]["count"], 0)
+
+        # Test EmpiricalLatencyModel with summary json
+        model_from_json = EmpiricalLatencyModel(summary_path)
+        sample_place = model_from_json.sample_ms("place")
+        self.assertGreater(sample_place, 0.0)
+
+        # Test EmpiricalLatencyModel with samples jsonl
+        model_from_jsonl = EmpiricalLatencyModel(samples_path)
+        sample_cancel = model_from_jsonl.sample_ms("cancel")
+        self.assertGreater(sample_cancel, 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -141,6 +141,20 @@ class EmpiricalLatencyModel(LatencyModel):
         import json
         if not self.samples_file.exists():
             return
+        if self.samples_file.suffix == ".jsonl":
+            try:
+                with open(self.samples_file, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        rec = json.loads(line)
+                        if "rtt_ms" in rec and rec.get("status") == "ok":
+                            self.samples.append(float(rec["rtt_ms"]))
+            except Exception:
+                pass
+            return
+
         try:
             with open(self.samples_file, "r", encoding="utf-8") as f:
                 data = json.load(f)

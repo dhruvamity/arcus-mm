@@ -20,12 +20,15 @@ fees:
   rebates_available: false
   rebate_threshold_volume_usd: 1000000000.0 # VIP tier only
 
-empirical_latency: # Measured from test host via scripts/measure_latency.py (2026-09-19)
-  p50_rtt_ms: 158.50 # [VERIFIED_MEASURED]
-  p95_rtt_ms: 640.26 # [VERIFIED_MEASURED]
-  p99_rtt_ms: 836.74 # [VERIFIED_MEASURED]
-  stress_p95_plus_500ms: 1140.26 # [VERIFIED_MEASURED]
-  clock_skew_p50_ms: -73.60 # [VERIFIED_MEASURED]
+empirical_latency: # Measured from test host via scripts/measure_latency.py against /v1/time (PROVISIONAL)
+  status: PROVISIONAL
+  source_file: latency/latency_summary.json
+  endpoint: /v1/time
+  endpoint_weight: 1
+  p50_rtt_ms: 173.99
+  p95_rtt_ms: 386.86
+  p99_rtt_ms: 511.06
+  stress_p95_plus_500ms: 886.86
 
 rate_limits:
   ip_weight_bucket:
