@@ -36,14 +36,22 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger("monday_sequence")
 
 DEFAULT_CONTROLS = ["BTC-USD", "ETH-USD", "SOL-USD"]
-DEFAULT_CRYPTO_CANDIDATES = ["HYPE-USD", "ZEC-USD", "NEAR-USD"]
-DEFAULT_EQUITY_CANDIDATES = ["SPY-USD", "QQQ-USD", "NVDA-USD"]
-DEFAULT_COMMODITY_CANDIDATES = ["SLV-USD"]
+DEFAULT_RTH_CANDIDATES = [
+    "SPY-USD",
+    "QQQ-USD",
+    "NVDA-USD",
+    "AMD-USD",
+    "TSLA-USD",
+    "GOOGL-USD",
+    "SPCX-USD",
+    "SLV-USD",
+    "GLD-USD",
+]
 
 
 async def rescan_universe() -> Dict[str, Any]:
     """Scans live markets via GET /v1/markets to rank and select active universe."""
-    logger.info("Executing Monday 12:00 UTC Universe Re-scan...")
+    logger.info("Executing Universe Re-scan for RTH Session...")
     scan_time = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     
     selected_markets: List[str] = []
@@ -77,10 +85,10 @@ async def rescan_universe() -> Dict[str, Any]:
                 })
         else:
             # Fallback spec list
-            for m in DEFAULT_CONTROLS + DEFAULT_CRYPTO_CANDIDATES + DEFAULT_EQUITY_CANDIDATES + DEFAULT_COMMODITY_CANDIDATES:
+            for m in DEFAULT_CONTROLS + DEFAULT_RTH_CANDIDATES:
                 market_rows.append({
                     "symbol": m,
-                    "category": "CRYPTO" if "USD" in m and not any(eq in m for eq in ["SPY", "QQQ", "NVDA", "SLV"]) else "EQUITY",
+                    "category": "CRYPTO" if "USD" in m and not any(eq in m for eq in ["SPY", "QQQ", "NVDA", "AMD", "TSLA", "GOOGL", "SPCX", "SLV", "GLD"]) else "EQUITY",
                     "volume24h": 1_000_000.0,
                     "trades24h": 1000,
                     "tick_size": 0.01,
@@ -93,18 +101,8 @@ async def rescan_universe() -> Dict[str, Any]:
         if any(r["symbol"] == m for r in market_rows) and m not in selected_markets:
             selected_markets.append(m)
 
-    # 2. Crypto candidates
-    for m in DEFAULT_CRYPTO_CANDIDATES:
-        if any(r["symbol"] == m for r in market_rows) and m not in selected_markets:
-            selected_markets.append(m)
-
-    # 3. Equity candidates
-    for m in DEFAULT_EQUITY_CANDIDATES:
-        if any(r["symbol"] == m for r in market_rows) and m not in selected_markets:
-            selected_markets.append(m)
-
-    # 4. Commodities
-    for m in DEFAULT_COMMODITY_CANDIDATES:
+    # 2. RTH Gated Candidates
+    for m in DEFAULT_RTH_CANDIDATES:
         if any(r["symbol"] == m for r in market_rows) and m not in selected_markets:
             selected_markets.append(m)
 
@@ -128,7 +126,7 @@ async def rescan_universe() -> Dict[str, Any]:
     for m in selected_markets:
         row = next((r for r in market_rows if r["symbol"] == m), None)
         if row:
-            role = "Benchmark Control" if m in DEFAULT_CONTROLS else ("High-Liquidity Crypto" if m in DEFAULT_CRYPTO_CANDIDATES else ("US Equity Perp" if m in DEFAULT_EQUITY_CANDIDATES else "Commodity Perp"))
+            role = "Benchmark Control" if m in DEFAULT_CONTROLS else ("Commodity Perp" if ("SLV" in m or "GLD" in m) else "US Equity Perp")
             lines.append(f"| **{m}** | {row['category']} | ${row['volume24h']:,.0f} | {row['trades24h']:,} | {row['tick_size']} | ${row['min_notional']:.2f} | {role} |")
 
     scan_report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -154,6 +152,17 @@ def generate_live_paper_report(
     total_fills = session_summary.get("total_fills_logged", 0)
     parity_ok = parity_result.get("parity_passed", False)
     fill_hash = parity_result.get("replay_hash", "N/A")
+    EMPTY_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    if total_fills == 0 or fill_hash == EMPTY_SHA256:
+        parity_header = "**INSUFFICIENT_FILLS** (Zero fills logged; vacuous empty hash avoided per V-17)"
+        live_hash_str = "N/A (Zero fills logged; vacuous hash avoided per V-17)"
+        replay_hash_str = "N/A (Zero fills logged; vacuous hash avoided per V-17)"
+        parity_status = "INSUFFICIENT_DATA (Zero fills logged)"
+    else:
+        parity_header = f"**{'PASS' if parity_ok else 'FAIL'}** (Hash: `{str(fill_hash)[:16]}`)"
+        live_hash_str = f"`{parity_result.get('live_hash', 'N/A')}`"
+        replay_hash_str = f"`{parity_result.get('replay_hash', 'N/A')}`"
+        parity_status = "VERIFIED (0 discrepancy)" if parity_ok else "UNVERIFIED"
 
     lines = [
         "# Phase 15 — Primary Live Paper Trading & Replay Parity Report",
@@ -163,7 +172,7 @@ def generate_live_paper_report(
         f"**End UTC:** `{end_utc}`  ",
         f"**Active Markets ({len(markets)}):** `{', '.join(markets)}`  ",
         f"**Total Simulated Fills:** `{total_fills}`  ",
-        f"**Bit-for-Bit Replay Parity:** **{'PASS' if parity_ok else 'FAIL'}** (Hash: `{str(fill_hash)[:16]}`)  ",
+        f"**Bit-for-Bit Replay Parity:** {parity_header}  ",
         "",
         "---",
         "",
@@ -203,10 +212,10 @@ def generate_live_paper_report(
         "",
         "## 3. Replay Parity Integrity Attestation",
         "",
-        f"- **Live Execution Fill Hash:** `{parity_result.get('live_hash', 'N/A')}`",
-        f"- **Offline Replay Fill Hash:** `{parity_result.get('replay_hash', 'N/A')}`",
+        f"- **Live Execution Fill Hash:** {live_hash_str}",
+        f"- **Offline Replay Fill Hash:** {replay_hash_str}",
         f"- **Fills Count Discrepancy:** `{parity_result.get('live_fills_count', 0) - parity_result.get('replay_fills_count', 0)}`",
-        f"- **Parity Status:** **{'VERIFIED (0 discrepancy)' if parity_ok else 'UNVERIFIED'}**",
+        f"- **Parity Status:** **{parity_status}**",
         "",
     ])
 
@@ -215,7 +224,7 @@ def generate_live_paper_report(
 
 
 async def execute_monday_sequence(
-    duration_sec: int = 14400,
+    duration_sec: int = 27000,
     skip_scan: bool = False,
     custom_markets: Optional[List[str]] = None,
 ) -> None:
@@ -228,7 +237,7 @@ async def execute_monday_sequence(
         scan_res = await rescan_universe()
         markets = scan_res["selected_markets"]
     else:
-        markets = DEFAULT_CONTROLS + DEFAULT_CRYPTO_CANDIDATES + DEFAULT_EQUITY_CANDIDATES + DEFAULT_COMMODITY_CANDIDATES
+        markets = DEFAULT_CONTROLS + DEFAULT_RTH_CANDIDATES
 
     logger.info(f"Initiating primary paper session across {len(markets)} markets for {duration_sec}s...")
     sid = f"monday_paper_{datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d_%H%M%S')}"
@@ -250,9 +259,9 @@ async def execute_monday_sequence(
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run Arcus MM Monday Sequence (Universe Re-scan + Primary Paper Session)")
-    parser.add_argument("--duration", type=int, default=14400, help="Paper session duration in seconds (default: 14400s / 4 hours)")
-    parser.add_argument("--now", action="store_true", help="Execute sequence immediately without waiting for Monday 12:00 UTC")
+    parser = argparse.ArgumentParser(description="Run Arcus MM Monday Sequence (Universe Re-scan + Primary RTH Paper Session)")
+    parser.add_argument("--duration", type=int, default=27000, help="Paper session duration in seconds (default: 27000s / 7.5 hours, 13:00-20:30 UTC)")
+    parser.add_argument("--now", action="store_true", help="Execute sequence immediately without waiting for Monday 13:00 UTC")
     parser.add_argument("--dry-run", action="store_true", help="Run a quick 10-second test of universe re-scan and paper session")
     parser.add_argument("--markets", nargs="*", default=None, help="Explicit market list")
     args = parser.parse_args()

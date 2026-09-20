@@ -1,11 +1,11 @@
 # Phase 15 — Primary Live Paper Trading & Replay Parity Report
 
-**Session ID:** `monday_paper_20260920_153030`  
-**Start UTC:** `2026-09-20T15:30:30.255474+00:00`  
-**End UTC:** `2026-09-20T15:30:41.068124+00:00`  
-**Active Markets (10):** `BTC-USD, ETH-USD, SOL-USD, HYPE-USD, ZEC-USD, NEAR-USD, SPY-USD, QQQ-USD, NVDA-USD, SLV-USD`  
-**Total Simulated Fills:** `12`  
-**Bit-for-Bit Replay Parity:** **PASS** (Hash: `07352806167a39fd`)  
+**Session ID:** `monday_paper_20260920_183928`  
+**Start UTC:** `2026-09-20T18:39:28.626381+00:00`  
+**End UTC:** `2026-09-20T18:39:39.486939+00:00`  
+**Active Markets (12):** `BTC-USD, ETH-USD, SOL-USD, SPY-USD, QQQ-USD, NVDA-USD, AMD-USD, TSLA-USD, GOOGL-USD, SPCX-USD, SLV-USD, GLD-USD`  
+**Total Simulated Fills:** `24`  
+**Bit-for-Bit Replay Parity:** **PASS** (Hash: `e43b0ad96e59c92b`)  
 
 ---
 
@@ -20,16 +20,26 @@
 
 | Strategy ID | Market | Model B PnL ($) | Model B Fills | Model C PnL ($) | Model C Fills | Risk State | Outcome Label |
 |---|---|---|---|---|---|---|---|
-| `BTC-USD_adaptive_c100` | **BTC-USD** | $+240.8159 | 1 | $+240.8159 | 1 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
-| `BTC-USD_adaptive_c50` | **BTC-USD** | $+240.8159 | 1 | $+240.8159 | 1 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `AMD-USD_adaptive_c100` | **AMD-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `AMD-USD_adaptive_c50` | **AMD-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `AMD-USD_donothing_c100` | **AMD-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `AMD-USD_donothing_c50` | **AMD-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `AMD-USD_fixed_c100` | **AMD-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `AMD-USD_fixed_c50` | **AMD-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `AMD-USD_randomside_c100` | **AMD-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `AMD-USD_randomside_c50` | **AMD-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `AMD-USD_volclock_c100` | **AMD-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `AMD-USD_volclock_c50` | **AMD-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `BTC-USD_adaptive_c100` | **BTC-USD** | $+238.7604 | 1 | $+238.7604 | 1 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `BTC-USD_adaptive_c50` | **BTC-USD** | $+238.7604 | 1 | $+238.7604 | 1 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
 | `BTC-USD_donothing_c100` | **BTC-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
 | `BTC-USD_donothing_c50` | **BTC-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
-| `BTC-USD_fixed_c100` | **BTC-USD** | $+240.8039 | 1 | $+240.8039 | 1 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
-| `BTC-USD_fixed_c50` | **BTC-USD** | $+240.8039 | 1 | $+240.8039 | 1 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
-| `BTC-USD_randomside_c100` | **BTC-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
-| `BTC-USD_randomside_c50` | **BTC-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
-| `BTC-USD_volclock_c100` | **BTC-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
-| `BTC-USD_volclock_c50` | **BTC-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `BTC-USD_fixed_c100` | **BTC-USD** | $+238.7607 | 1 | $+238.7607 | 1 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `BTC-USD_fixed_c50` | **BTC-USD** | $+238.7607 | 1 | $+238.7607 | 1 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `BTC-USD_randomside_c100` | **BTC-USD** | $+238.7604 | 1 | $+238.7604 | 1 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `BTC-USD_randomside_c50` | **BTC-USD** | $+238.7604 | 1 | $+238.7604 | 1 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `BTC-USD_volclock_c100` | **BTC-USD** | $+238.7619 | 1 | $+238.7619 | 1 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `BTC-USD_volclock_c50` | **BTC-USD** | $+238.7619 | 1 | $+238.7619 | 1 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
 | `ETH-USD_adaptive_c100` | **ETH-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
 | `ETH-USD_adaptive_c50` | **ETH-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
 | `ETH-USD_donothing_c100` | **ETH-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
@@ -40,26 +50,26 @@
 | `ETH-USD_randomside_c50` | **ETH-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
 | `ETH-USD_volclock_c100` | **ETH-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
 | `ETH-USD_volclock_c50` | **ETH-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
-| `HYPE-USD_adaptive_c100` | **HYPE-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
-| `HYPE-USD_adaptive_c50` | **HYPE-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
-| `HYPE-USD_donothing_c100` | **HYPE-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
-| `HYPE-USD_donothing_c50` | **HYPE-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
-| `HYPE-USD_fixed_c100` | **HYPE-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
-| `HYPE-USD_fixed_c50` | **HYPE-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
-| `HYPE-USD_randomside_c100` | **HYPE-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
-| `HYPE-USD_randomside_c50` | **HYPE-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
-| `HYPE-USD_volclock_c100` | **HYPE-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
-| `HYPE-USD_volclock_c50` | **HYPE-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
-| `NEAR-USD_adaptive_c100` | **NEAR-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
-| `NEAR-USD_adaptive_c50` | **NEAR-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
-| `NEAR-USD_donothing_c100` | **NEAR-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
-| `NEAR-USD_donothing_c50` | **NEAR-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
-| `NEAR-USD_fixed_c100` | **NEAR-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
-| `NEAR-USD_fixed_c50` | **NEAR-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
-| `NEAR-USD_randomside_c100` | **NEAR-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
-| `NEAR-USD_randomside_c50` | **NEAR-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
-| `NEAR-USD_volclock_c100` | **NEAR-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
-| `NEAR-USD_volclock_c50` | **NEAR-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `GLD-USD_adaptive_c100` | **GLD-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `GLD-USD_adaptive_c50` | **GLD-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `GLD-USD_donothing_c100` | **GLD-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `GLD-USD_donothing_c50` | **GLD-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `GLD-USD_fixed_c100` | **GLD-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `GLD-USD_fixed_c50` | **GLD-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `GLD-USD_randomside_c100` | **GLD-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `GLD-USD_randomside_c50` | **GLD-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `GLD-USD_volclock_c100` | **GLD-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `GLD-USD_volclock_c50` | **GLD-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `GOOGL-USD_adaptive_c100` | **GOOGL-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `GOOGL-USD_adaptive_c50` | **GOOGL-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `GOOGL-USD_donothing_c100` | **GOOGL-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `GOOGL-USD_donothing_c50` | **GOOGL-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `GOOGL-USD_fixed_c100` | **GOOGL-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `GOOGL-USD_fixed_c50` | **GOOGL-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `GOOGL-USD_randomside_c100` | **GOOGL-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `GOOGL-USD_randomside_c50` | **GOOGL-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `GOOGL-USD_volclock_c100` | **GOOGL-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `GOOGL-USD_volclock_c50` | **GOOGL-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
 | `NVDA-USD_adaptive_c100` | **NVDA-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
 | `NVDA-USD_adaptive_c50` | **NVDA-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
 | `NVDA-USD_donothing_c100` | **NVDA-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
@@ -100,6 +110,16 @@
 | `SOL-USD_randomside_c50` | **SOL-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
 | `SOL-USD_volclock_c100` | **SOL-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
 | `SOL-USD_volclock_c50` | **SOL-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `SPCX-USD_adaptive_c100` | **SPCX-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `SPCX-USD_adaptive_c50` | **SPCX-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `SPCX-USD_donothing_c100` | **SPCX-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `SPCX-USD_donothing_c50` | **SPCX-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `SPCX-USD_fixed_c100` | **SPCX-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `SPCX-USD_fixed_c50` | **SPCX-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `SPCX-USD_randomside_c100` | **SPCX-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `SPCX-USD_randomside_c50` | **SPCX-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `SPCX-USD_volclock_c100` | **SPCX-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `SPCX-USD_volclock_c50` | **SPCX-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
 | `SPY-USD_adaptive_c100` | **SPY-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
 | `SPY-USD_adaptive_c50` | **SPY-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
 | `SPY-USD_donothing_c100` | **SPY-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
@@ -110,23 +130,23 @@
 | `SPY-USD_randomside_c50` | **SPY-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
 | `SPY-USD_volclock_c100` | **SPY-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
 | `SPY-USD_volclock_c50` | **SPY-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
-| `ZEC-USD_adaptive_c100` | **ZEC-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
-| `ZEC-USD_adaptive_c50` | **ZEC-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
-| `ZEC-USD_donothing_c100` | **ZEC-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
-| `ZEC-USD_donothing_c50` | **ZEC-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
-| `ZEC-USD_fixed_c100` | **ZEC-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
-| `ZEC-USD_fixed_c50` | **ZEC-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
-| `ZEC-USD_randomside_c100` | **ZEC-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
-| `ZEC-USD_randomside_c50` | **ZEC-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
-| `ZEC-USD_volclock_c100` | **ZEC-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
-| `ZEC-USD_volclock_c50` | **ZEC-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `TSLA-USD_adaptive_c100` | **TSLA-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `TSLA-USD_adaptive_c50` | **TSLA-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `TSLA-USD_donothing_c100` | **TSLA-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `TSLA-USD_donothing_c50` | **TSLA-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `TSLA-USD_fixed_c100` | **TSLA-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `TSLA-USD_fixed_c50` | **TSLA-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `TSLA-USD_randomside_c100` | **TSLA-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `TSLA-USD_randomside_c50` | **TSLA-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `TSLA-USD_volclock_c100` | **TSLA-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
+| `TSLA-USD_volclock_c50` | **TSLA-USD** | $+0.0000 | 0 | $+0.0000 | 0 | `NORMAL` | **`SESSION: INSUFFICIENT`** |
 
 ---
 
 ## 3. Replay Parity Integrity Attestation
 
-- **Live Execution Fill Hash:** `07352806167a39fdc4d27df55be038f7a952631b1c207e7de55ca71bf261b292`
-- **Offline Replay Fill Hash:** `07352806167a39fdc4d27df55be038f7a952631b1c207e7de55ca71bf261b292`
+- **Live Execution Fill Hash:** `e43b0ad96e59c92bfe05a2eedb556d09b6aea9f9ddacabdc14a9c576a252c55b`
+- **Offline Replay Fill Hash:** `e43b0ad96e59c92bfe05a2eedb556d09b6aea9f9ddacabdc14a9c576a252c55b`
 - **Fills Count Discrepancy:** `0`
 - **Parity Status:** **VERIFIED (0 discrepancy)**
 
