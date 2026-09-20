@@ -1,0 +1,58 @@
+{
+  "markets": [
+    {
+      "marketDisplayName": "BTC-USD",
+      "fullAssetName": "Bitcoin",
+      "marketId": 1,
+      "status": "ONLINE",
+      "baseAsset": "BTC",
+      "quoteAsset": "USD",
+      "tickSize": "0.1",
+      "stepSize": "0.00000001",
+      "minOrderNotional": "5",
+      "minOrderSize": "0.0001",
+      "maxOrderSize": "10000",
+      "initialMarginFraction": "0.025",
+      "maintenanceMarginFraction": "0.016667",
+      "offHoursInitialMarginFraction": "0.025",
+      "type": "PERPETUAL",
+      "category": "CRYPTO"
+    },
+    {
+      "marketDisplayName": "ETH-USD",
+      "fullAssetName": "Ethereum",
+      "marketId": 2,
+      "status": "ONLINE",
+      "baseAsset": "ETH",
+      "quoteAsset": "USD",
+      "tickSize": "0.01",
+      "stepSize": "0.000001",
+      "minOrderNotional": "5",
+      "minOrderSize": "0.001",
+      "maxOrderSize": "50000",
+      "initialMarginFraction": "0.05",
+      "maintenanceMarginFraction": "0.03",
+      "offHoursInitialMarginFraction": "0.05",
+      "type": "PERPETUAL",
+      "category": "CRYPTO"
+    },
+    {
+      "marketDisplayName": "SOL-USD",
+      "fullAssetName": "Solana",
+      "marketId": 3,
+      "status": "ONLINE",
+      "baseAsset": "SOL",
+      "quoteAsset": "USD",
+      "tickSize": "0.01",
+      "stepSize": "0.0001",
+      "minOrderNotional": "5",
+      "minOrderSize": "0.01",
+      "maxOrderSize": "100000",
+      "initialMarginFraction": "0.05",
+      "maintenanceMarginFraction": "0.03",
+      "offHoursInitialMarginFraction": "0.075",
+      "type": "PERPETUAL",
+      "category": "CRYPTO"
+    }
+  ]
+}

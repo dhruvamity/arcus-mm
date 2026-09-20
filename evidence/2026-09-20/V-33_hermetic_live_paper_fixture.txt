@@ -1,0 +1,115 @@
+COMMAND: bash scripts/ci.sh 
+GIT_HEAD: 423f3d68bd6dce9aafa76973b2b53a1841a54c93
+TIMESTAMP: 2026-09-20T15:25:15Z
+PYTHON_VERSION: Python 3.12.14
+EXIT_CODE: 0
+--- OUTPUT ---
+=== Running CI for Arcus MM ===
+Using reference interpreter: Python 3.12.14
+
+--- Testing with Python 3.12.14 ---
+Running pyflakes...
+Running offline unit tests...
+sss......[SOL-USD] Mid-stream sequence gap: expected 104, got 105
+............[BTC-USD] Mid-stream sequence gap: expected 107, got 110
+.............................../opt/homebrew/Cellar/python@3.12/3.12.14/Frameworks/Python.framework/Versions/3.12/lib/python3.12/json/decoder.py:354: ResourceWarning: unclosed <socket.socket fd=9, family=30, type=1, proto=6, laddr=('2606:4700:110:8a84:3be:dd0d:ff0d:7f46', 60127, 0, 0), raddr=('2606:4700::6812:c16', 443, 0, 0)>
+  obj, end = self.scan_once(s, idx)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/opt/homebrew/Cellar/python@3.12/3.12.14/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/selector_events.py:879: ResourceWarning: unclosed transport <_SelectorSocketTransport fd=9>
+  _warn(f"unclosed transport {self!r}", ResourceWarning, source=self)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+..................[BTC-USD] Sequence gap in l2OrderbookUpdates: expected 106, got 110. Marking book INVALID and emitting INVALID_BOOK_INTERVAL.
+..[BTC-USD] Sequence gap in l2OrderbookUpdates: expected 106, got 110. Marking book INVALID and emitting INVALID_BOOK_INTERVAL.
+................./opt/homebrew/Cellar/python@3.12/3.12.14/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/selector_events.py:879: ResourceWarning: unclosed transport <_SelectorSocketTransport fd=11>
+  _warn(f"unclosed transport {self!r}", ResourceWarning, source=self)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/opt/homebrew/Cellar/python@3.12/3.12.14/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/selector_events.py:879: ResourceWarning: unclosed transport <_SelectorSocketTransport fd=12>
+  _warn(f"unclosed transport {self!r}", ResourceWarning, source=self)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+...[BTC-USD] Delta received while orderbook is not synchronized
+.............................WATCHDOG TRIGGERED: Heartbeat expired: 0.09s elapsed (limit: 0.05s). Executing emergency cleanup!
+......
+----------------------------------------------------------------------
+Ran 127 tests in 2.845s
+
+OK (skipped=3)
+Hashing 1 files for date 2026-09-18 (chain parent: 0000000000000000...)...
+Generated chained manifest: /Users/dhruv/Desktop/CodeWithD/arcus-mm/data/MANIFEST_2026-09-18.sha256 (1 files, digest c1e800557e9b1607...)
+
+--- Testing with Python 3.14.5 ---
+Running pyflakes...
+Running offline unit tests...
+sss......[SOL-USD] Mid-stream sequence gap: expected 104, got 105
+............[BTC-USD] Mid-stream sequence gap: expected 107, got 110
+.................................................[BTC-USD] Sequence gap in l2OrderbookUpdates: expected 106, got 110. Marking book INVALID and emitting INVALID_BOOK_INTERVAL.
+..[BTC-USD] Sequence gap in l2OrderbookUpdates: expected 106, got 110. Marking book INVALID and emitting INVALID_BOOK_INTERVAL.
+................./Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/traceback.py:890: ResourceWarning: unclosed <socket.socket fd=8, family=30, type=1, proto=6, laddr=('2606:4700:110:8a84:3be:dd0d:ff0d:7f46', 60163, 0, 0), raddr=('2606:4700::6812:c16', 443, 0, 0)>
+  def setup_positions(expr, force_valid=True):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/asyncio/selector_events.py:873: ResourceWarning: unclosed transport <_SelectorSocketTransport fd=8>
+  _warn(f"unclosed transport {self!r}", ResourceWarning, source=self)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/traceback.py:890: ResourceWarning: unclosed <socket.socket fd=12, family=30, type=1, proto=6, laddr=('2606:4700:110:8a84:3be:dd0d:ff0d:7f46', 60185, 0, 0), raddr=('2606:4700::6812:c16', 443, 0, 0)>
+  def setup_positions(expr, force_valid=True):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/asyncio/selector_events.py:873: ResourceWarning: unclosed transport <_SelectorSocketTransport fd=12>
+  _warn(f"unclosed transport {self!r}", ResourceWarning, source=self)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+...[BTC-USD] Delta received while orderbook is not synchronized
+.............................WATCHDOG TRIGGERED: Heartbeat expired: 0.08s elapsed (limit: 0.05s). Executing emergency cleanup!
+......
+----------------------------------------------------------------------
+Ran 127 tests in 7.039s
+
+OK (skipped=3)
+Hashing 1 files for date 2026-09-18 (chain parent: 0000000000000000...)...
+Generated chained manifest: /Users/dhruv/Desktop/CodeWithD/arcus-mm/data/MANIFEST_2026-09-18.sha256 (1 files, digest c1e800557e9b1607...)
+
+--- Running mutation verification suite ---
+================================================================================
+ARCUS SIMENGINE MUTATION VERIFICATION SUITE
+Applying 17 deliberate architectural mutations to verify test sensitivity...
+================================================================================
+[MUT-01] Invert Queue Priority            | CAUGHT (PASS)  | Target: TestSimEngine.test_5_queue_fifo_depletion
+        Failure Reason: AssertionError: 0.0 != 0.5 within 5 places (0.5 difference)
+[MUT-02] Lookahead Bias                   | CAUGHT (PASS)  | Target: TestSimEngine.test_8_no_lookahead
+        Failure Reason: AssertionError: 3 != 0 : Trade before order arrival must not fill order
+[MUT-03] Zero Cancel Latency              | CAUGHT (PASS)  | Target: TestSimEngine.test_3_cancel_latency_pickoff
+        Failure Reason: AssertionError: False is not true : In-flight cancel must be filled by aggressive trade
+[MUT-04] Funding Sign Flip                | CAUGHT (PASS)  | Target: TestSimEngine.test_7_funding_hourly_boundaries
+        Failure Reason: AssertionError: 0.01 != -0.01 within 5 places (0.02 difference)
+[MUT-05] Trade Side Semantics Inversion   | CAUGHT (PASS)  | Target: TestSimEngine.test_1_scripted_scenario_hand_computed_expectations
+        Failure Reason: AssertionError: 0 != 1 : Model A must fill on touch
+[MUT-06] Bypass Minimum Size              | CAUGHT (PASS)  | Target: TestSimEngine.test_6_quantization_and_min_size
+        Failure Reason: AssertionError: 2 != 0 : Sub-minimum notional quote must not be placed
+[MUT-07] Bypass Post-Only Crossing        | CAUGHT (PASS)  | Target: TestSimEngine.test_4_post_only_would_cross
+        Failure Reason: AssertionError: <OrderStatus.RESTING: 'RESTING'> != <OrderStatus.REJECTED: 'REJECTED'>
+[MUT-08] Disable Stale Watchdog           | CAUGHT (PASS)  | Target: TestSimEngine.test_10_kill_switches
+        Failure Reason: AssertionError: <RiskState.NORMAL: 'NORMAL'> != <RiskState.PAUSED_STALE_FEED: 'PAUSED_STALE_FEED'>
+[MUT-09] Fee Sign Flip                    | CAUGHT (PASS)  | Target: TestPnLAccounting.test_fee_separation_maker_vs_taker
+        Failure Reason: AssertionError: -0.0225 != 0.0225 within 6 places (0.045 difference)
+[MUT-10] Clamp Markout Horizons           | CAUGHT (PASS)  | Target: TestHarnessIntegrity.test_markout_horizons_random_walk
+        Failure Reason: AssertionError: 0.0 == 0.0
+[MUT-11] Charge Funding Per Message       | CAUGHT (PASS)  | Target: TestSimEngine.test_15_funding_predicted_vs_settlement_regression
+        Failure Reason: AssertionError: -0.6000000000000003 != 0.0 : Streaming predictedFunding messages must not debit funding PnL
+[MUT-12] Zero Queue Behind Touch          | CAUGHT (PASS)  | Target: TestSimEngine.test_14_l2_snapshot_delta_queue_depth
+        Failure Reason: AssertionError: 0.0 != 5.0 within 4 places (5.0 difference)
+[MUT-13] Never Recover From Pause         | CAUGHT (PASS)  | Target: TestSimEngine.test_16_risk_state_recovery_mechanisms
+        Failure Reason: AssertionError: <RiskState.PAUSED_STALE_FEED: 'PAUSED_STALE_FEED'> != <RiskState.NORMAL: 'NORMAL'>
+[MUT-14] Drop Stale Feed Watchdog         | CAUGHT (PASS)  | Target: TestSimEngine.test_10_kill_switches
+        Failure Reason: AssertionError: <RiskState.NORMAL: 'NORMAL'> != <RiskState.PAUSED_STALE_FEED: 'PAUSED_STALE_FEED'>
+[MUT-15] Ignore Rate Limit Denials        | CAUGHT (PASS)  | Target: TestSimEngine.test_18_subaccount_rate_limit_denial_and_drip
+        Failure Reason: AssertionError: 0 not greater than 0
+[MUT-16] Recv Time Order Fill (Lookahead) | CAUGHT (PASS)  | Target: TestSimEngine.test_8_no_lookahead
+        Failure Reason: AssertionError: 3 != 0 : Trade before order arrival must not fill order
+[MUT-17] C-World Shares Inventory         | CAUGHT (PASS)  | Target: TestSimEngine.test_17_independent_fill_worlds_quoting
+        Failure Reason: AssertionError: 0.0999 != 0.0
+--------------------------------------------------------------------------------
+Summary: 17/17 mutations caught by unit test suite.
+================================================================================
+Detailed evidence written to: /Users/dhruv/Desktop/CodeWithD/arcus-mm/evidence/mutation_check.txt
+
+--- Running secret scanner on git-tracked files ---
+PASS: No secrets found (0 findings).
+
+=== ALL CI CHECKS PASSED ===

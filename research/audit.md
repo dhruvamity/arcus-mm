@@ -1,6 +1,6 @@
 # Audit v3 Ledger — Ground Truth & Defect Remediation
 
-**Generated At:** `2026-09-20 14:04:22 UTC`  
+**Generated At:** `2026-09-20 15:26:00 UTC`  
 **Evaluation Scope:** All Findings (V-01 through V-32) from Mandate v3 (`prompts/2026-09-20_v3.md`)  
 **Commit Discrepancy Note:** Prior reports referenced commit hash `23a03f3` which does not exist on the remote GitHub repository. This occurred because the initial repository setup was committed and pushed via a squashed root commit (`0905008`), obliterating local scratch commit IDs. From this point forward, strict verifiable linear Git history is maintained with one commit per defect/milestone.  
 
@@ -42,6 +42,7 @@
 | **V-30** | `MAJOR` | DOCS | verify_report.py cannot catch fabricated generator data or invalid claims | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/V-30_verify_report_enhancements.txt`](evidence/2026-09-20/V-30_verify_report_enhancements.txt) | [`tests/test_report_provenance.py`](tests/test_report_provenance.py) | `HEAD` |
 | **V-31** | `MINOR` | DOCS | Time labels are unreliable (IST labeled as UTC in reports) | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/V-31_timezone_integrity.txt`](evidence/2026-09-20/V-31_timezone_integrity.txt) | [`tests/test_calendar_regimes.py`](tests/test_calendar_regimes.py) | `HEAD` |
 | **V-32** | `MINOR` | DOCS | Repo clutter and duplicates (~70 stale/duplicate files) | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/V-32_repo_cleanup_verified.txt`](evidence/2026-09-20/V-32_repo_cleanup_verified.txt) | [`tests/test_storage_manager.py`](tests/test_storage_manager.py) | `5010f91` |
+| **V-33** | `MINOR` | TESTS | Live paper trader tests non-hermetic without pre-existing data/raw snapshots | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/V-33_hermetic_live_paper_fixture.txt`](evidence/2026-09-20/V-33_hermetic_live_paper_fixture.txt) | [`tests/test_live_paper_trader.py`](tests/test_live_paper_trader.py) | `HEAD` |
 
 ---
 
@@ -55,10 +56,10 @@ All referenced evidence and test suites are machine-validated to exist on disk:
 
 ## 3. Progress Metrics
 
-- **Total Findings Audited:** 32
-- **Confirmed Defects:** 32
+- **Total Findings Audited:** 33
+- **Confirmed Defects:** 33
 - **Refuted Defects:** 0
-- **Remediated (FIXED):** 32
+- **Remediated (FIXED):** 33
 - **In Progress:** 0
 - **Open:** 0
 

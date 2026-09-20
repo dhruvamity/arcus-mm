@@ -382,5 +382,17 @@
     "test_file": "tests/test_storage_manager.py",
     "commit_hash": "5010f91",
     "notes": "Approved for deletion in WS-K per Appendix B; ~70 stale/duplicate files deleted across commits f962161 through 5010f91."
+  },
+  {
+    "id": "V-33",
+    "severity": "MINOR",
+    "category": "TESTS",
+    "summary": "Live paper trader tests non-hermetic without pre-existing data/raw snapshots",
+    "reproduction_status": "CONFIRMED",
+    "remediation_status": "FIXED",
+    "evidence_file": "evidence/2026-09-20/V-33_hermetic_live_paper_fixture.txt",
+    "test_file": "tests/test_live_paper_trader.py",
+    "commit_hash": "HEAD",
+    "notes": "Committed tests/fixtures/markets_snapshot_sample.json and patched test_live_paper_trader.py to use fixture, making suite 100% hermetic on clean checkouts with empty data/ directory."
   }
 ]

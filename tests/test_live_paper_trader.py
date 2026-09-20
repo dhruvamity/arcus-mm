@@ -7,18 +7,66 @@ Verifies:
 - State-machine kill switches trigger on stale feed.
 - Rule 11 session outcome labeling (SESSION: POSITIVE / NEGATIVE / INSUFFICIENT).
 - Session directory persistence and SHA-256 manifest generation.
+
+Hermetic: Injects a committed fixture via VenueMetadata.load_all_specs(snapshot_path=...)
+so tests run on a fresh clone with an empty data/ directory (V-33).
 """
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from src.paper_trader import ArcusLivePaperTrader
 from src.sim.engine import RiskState
+from src.venue import VenueMetadata
+
+FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures"
+MARKETS_FIXTURE = FIXTURE_DIR / "markets_snapshot_sample.json"
+
+# Pre-load fixture specs once at import time for deterministic injection
+_FIXTURE_SPECS = None
+
+
+def _get_fixture_specs():
+    """Loads and caches market specs from the committed test fixture."""
+    global _FIXTURE_SPECS
+    if _FIXTURE_SPECS is None:
+        with open(MARKETS_FIXTURE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        items = data.get("markets", [])
+        specs = {}
+        for item in items:
+            symbol = item.get("marketDisplayName", "")
+            if not symbol:
+                continue
+            specs[symbol] = {
+                "market_id": int(item.get("marketId", 0)),
+                "market": symbol,
+                "symbol": symbol,
+                "base_asset": item.get("baseAsset", ""),
+                "quote_asset": item.get("quoteAsset", "USD"),
+                "tick_size": float(item.get("tickSize", 0.001)),
+                "step_size": float(item.get("stepSize", 0.0001)),
+                "min_notional": float(item.get("minOrderNotional", 5.0)),
+                "min_order_size": float(item.get("minOrderSize", 0.0)),
+                "max_order_size": float(item.get("maxOrderSize", 1_000_000.0)),
+                "category": str(item.get("category", "CRYPTO")).upper(),
+                "initial_margin_fraction": float(item.get("initialMarginFraction", 0.05)),
+                "maintenance_margin_fraction": float(item.get("maintenanceMarginFraction", 0.03)),
+                "off_hours_initial_margin_fraction": float(item.get("offHoursInitialMarginFraction", 0.075)),
+                "status": item.get("status", "ONLINE"),
+            }
+        _FIXTURE_SPECS = specs
+    return _FIXTURE_SPECS
 
 
 class TestLivePaperTrader(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
+        # Reset VenueMetadata cache so each test is independent
+        VenueMetadata.reset_cache()
+
         self.tmp_dir = tempfile.TemporaryDirectory()
         self.output_dir = Path(self.tmp_dir.name)
         self.trader = ArcusLivePaperTrader(
@@ -28,9 +76,17 @@ class TestLivePaperTrader(unittest.IsolatedAsyncioTestCase):
             initial_capital=100.0,
             strategy_types=["fixed_spread"],
         )
-        await self.trader.initialize_engine()
+
+        # Monkeypatch VenueMetadata to use committed fixture instead of data/raw/*
+        with patch.object(
+            VenueMetadata,
+            "load_all_specs",
+            new=classmethod(lambda cls, snapshot_path=None: _get_fixture_specs()),
+        ):
+            await self.trader.initialize_engine()
 
     async def asyncTearDown(self):
+        VenueMetadata.reset_cache()
         if self.trader._running:
             await self.trader.stop()
         self.tmp_dir.cleanup()
@@ -80,3 +136,4 @@ class TestLivePaperTrader(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

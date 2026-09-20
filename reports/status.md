@@ -1,7 +1,7 @@
 # Arcus MM — Active System & Verification Status
 
-**Generated At:** `2026-09-20T14:08:59Z`  
-**Git Commit:** `2cc3731`  
+**Generated At:** `2026-09-20T15:26:03Z`  
+**Git Commit:** `423f3d6`  
 **Headline Status:** `INCONCLUSIVE — no strategy validated`  
 
 ## 1. Governance & Operating Constraints
@@ -26,10 +26,10 @@
 
 | Subsystem | Metric | Current Value | Specification / Health |
 |---|---|---|---|
-| **Defect Ledger** | Total Findings | 32 | V-01 through V-32 |
-| **Defect Remediation** | Fixed / Open | 32 / 0 | Verified via `scripts/generate_audit_report.py` |
-| **Recorder PID 11661** | Uptime | 22.3 hours (80,379 s) | Status: ACTIVE / HEALTHY |
-| **Data Ingestion** | Recorded Messages | 26,895,719 frames | Free Disk: 161.5 GB |
+| **Defect Ledger** | Total Findings | 33 | V-01 through V-32 |
+| **Defect Remediation** | Fixed / Open | 33 / 0 | Verified via `scripts/generate_audit_report.py` |
+| **Recorder PID 11661** | Uptime | 23.6 hours (85,006 s) | Status: ACTIVE / HEALTHY |
+| **Data Ingestion** | Recorded Messages | 28,728,774 frames | Free Disk: 159.5 GB |
 | **Wire Latency** | REST /v1/time p50 | 173.99 ms | Status: `PROVISIONAL` |
 
 ## 4. Key Takeaway
