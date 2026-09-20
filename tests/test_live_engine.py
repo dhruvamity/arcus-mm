@@ -138,6 +138,35 @@ class TestLiveExecutionEngine(unittest.TestCase):
         self.assertIsNone(bid_q)
         self.assertIsNone(ask_q)
 
+    def test_self_cross_prevention(self):
+        """Mandate v5 §6.4: Live engine refuses non-positive spreads and self-crossing quotes."""
+        cfg_testnet = ArcusConfig(environment="testnet")
+        
+        # 1. Startup refusal for negative or zero spread
+        bad_strat = FixedSpreadStrategy(
+            market=self.market,
+            tick_size=0.1,
+            step_size=0.0001,
+            spread_bps=-1.0,
+            clip_notional=10.0,
+        )
+        with self.assertRaises(ValueError):
+            LiveExecutionEngine(strategy=bad_strat, market=self.market, config=cfg_testnet)
+
+        # 2. Cycle refusal if quotes cross
+        engine = LiveExecutionEngine(strategy=self.strategy, market=self.market, config=cfg_testnet)
+        # Mock strategy to return crossed quotes
+        from src.strategies.base import Quote
+        import asyncio
+        engine.strategy.generate_quotes = MagicMock(return_value=(
+            Quote(side="BUY", price=80005.0, size=0.001),
+            Quote(side="SELL", price=80000.0, size=0.001),
+        ))
+        engine.update_bbo(bid_price=80000.0, bid_size=1.0, ask_price=80005.0, ask_size=1.0, ts_ns=1000)
+        bid_q, ask_q = asyncio.run(engine.execute_cycle())
+        self.assertIsNone(bid_q)
+        self.assertIsNone(ask_q)
+
 
 if __name__ == "__main__":
     unittest.main()

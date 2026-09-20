@@ -107,8 +107,18 @@ class LiveExecutionEngine:
         self._running = False
         self._last_heartbeat_ts = 0.0
 
-        # Enforce two-key guard at initialization
+        # Enforce two-key guard and configuration safety at initialization
         self.verify_safety_guards()
+        self.check_configuration_self_cross()
+
+    def check_configuration_self_cross(self) -> None:
+        """Mandate v5 §6.4: Refuses any configuration that would cause self-trading or crossed quotes."""
+        spread_bps = getattr(self.strategy, "spread_bps", None) or getattr(self.strategy, "base_spread_bps", None)
+        if spread_bps is not None and spread_bps <= 0:
+            logger.error(f"[{self.market}] Refusing configuration: non-positive spread ({spread_bps} bps) would self-cross.")
+            raise ValueError(
+                f"Configuration rejected: Strategy spread ({spread_bps} bps) must be strictly positive to prevent self-trading."
+            )
 
     def verify_safety_guards(self) -> None:
         """Enforces Mandate v5 §5.3: Two-Key Mainnet Guard."""
@@ -228,14 +238,23 @@ class LiveExecutionEngine:
         target_bid = self.quantize_order(bid_quote, "BUY")
         target_ask = self.quantize_order(ask_quote, "SELL")
 
-        # 5. Execute Requote Logic
+        # 5. Prevent Self-Crossing Quotes
+        if target_bid is not None and target_ask is not None:
+            if target_bid["price"] >= target_ask["price"]:
+                logger.error(
+                    f"[{self.market}] Self-cross protection: target bid {target_bid['price']} >= target ask {target_ask['price']}. Refusing to quote."
+                )
+                await self.cancel_all_quotes()
+                return None, None
+
+        # 6. Execute Requote Logic
         if self.should_requote(self.active_bid, target_bid):
             self.active_bid = target_bid
 
         if self.should_requote(self.active_ask, target_ask):
             self.active_ask = target_ask
 
-        # 6. Dead-Man's Switch Refresh
+        # 7. Dead-Man's Switch Refresh
         now = time.time()
         if now - self._last_heartbeat_ts >= 15.0:
             await self.refresh_dead_man_switch()

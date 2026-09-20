@@ -132,6 +132,7 @@ The unified CI suite runs pyflakes, the complete offline unit test suite across 
 2. **Deterministic Evidence (Rule 3 & 4)**: Every status claim in research ledgers must link to an evidence file generated via `scripts/ev.sh <ID> <slug> -- <command...>`. Hand-typed statuses and empty-string hashes are prohibited.
 3. **Regime Stratification**: Weekend data is labeled `WEEKEND-ONLY, NOT TRANSFERABLE` and is never pooled with weekday US-RTH sessions.
 4. **Honest Reporting**: `INSUFFICIENT DATA` and `NOT TUNABLE` are valid and expected classifications for illiquid instruments or uncalibrated models.
+5. **Exchange Compliance & Conduct**: Strictly single account per trader; strictly zero self-trading or wash trading; no multi-account / sybil activity; and zero circumvention of jurisdiction restrictions (including US, UK, Canada, and sanctioned territories per Arcus Terms of Use). The live engine enforces automated startup and runtime protections to log and reject any quotes that would cause self-crossing.
 
 ---
 
