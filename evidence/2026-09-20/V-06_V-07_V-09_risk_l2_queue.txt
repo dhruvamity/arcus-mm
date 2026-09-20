@@ -1,0 +1,12 @@
+COMMAND: python3 scripts/reproduce_audit_findings.py v06_v07_v09
+GIT_HEAD: ab55a3f244d6c59aa29025a0c33ef461f4a51e20
+TIMESTAMP: 2026-09-20T08:56:17Z
+PYTHON_VERSION: Python 3.14.5
+EXIT_CODE: 0
+--- OUTPUT ---
+after 4 s silence: PAUSED_STALE_FEED
+after 200 clean BBO: PAUSED_STALE_FEED
+CONFIRMED: V-09 Risk state never recovers from PAUSED_STALE_FEED.
+CONFIRMED: V-06 L2 event -> AttributeError: 'LocalOrderBook' object has no attribute 'handle_snapshot'
+quote: 99.8, queue_ahead: 0.0, fills: ['MODEL_A_OPTIMISTIC', 'MODEL_B_MODERATE']
+CONFIRMED: V-07 Quote behind the touch gets queue_ahead 0.0 instead of L2 depth.
