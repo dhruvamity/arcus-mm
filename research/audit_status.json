@@ -449,11 +449,11 @@
     "category": "STRATEGY",
     "summary": "Adaptive (OFI/microprice) strategy never receives microprice/OFI signal from engine",
     "reproduction_status": "CONFIRMED",
-    "remediation_status": "OPEN",
-    "evidence_file": "",
+    "remediation_status": "FIXED",
+    "evidence_file": "evidence/2026-09-20/W-03_ofi_wire_post_fix_pass.txt",
     "test_file": "tests/test_sim_engine.py",
-    "commit_hash": "-",
-    "notes": "SimEngine never computes or passes microprice/OFI imbalance to strategies, leaving skew term permanently zero."
+    "commit_hash": "HEAD",
+    "notes": "Computed causal microprice deviation and decaying trade-flow imbalance (OFI) in MarketState and wired microprice_dev_bps into strategy.generate_quotes calls in SimEngine. Added regression mutation MUT-19."
   },
   {
     "id": "W-04",

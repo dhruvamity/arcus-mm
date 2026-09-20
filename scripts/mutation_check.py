@@ -436,6 +436,33 @@ def test_mutation_18_mid_based_min_clip_check() -> MutationResult:
         SimEngine._schedule_quote_update = orig_sched
 
 
+def test_mutation_19_drop_ofi_microprice_argument() -> MutationResult:
+    """MUT-19: SimEngine drops microprice/OFI signal (hardcoded microprice_dev_bps=0.0)."""
+    orig_eval = SimEngine._evaluate_strategies_quoting
+
+    def mutated_eval(self, venue, ts_ns):
+        orig_get = venue.get_microprice_and_ofi_deviation
+        venue.get_microprice_and_ofi_deviation = lambda t: 0.0
+        try:
+            return orig_eval(self, venue, ts_ns)
+        finally:
+            venue.get_microprice_and_ofi_deviation = orig_get
+
+    SimEngine._evaluate_strategies_quoting = mutated_eval
+    try:
+        failed, msg = run_targeted_test(TestSimEngine, "test_22_w03_microprice_ofi_signal_wired_to_quotes")
+        return MutationResult(
+            "MUT-19",
+            "Drop OFI/Microprice Signal",
+            "TestSimEngine.test_22_w03_microprice_ofi_signal_wired_to_quotes",
+            "Drops microprice and OFI order flow signal by forcing deviation to 0.0",
+            failed,
+            msg,
+        )
+    finally:
+        SimEngine._evaluate_strategies_quoting = orig_eval
+
+
 def main():
     mutations: List[Callable[[], MutationResult]] = [
         test_mutation_1_invert_queue,
@@ -456,6 +483,7 @@ def main():
         test_mutation_16_recv_time_joins,
         test_mutation_17_c_world_from_b_inventory,
         test_mutation_18_mid_based_min_clip_check,
+        test_mutation_19_drop_ofi_microprice_argument,
     ]
 
     print("=" * 80)

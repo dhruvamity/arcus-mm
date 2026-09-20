@@ -1,5 +1,5 @@
 ARCUS SIMENGINE MUTATION VERIFICATION REPORT
-Generated: 2026-09-20 | Total Mutations: 18 | Caught: 18
+Generated: 2026-09-20 | Total Mutations: 19 | Caught: 19
 
 | ID | Mutation Name | Target Test | Status | Defect Description |
 |---|---|---|---|---|
@@ -21,6 +21,7 @@ Generated: 2026-09-20 | Total Mutations: 18 | Caught: 18
 | MUT-16 | Recv Time Order Fill (Lookahead) | `TestSimEngine.test_8_no_lookahead` | **CAUGHT** | Fills orders based on event receive time rather than arrival timestamp |
 | MUT-17 | C-World Shares Inventory | `TestSimEngine.test_17_independent_fill_worlds_quoting` | **CAUGHT** | Model C quotes and tracks from Model A/B inventory instead of independent state |
 | MUT-18 | Mid-Based Min-Clip Check | `TestSimEngine.test_19_w01_min_size_bids_not_rejected_on_min_clip_markets` | **CAUGHT** | Reintroduces mid-based clip validation rejecting min-size bids below mid |
+| MUT-19 | Drop OFI/Microprice Signal | `TestSimEngine.test_22_w03_microprice_ofi_signal_wired_to_quotes` | **CAUGHT** | Drops microprice and OFI order flow signal by forcing deviation to 0.0 |
 
 Detailed Failure Traces:
 
@@ -131,3 +132,9 @@ Description: Reintroduces mid-based clip validation rejecting min-size bids belo
 Target: TestSimEngine.test_19_w01_min_size_bids_not_rejected_on_min_clip_markets
 Outcome: CAUGHT BY TEST
 Test Exception Message: AssertionError: unexpectedly None : [BTC-USD] Bid order must not be None
+
+--- MUT-19: Drop OFI/Microprice Signal ---
+Description: Drops microprice and OFI order flow signal by forcing deviation to 0.0
+Target: TestSimEngine.test_22_w03_microprice_ofi_signal_wired_to_quotes
+Outcome: CAUGHT BY TEST
+Test Exception Message: AssertionError: 99.9 not greater than 99.9 : Bid price must shift upwards under positive microprice imbalance (was 99.9, got 99.9)

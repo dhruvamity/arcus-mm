@@ -1,0 +1,6 @@
+=== Command: python3 -m unittest tests/test_sim_engine.py -k test_22_w03_microprice_ofi_signal_wired_to_quotes ===
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.001s
+
+OK

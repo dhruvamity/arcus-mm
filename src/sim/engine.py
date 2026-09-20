@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from enum import Enum
 import hashlib
 import logging
+import math
 import random
 from typing import Dict, List, Optional, Any, Set
 import pandas as pd
@@ -146,6 +147,56 @@ class MarketState:
         self.predicted_funding_rate: float = 0.0
         self.last_settled_hour: Optional[int] = None
         self.is_outside_rth: bool = False
+
+        # Microprice and Order Flow Imbalance (OFI) tracking (fix W-03)
+        self.decaying_buy_vol: float = 0.0
+        self.decaying_sell_vol: float = 0.0
+        self.last_trade_decay_ts_ns: int = 0
+        self.tfi_half_life_sec: float = 30.0
+
+    def update_trade_flow(self, side: str, size: float, ts_ns: int) -> None:
+        """Updates exponentially decaying trade flow imbalance (causal, no lookahead)."""
+        if self.last_trade_decay_ts_ns > 0 and ts_ns > self.last_trade_decay_ts_ns:
+            dt_sec = (ts_ns - self.last_trade_decay_ts_ns) / 1e9
+            decay = math.exp(-0.69314718056 * dt_sec / self.tfi_half_life_sec)
+            self.decaying_buy_vol *= decay
+            self.decaying_sell_vol *= decay
+        self.last_trade_decay_ts_ns = ts_ns
+
+        side_upper = side.upper()
+        if side_upper == "BUY":
+            self.decaying_buy_vol += size
+        elif side_upper == "SELL":
+            self.decaying_sell_vol += size
+
+    def get_microprice_and_ofi_deviation(self, current_ts_ns: int) -> float:
+        """Computes combined microprice deviation and trade-flow imbalance in bps."""
+        # 1. Top of book microprice deviation
+        micro_dev_bps = 0.0
+        if self.best_bid > 0 and self.best_ask > 0 and self.current_mid > 0:
+            tot_depth = self.best_bid_size + self.best_ask_size
+            if tot_depth > 1e-9:
+                microprice = (self.best_bid * self.best_ask_size + self.best_ask * self.best_bid_size) / tot_depth
+                micro_dev_bps = ((microprice - self.current_mid) / self.current_mid) * 10_000.0
+
+        # 2. Causal trade flow imbalance (OFI)
+        b_vol = self.decaying_buy_vol
+        s_vol = self.decaying_sell_vol
+        if self.last_trade_decay_ts_ns > 0 and current_ts_ns > self.last_trade_decay_ts_ns:
+            dt_sec = (current_ts_ns - self.last_trade_decay_ts_ns) / 1e9
+            decay = math.exp(-0.69314718056 * dt_sec / self.tfi_half_life_sec)
+            b_vol *= decay
+            s_vol *= decay
+
+        tot_vol = b_vol + s_vol
+        tfi = (b_vol - s_vol) / (tot_vol + 1e-9) if tot_vol > 1e-9 else 0.0
+
+        spread_bps = 0.0
+        if self.current_mid > 0 and self.best_ask > self.best_bid:
+            spread_bps = ((self.best_ask - self.best_bid) / self.current_mid) * 10_000.0
+
+        ofi_component_bps = tfi * (spread_bps * 0.25)
+        return micro_dev_bps + ofi_component_bps
 
     def get_min_executable_clip(self) -> float:
         ref_p = self.current_mid if self.current_mid > 0 else 1.0
@@ -524,6 +575,9 @@ class SimEngine:
             if trade_p <= 0 or trade_s <= 0 or not trade_side:
                 continue
 
+            # Update venue trade flow for OFI tracking (fix W-03)
+            venue.update_trade_flow(trade_side, trade_s, ts_ns)
+
             for ctx in self.contexts.values():
                 if hasattr(ctx.strategy, "market") and ctx.strategy.market != venue.market:
                     continue
@@ -667,6 +721,7 @@ class SimEngine:
             return
 
         spread_bps = ((venue.best_ask - venue.best_bid) / venue.current_mid) * 10_000.0
+        microprice_dev_bps = venue.get_microprice_and_ofi_deviation(ts_ns)
 
         elapsed_hours = max(1.0, (ts_ns - self.session_start_ts_ns) / (3600.0 * 1e9)) if self.session_start_ts_ns > 0 else 1.0
 
@@ -717,6 +772,7 @@ class SimEngine:
                     inventory_units=inv_units,
                     volatility=venue.current_volatility,
                     market_spread_bps=spread_bps,
+                    microprice_dev_bps=microprice_dev_bps,
                 )
                 if quotes:
                     target_bid, target_ask = quotes
@@ -737,6 +793,7 @@ class SimEngine:
                         inventory_units=inv_units,
                         volatility=venue.current_volatility,
                         market_spread_bps=spread_bps,
+                        microprice_dev_bps=microprice_dev_bps,
                     )
                     if not quotes:
                         continue

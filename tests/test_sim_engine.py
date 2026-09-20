@@ -647,6 +647,85 @@ class TestSimEngine(unittest.TestCase):
             self.assertIn("quote_hash", f)
             self.assertTrue(f["observation_key"].startswith(f"{self.market}:strat:{f['fill_model']}:"))
 
+    def test_22_w03_microprice_ofi_signal_wired_to_quotes(self):
+        """W-03: Verifies that SimEngine computes microprice / OFI signal and passes it to AdaptiveMicrostructureStrategy."""
+        from src.strategies.adaptive_mm import AdaptiveMicrostructureStrategy
+
+        strat = AdaptiveMicrostructureStrategy(
+            market=self.market,
+            tick_size=0.1,
+            step_size=0.0001,
+            base_spread_bps=20.0,
+            ofi_skew_factor=2.0,
+            clip_notional=10.0,
+            min_notional=5.0,
+        )
+        engine = SimEngine(
+            markets=self.specs,
+            strategies={"strat": strat},
+            fill_models=[FillModelType.MODEL_B_MODERATE],
+            latency_config=LatencyConfig(order_entry_latency_ms=0.0, cancel_latency_ms=0.0),
+        )
+        ctx = engine.contexts["strat"]
+        t0 = 1_000_000_000
+
+        # 1. Symmetric baseline: mid 100.0, bid 99.90 (size 1.0), ask 100.10 (size 1.0)
+        engine.on_event(SimEvent(SimEventType.BBO, t0, self.market, {
+            "bid_price": 99.90, "ask_price": 100.10, "bid_size": 1.0, "ask_size": 1.0
+        }))
+        engine.on_event(SimEvent(SimEventType.CLOCK_TICK, t0 + int(20e6), self.market, {}))
+
+        bid_neutral = ctx.active_bid[FillModelType.MODEL_B_MODERATE]
+        ask_neutral = ctx.active_ask[FillModelType.MODEL_B_MODERATE]
+        self.assertIsNotNone(bid_neutral)
+        self.assertIsNotNone(ask_neutral)
+        p_bid_neutral = bid_neutral.price
+        p_ask_neutral = ask_neutral.price
+
+        # 2. Bullish book imbalance: huge bid size (99.0) vs tiny ask size (1.0)
+        t1 = t0 + 1_000_000_000
+        engine.on_event(SimEvent(SimEventType.BBO, t1, self.market, {
+            "bid_price": 99.90, "ask_price": 100.10, "bid_size": 99.0, "ask_size": 1.0
+        }))
+        engine.on_event(SimEvent(SimEventType.CLOCK_TICK, t1 + int(20e6), self.market, {}))
+
+        bid_skewed = ctx.active_bid[FillModelType.MODEL_B_MODERATE]
+        ask_skewed = ctx.active_ask[FillModelType.MODEL_B_MODERATE]
+        self.assertIsNotNone(bid_skewed)
+        self.assertIsNotNone(ask_skewed)
+
+        # Quotes MUST shift upwards due to positive microprice/OFI skew
+        self.assertGreater(
+            bid_skewed.price,
+            p_bid_neutral,
+            f"Bid price must shift upwards under positive microprice imbalance (was {p_bid_neutral}, got {bid_skewed.price})",
+        )
+        self.assertGreater(
+            ask_skewed.price,
+            p_ask_neutral,
+            f"Ask price must shift upwards under positive microprice imbalance (was {p_ask_neutral}, got {ask_skewed.price})",
+        )
+
+        # 3. Aggressive buyer trade flow (OFI) shifting quotes upwards even with balanced book
+        t2 = t1 + 1_000_000_000
+        # Heavy taker buy trade flow hitting ask
+        engine.on_event(SimEvent(SimEventType.TRADE, t2, self.market, {
+            "side": "BUY", "price": 100.10, "size": 50.0
+        }))
+        # Subsequent BBO with balanced depth
+        engine.on_event(SimEvent(SimEventType.BBO, t2 + int(1e6), self.market, {
+            "bid_price": 99.90, "ask_price": 100.10, "bid_size": 1.0, "ask_size": 1.0
+        }))
+        engine.on_event(SimEvent(SimEventType.CLOCK_TICK, t2 + int(20e6), self.market, {}))
+
+        bid_trade_skewed = ctx.active_bid[FillModelType.MODEL_B_MODERATE]
+        self.assertIsNotNone(bid_trade_skewed)
+        self.assertGreater(
+            bid_trade_skewed.price,
+            p_bid_neutral,
+            f"Bid price must shift upwards under positive trade flow imbalance (was {p_bid_neutral}, got {bid_trade_skewed.price})",
+        )
+
     def test_13_mutation_tests(self):
         """Test 13: Mutation tests (at least 16 mutations applied to the engine fail test suite)."""
         from scripts.mutation_check import (
@@ -668,6 +747,7 @@ class TestSimEngine(unittest.TestCase):
             test_mutation_16_recv_time_joins,
             test_mutation_17_c_world_from_b_inventory,
             test_mutation_18_mid_based_min_clip_check,
+            test_mutation_19_drop_ofi_microprice_argument,
         )
         mutations = [
             test_mutation_1_invert_queue,
@@ -688,10 +768,11 @@ class TestSimEngine(unittest.TestCase):
             test_mutation_16_recv_time_joins,
             test_mutation_17_c_world_from_b_inventory,
             test_mutation_18_mid_based_min_clip_check,
+            test_mutation_19_drop_ofi_microprice_argument,
         ]
         results = [m() for m in mutations]
         caught = sum(1 for r in results if r.caught)
-        self.assertGreaterEqual(caught, 18, f"Must catch at least 18 mutations, caught {caught}")
+        self.assertGreaterEqual(caught, 19, f"Must catch at least 19 mutations, caught {caught}")
 
 
 if __name__ == "__main__":
