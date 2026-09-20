@@ -98,6 +98,7 @@ class RiskState(str, Enum):
     REDUCE_ONLY = "REDUCE_ONLY"
     PAUSED_STALE_FEED = "PAUSED_STALE_FEED"
     PAUSED_GAP = "PAUSED_GAP"
+    PAUSED_ANOMALY = "PAUSED_ANOMALY"
     FLATTENED_LOSS_LIMIT = "FLATTENED_LOSS_LIMIT"
     FLATTENED_CROSSED_BOOK = "FLATTENED_CROSSED_BOOK"
 
@@ -284,6 +285,7 @@ class SimEngine:
 
         self.funding_model = TimeAwareFundingModel()
         self.current_clock_ts_ns: int = 0
+        self.session_start_ts_ns: int = 0
         self.fill_log_hasher = hashlib.sha256()
 
     def sample_latency_ns(self, action: str) -> int:
@@ -294,6 +296,8 @@ class SimEngine:
         """Processes a single event in strict timestamp order and returns any fills generated."""
         ts_ns = event.recv_ts_ns
         self.current_clock_ts_ns = max(self.current_clock_ts_ns, ts_ns)
+        if self.session_start_ts_ns == 0:
+            self.session_start_ts_ns = ts_ns
         market = event.market
         venue = self.venues.get(market)
         if not venue:
@@ -645,12 +649,42 @@ class SimEngine:
 
         spread_bps = ((venue.best_ask - venue.best_bid) / venue.current_mid) * 10_000.0
 
+        elapsed_hours = max(1.0, (ts_ns - self.session_start_ts_ns) / (3600.0 * 1e9)) if self.session_start_ts_ns > 0 else 1.0
+
         for ctx in self.contexts.values():
             if hasattr(ctx.strategy, "market") and ctx.strategy.market != venue.market:
                 continue
+
+            # Sanity invariant: |PnL| <= initial_capital * 0.50 per hour (W-06)
+            max_pnl = ctx.initial_capital * 0.50 * elapsed_hours
+            pnl_anomalous = False
+            for fm, pnl_eng in ctx.pnl_engines.items():
+                eq = pnl_eng.compute_equity(venue.current_mid)
+                net = eq - pnl_eng.initial_capital
+                if abs(net) > max_pnl:
+                    pnl_anomalous = True
+                    break
+
+            if pnl_anomalous:
+                if ctx.get_risk_state(venue.market) != RiskState.PAUSED_ANOMALY:
+                    logger.warning(
+                        f"[{venue.market}] PnL sanity invariant breached on {ctx.strategy_id} "
+                        f"(|PnL| > ${max_pnl:.2f} in {elapsed_hours:.2f}h). Transitioning to PAUSED_ANOMALY."
+                    )
+                    ctx.set_risk_state(venue.market, RiskState.PAUSED_ANOMALY)
+                    for fm in ctx.fill_models:
+                        if ctx.active_bid[fm]:
+                            ctx.active_bid[fm].status = OrderStatus.CANCELLED
+                            ctx.active_bid[fm] = None
+                        if ctx.active_ask[fm]:
+                            ctx.active_ask[fm].status = OrderStatus.CANCELLED
+                            ctx.active_ask[fm] = None
+                continue
+
             if ctx.get_risk_state(venue.market) in (
                 RiskState.PAUSED_GAP,
                 RiskState.PAUSED_STALE_FEED,
+                RiskState.PAUSED_ANOMALY,
                 RiskState.FLATTENED_CROSSED_BOOK,
             ):
                 continue
@@ -874,6 +908,31 @@ class SimEngine:
             venue.last_settled_hour = current_hour
         elif venue.last_settled_hour is None:
             venue.last_settled_hour = current_hour
+
+        # 3. Sanity invariant: |PnL| <= initial_capital * 0.50 per hour (W-06)
+        elapsed_hours = max(1.0, (ts_ns - self.session_start_ts_ns) / (3600.0 * 1e9)) if self.session_start_ts_ns > 0 else 1.0
+        for ctx in self.contexts.values():
+            if hasattr(ctx.strategy, "market") and ctx.strategy.market != venue.market:
+                continue
+            max_pnl = ctx.initial_capital * 0.50 * elapsed_hours
+            for fm, pnl_eng in ctx.pnl_engines.items():
+                eq = pnl_eng.compute_equity(venue.current_mid)
+                net = eq - pnl_eng.initial_capital
+                if abs(net) > max_pnl:
+                    if ctx.get_risk_state(venue.market) != RiskState.PAUSED_ANOMALY:
+                        logger.warning(
+                            f"[{venue.market}] Clock tick PnL sanity invariant breached on {ctx.strategy_id} "
+                            f"(|PnL| > ${max_pnl:.2f} in {elapsed_hours:.2f}h). Transitioning to PAUSED_ANOMALY."
+                        )
+                        ctx.set_risk_state(venue.market, RiskState.PAUSED_ANOMALY)
+                        for m in ctx.fill_models:
+                            if ctx.active_bid[m]:
+                                ctx.active_bid[m].status = OrderStatus.CANCELLED
+                                ctx.active_bid[m] = None
+                            if ctx.active_ask[m]:
+                                ctx.active_ask[m].status = OrderStatus.CANCELLED
+                                ctx.active_ask[m] = None
+                    break
 
     def _hash_fill_record(self, fill_rec: Dict[str, Any]) -> None:
         """Appends deterministic canonical hash of fill record for bit-for-bit replay parity."""

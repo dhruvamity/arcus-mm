@@ -1,4 +1,8 @@
-# Monday Universe Re-Scan Report (US Cash Market Hours)
+# Monday Universe Re-Scan Report (US Cash Market Hours) [REHEARSAL DRY RUN]
+
+> [!NOTE]
+> **REHEARSAL DRY RUN (PRE-FIX) (W-06 / Mandate v5 §1)**  
+> This universe scan dry run was conducted on Sunday 2026-09-20 18:39 UTC as a system rehearsal. The primary live Monday universe scan will execute during active US cash market hours.
 
 **Timestamp:** `2026-09-20 18:39:28 UTC`  
 **Selected Paper Trading Markets (12):** `BTC-USD, ETH-USD, SOL-USD, SPY-USD, QQQ-USD, NVDA-USD, AMD-USD, TSLA-USD, GOOGL-USD, SPCX-USD, SLV-USD, GLD-USD`  

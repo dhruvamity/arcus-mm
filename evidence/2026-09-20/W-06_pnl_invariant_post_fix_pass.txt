@@ -1,0 +1,13 @@
+=== COMMAND ===
+.venv/bin/python -m unittest tests.test_sim_engine.TestSimEngine.test_20_w06_pnl_rate_of_change_invariant
+
+=== EXIT CODE ===
+0
+
+=== OUTPUT ===
+[BTC-USD] PnL sanity invariant breached on strat (|PnL| > $50.00 in 1.00h). Transitioning to PAUSED_ANOMALY.
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.002s
+
+OK

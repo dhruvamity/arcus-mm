@@ -1,0 +1,35 @@
+ARCUS LIVE PAPER TRADING ROOT-CAUSE ANALYSIS: SUNDAY PNL ANOMALY (W-06)
+Generated: 2026-09-20 | Author: Antigravity Agentic Auditor
+
+1. ANOMALY SUMMARY
+In reports/phase_15_live_paper_report.md (Session monday_paper_20260920_183928, executed Sunday 2026-09-20 18:39:28 UTC), 8 BTC-USD strategies reported an impossible net PnL of +$238.76 on $100 capital in just 11 seconds (238% return), while all other 11 markets reported 0 fills.
+
+2. FORENSIC TRACE & ROOT CAUSE IDENTIFICATION
+Examination of data/live_paper/monday_paper_20260920_183928/fills.jsonl and raw_stream.jsonl revealed:
+- Fill Record:
+  {"strategy_id":"BTC-USD_adaptive_c50","fill_model":"MODEL_B_MODERATE","market":"BTC-USD","side":"BUY","price":2631.8,"size":0.00303916,"mid_at_fill":109.7955,"fee":0.0,"ts_ns":1789929570094475000,"was_in_flight_cancel":true}
+
+- Raw Stream Record (line 68):
+  {"recv_ts_ns":1789929570867297000,"channel":"bbo","market":"BTC-USD","data":{"type":"channel_data","channel":"bbo","id":"ETH-USD","contents":{"bestBid":{"price":"2631.95","size":"0.003"},"bestAsk":{"price":"2632.05","size":"102.9596557"}}}}
+
+Code Defect in src/paper_trader.py lines 211 and 234:
+  market = msg.get("market") or self.markets[0]
+
+Arcus WebSocket public protocol specification:
+- Arcus BBO frames provide market identity in msg["id"] (e.g. {"type":"channel_data","channel":"bbo","id":"ETH-USD"}), NOT msg["market"].
+- Arcus Trade frames provide market identity in trade_data["marketDisplayName"] or msg["id"].
+- Since msg.get("market") evaluated to None, EVERY incoming WebSocket message across all 12 subscribed instruments defaulted to self.markets[0] ("BTC-USD").
+
+Sequence of Failure:
+1. AMD-USD BBO ($109.80) was processed as BTC-USD BBO.
+2. ETH-USD BBO ($2,631.80) was processed as BTC-USD BBO, inducing BTC quoting strategies to quote bids around $2,631.80.
+3. ETH-USD trade at $2,631.80 was processed as BTC-USD trade, executing simulated fills for BTC strategies at $2,631.80 for 0.00303916 BTC.
+4. At session termination / MTM evaluation, the 0.00303916 position was evaluated against BTC-USD's actual mid ($81,200).
+5. Unrealized MTM gain: 0.00303916 * ($81,200 - $2,631.80) = +$238.76!
+
+3. REMEDIATION & INVARIANTS
+1. Corrected message market parsing in src/paper_trader.py to inspect msg.get("id"), msg.get("market"), and trade_data.get("marketDisplayName"). Unknown markets are dropped with debug logs rather than defaulting to self.markets[0].
+2. Added RiskState.PAUSED_ANOMALY and enforced the sanity invariant:
+   |PnL| <= initial_capital * 0.50 * max(1.0, elapsed_hours)
+   Breaches immediately transition strategy to PAUSED_ANOMALY, cancel resting quotes, and halt quoting.
+3. Renamed reports to reports/rehearsal_sunday_paper_report.md and reports/rehearsal_monday_universe_scan.md, prepending explicit REHEARSAL DRY RUN (PRE-FIX) notices.

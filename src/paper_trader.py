@@ -206,9 +206,16 @@ class ArcusLivePaperTrader:
             self._raw_file.write(json.dumps(row, separators=(",", ":")) + "\n")
 
     async def _on_bbo_update(self, msg: Dict[str, Any]) -> None:
-        """Handles incoming BBO WebSocket frame."""
+        """Handles incoming BBO WebSocket frame with strict market routing."""
         t_recv = now_ns()
-        market = msg.get("market") or self.markets[0]
+        market = (
+            msg.get("id")
+            or msg.get("market")
+            or (msg.get("contents", {}).get("marketDisplayName") if isinstance(msg.get("contents"), dict) else None)
+        )
+        if not market or market not in self.markets:
+            return
+
         self._persist_raw_ws("bbo", market, msg, t_recv)
 
         contents = msg.get("contents", {})
@@ -229,17 +236,28 @@ class ArcusLivePaperTrader:
         self.engine.on_event(event)
 
     async def _on_trades_update(self, msg: Dict[str, Any]) -> None:
-        """Handles incoming Trades WebSocket frame."""
+        """Handles incoming Trades WebSocket frame with strict per-trade market routing."""
         t_recv = now_ns()
-        market = msg.get("market") or self.markets[0]
-        self._persist_raw_ws("trades", market, msg, t_recv)
-
         contents = msg.get("contents")
         if not isinstance(contents, list) or not contents:
             return
 
+        # Persist raw frame with primary market or first trade's market
+        primary_mkt = msg.get("id") or msg.get("market") or (contents[0].get("marketDisplayName") if contents else None)
+        if primary_mkt and primary_mkt in self.markets:
+            self._persist_raw_ws("trades", primary_mkt, msg, t_recv)
+
         for trade_data in contents:
-            event = SimEvent(SimEventType.TRADE, t_recv, market, trade_data)
+            t_market = (
+                trade_data.get("marketDisplayName")
+                or trade_data.get("market")
+                or msg.get("id")
+                or msg.get("market")
+            )
+            if not t_market or t_market not in self.markets:
+                continue
+
+            event = SimEvent(SimEventType.TRADE, t_recv, t_market, trade_data)
             fills = self.engine.on_event(event)
             if fills:
                 self._record_fills(fills)

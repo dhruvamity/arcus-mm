@@ -564,6 +564,48 @@ class TestSimEngine(unittest.TestCase):
             self.assertIsNotNone(ask_order, f"[{mkt}] Ask order must not be None")
             self.assertEqual(ask_order.status, OrderStatus.RESTING, f"[{mkt}] Ask order must be RESTING")
 
+    def test_20_w06_pnl_rate_of_change_invariant(self):
+        """W-06: Verifies sanity invariant |PnL| <= max_capital * 0.50 per hour is enforced in SimEngine.
+
+        If PnL breaches 50% capital per hour, the engine must halt quoting and transition to PAUSED_ANOMALY.
+        """
+        strat = FixedSpreadStrategy(
+            market=self.market,
+            tick_size=0.01,
+            step_size=0.01,
+            spread_bps=10.0,
+            clip_notional=10.0,
+            min_notional=5.0,
+            min_order_size=0.01,
+        )
+        engine = SimEngine(
+            markets={self.market: {"tick_size": 0.01, "step_size": 0.01, "min_order_size": 0.01, "min_notional": 5.0}},
+            strategies={"strat": strat},
+            fill_models=[FillModelType.MODEL_B_MODERATE],
+            initial_capital=100.0,
+        )
+        ctx = engine.contexts["strat"]
+        t0 = 1_000_000_000
+
+        # Normal start: mid = 100.0
+        engine.on_event(SimEvent(SimEventType.BBO, t0, self.market, {"bid_price": 99.95, "ask_price": 100.05, "bid_size": 1.0, "ask_size": 1.0}))
+        engine.on_event(SimEvent(SimEventType.CLOCK_TICK, t0 + int(20e6), self.market, {}))
+        self.assertEqual(ctx.get_risk_state(self.market), RiskState.NORMAL)
+
+        # Inject an anomalous position/PnL jump (+60% on $100 capital in hour 1)
+        pnl_b = ctx.pnl_engines[FillModelType.MODEL_B_MODERATE]
+        pnl_b.record_fill(side="BUY", price=100.0, size=1.0, mid_at_fill=100.0, is_taker=False, ts_ns=t0 + int(30e6))
+
+        # Mid price shifts to 165.0 (unrealized PnL = +$65 > $50 limit for 1 hour)
+        t_jump = t0 + int(60e9)  # 60 seconds later (<1 hour)
+        engine.on_event(SimEvent(SimEventType.BBO, t_jump, self.market, {"bid_price": 164.95, "ask_price": 165.05, "bid_size": 1.0, "ask_size": 1.0}))
+        engine.on_event(SimEvent(SimEventType.CLOCK_TICK, t_jump + int(20e6), self.market, {}))
+
+        # Risk state must be PAUSED_ANOMALY and active quotes must be suppressed
+        self.assertEqual(ctx.get_risk_state(self.market), RiskState.PAUSED_ANOMALY, "Engine must transition to PAUSED_ANOMALY on PnL rate of change violation")
+        bid_order = ctx.active_bid.get(FillModelType.MODEL_B_MODERATE)
+        self.assertTrue(bid_order is None or bid_order.status != OrderStatus.RESTING, "Quotes must not rest when PAUSED_ANOMALY is triggered")
+
     def test_13_mutation_tests(self):
         """Test 13: Mutation tests (at least 16 mutations applied to the engine fail test suite)."""
         from scripts.mutation_check import (

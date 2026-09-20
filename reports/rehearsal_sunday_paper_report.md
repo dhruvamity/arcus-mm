@@ -1,4 +1,8 @@
-# Phase 15 — Primary Live Paper Trading & Replay Parity Report
+# Phase 15 — Rehearsal Live Paper Trading & Replay Parity Report [PRE-FIX]
+
+> [!WARNING]
+> **REHEARSAL DRY RUN (PRE-FIX) — NOT FOR STATISTICAL INFERENCE (W-06 / Rule 8)**  
+> This dry-run session ran on Sunday 2026-09-20 (11 seconds). The reported +$238.76 net PnL was an artifact of cross-market message misattribution in `src/paper_trader.py` (W-06: ETH-USD trades routed to BTC-USD). This artifact is preserved strictly for historical audit trail and is excluded from all tuning, inference, and validation.
 
 **Session ID:** `monday_paper_20260920_183928`  
 **Start UTC:** `2026-09-20T18:39:28.626381+00:00`  
