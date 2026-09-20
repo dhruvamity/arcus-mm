@@ -1,0 +1,22 @@
+=== COMMAND ===
+.venv/bin/python -m unittest tests.test_sim_engine.TestSimEngine.test_21_w07_fill_model_deduplication
+
+=== EXIT CODE ===
+1
+
+=== OUTPUT ===
+E
+======================================================================
+ERROR: test_21_w07_fill_model_deduplication (tests.test_sim_engine.TestSimEngine.test_21_w07_fill_model_deduplication)
+W-07: Verifies unique physical matches against book events are deduplicated across fill models.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/dhruv/Desktop/CodeWithD/arcus-mm/tests/test_sim_engine.py", line 641, in test_21_w07_fill_model_deduplication
+    self.assertEqual(ctx.unique_physical_matches_count, 1, "Unique physical match count must be 1, not 3x inflated")
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'StrategyInstanceContext' object has no attribute 'unique_physical_matches_count'
+
+----------------------------------------------------------------------
+Ran 1 test in 0.002s
+
+FAILED (errors=1)

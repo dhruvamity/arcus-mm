@@ -22,7 +22,7 @@ import hashlib
 import json
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Union
+from typing import Dict, List, Optional, Any, Union, Set
 
 from src.config import ArcusConfig, settings
 from src.ws_client import ArcusWsClient
@@ -106,6 +106,7 @@ class ArcusLivePaperTrader:
         self._telemetry_task: Optional[asyncio.Task] = None
         self.session_start_utc: Optional[str] = None
         self.session_fills_count = 0
+        self.session_unique_matches: Set[str] = set()
 
     async def initialize_engine(self) -> None:
         """Dynamically loads live venue specs from REST /v1/markets and initializes SimEngine."""
@@ -263,8 +264,11 @@ class ArcusLivePaperTrader:
                 self._record_fills(fills)
 
     def _record_fills(self, fills: List[Dict[str, Any]]) -> None:
-        """Logs simulated fills to disk."""
+        """Logs simulated fills to disk and tracks physical match deduplication."""
         self.session_fills_count += len(fills)
+        for f in fills:
+            match_key = f"{f.get('market')}:{f.get('strategy_id')}:{f.get('ts_ns')}:{f.get('side')}:{f.get('price')}"
+            self.session_unique_matches.add(match_key)
         if self._fills_file:
             for f in fills:
                 self._fills_file.write(json.dumps(f, separators=(",", ":")) + "\n")
@@ -420,6 +424,7 @@ class ArcusLivePaperTrader:
             "session_end_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             "markets": self.markets,
             "total_fills_logged": self.session_fills_count,
+            "unique_physical_matches": len(self.session_unique_matches),
             "engine_fill_hash": self.engine.get_fill_log_hash() if self.engine else None,
             "strategies": {},
         }

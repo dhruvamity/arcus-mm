@@ -606,6 +606,47 @@ class TestSimEngine(unittest.TestCase):
         bid_order = ctx.active_bid.get(FillModelType.MODEL_B_MODERATE)
         self.assertTrue(bid_order is None or bid_order.status != OrderStatus.RESTING, "Quotes must not rest when PAUSED_ANOMALY is triggered")
 
+    def test_21_w07_fill_model_deduplication(self):
+        """W-07: Verifies unique physical matches against book events are deduplicated across fill models."""
+        strat = FixedSpreadStrategy(
+            market=self.market,
+            tick_size=0.01,
+            step_size=0.01,
+            spread_bps=10.0,
+            clip_notional=10.0,
+            min_notional=5.0,
+            min_order_size=0.01,
+        )
+        engine = SimEngine(
+            markets={self.market: {"tick_size": 0.01, "step_size": 0.01, "min_order_size": 0.01, "min_notional": 5.0}},
+            strategies={"strat": strat},
+            fill_models=[FillModelType.MODEL_A_OPTIMISTIC, FillModelType.MODEL_B_MODERATE, FillModelType.MODEL_C_CONSERVATIVE],
+            latency_config=LatencyConfig(order_entry_latency_ms=10.0, cancel_latency_ms=10.0),
+        )
+        ctx = engine.contexts["strat"]
+        t0 = 1_000_000_000
+
+        # Quoting at mid 100.0 (bid 99.95, ask 100.05)
+        engine.on_event(SimEvent(SimEventType.BBO, t0, self.market, {"bid_price": 99.95, "ask_price": 100.05, "bid_size": 1.0, "ask_size": 1.0}))
+        # Advance clock to activate resting orders
+        engine.on_event(SimEvent(SimEventType.CLOCK_TICK, t0 + int(20e6), self.market, {}))
+
+        # Single trade crossing bid (side SELL, price 99.90, size 1.0)
+        t_trade = t0 + int(30e6)
+        fills = engine.on_event(SimEvent(SimEventType.TRADE, t_trade, self.market, {"side": "SELL", "price": 99.90, "size": 1.0}))
+
+        # Must generate 3 raw model fills (one per fill model)
+        self.assertEqual(len(fills), 3, "Raw fills list must contain 1 fill per active model")
+        # BUT unique physical matches count must be strictly 1
+        self.assertEqual(ctx.unique_physical_matches_count, 1, "Unique physical match count must be 1, not 3x inflated")
+        self.assertEqual(engine.get_total_unique_physical_matches(), 1, "Engine unique physical match count must be 1")
+
+        # Each fill record must contain observation_key and quote_hash
+        for f in fills:
+            self.assertIn("observation_key", f)
+            self.assertIn("quote_hash", f)
+            self.assertTrue(f["observation_key"].startswith(f"{self.market}:strat:{f['fill_model']}:"))
+
     def test_13_mutation_tests(self):
         """Test 13: Mutation tests (at least 16 mutations applied to the engine fail test suite)."""
         from scripts.mutation_check import (

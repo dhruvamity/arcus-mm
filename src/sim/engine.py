@@ -20,7 +20,7 @@ from enum import Enum
 import hashlib
 import logging
 import random
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Set
 import pandas as pd
 
 from src.models.fill import FillModelType, OrderStatus
@@ -184,9 +184,14 @@ class StrategyInstanceContext:
         # In-flight scheduled actions
         self.in_flight_orders: List[SimulatedOrder] = []
         self.fill_records: List[Dict[str, Any]] = []
+        self.unique_physical_matches: Set[str] = set()
         self.order_counter: int = 0
         self.post_only_rejections_count: int = 0
         self.rate_limited_actions_count: int = 0
+
+    @property
+    def unique_physical_matches_count(self) -> int:
+        return len(self.unique_physical_matches)
 
     @property
     def risk_state(self) -> RiskState:
@@ -538,6 +543,11 @@ class SimEngine:
                                 bid_order.status = OrderStatus.FILLED
                                 ctx.active_bid[fm] = None
 
+                            quote_hash = hashlib.sha256(f"{bid_order.market}:{bid_order.side}:{bid_order.price:.5f}:{bid_order.created_ts_ns}:{bid_order.order_id}".encode()).hexdigest()[:16]
+                            obs_key = f"{venue.market}:{ctx.strategy_id}:{fm.value}:{quote_hash}"
+                            match_key = f"{venue.market}:{ctx.strategy_id}:{ts_ns}:{trade_side}:{trade_p}:{trade_s}"
+                            ctx.unique_physical_matches.add(match_key)
+
                             fill_rec = {
                                 "strategy_id": ctx.strategy_id,
                                 "fill_model": fm.value,
@@ -549,6 +559,8 @@ class SimEngine:
                                 "fee": fee,
                                 "ts_ns": ts_ns,
                                 "was_in_flight_cancel": was_in_flight,
+                                "quote_hash": quote_hash,
+                                "observation_key": obs_key,
                             }
                             fills_generated.append(fill_rec)
                             ctx.fill_records.append(fill_rec)
@@ -567,6 +579,11 @@ class SimEngine:
                                 ask_order.status = OrderStatus.FILLED
                                 ctx.active_ask[fm] = None
 
+                            quote_hash = hashlib.sha256(f"{ask_order.market}:{ask_order.side}:{ask_order.price:.5f}:{ask_order.created_ts_ns}:{ask_order.order_id}".encode()).hexdigest()[:16]
+                            obs_key = f"{venue.market}:{ctx.strategy_id}:{fm.value}:{quote_hash}"
+                            match_key = f"{venue.market}:{ctx.strategy_id}:{ts_ns}:{trade_side}:{trade_p}:{trade_s}"
+                            ctx.unique_physical_matches.add(match_key)
+
                             fill_rec = {
                                 "strategy_id": ctx.strategy_id,
                                 "fill_model": fm.value,
@@ -578,6 +595,8 @@ class SimEngine:
                                 "fee": fee,
                                 "ts_ns": ts_ns,
                                 "was_in_flight_cancel": was_in_flight,
+                                "quote_hash": quote_hash,
+                                "observation_key": obs_key,
                             }
                             fills_generated.append(fill_rec)
                             ctx.fill_records.append(fill_rec)
@@ -941,6 +960,10 @@ class SimEngine:
 
     def get_fill_log_hash(self) -> str:
         return self.fill_log_hasher.hexdigest()
+
+    def get_total_unique_physical_matches(self) -> int:
+        """Returns total unique physical trade events matched across all strategies (W-07 deduplication)."""
+        return sum(ctx.unique_physical_matches_count for ctx in self.contexts.values())
 
 
 class BacktestRunResult:

@@ -488,7 +488,7 @@
     "remediation_status": "FIXED",
     "evidence_file": "evidence/2026-09-20/W-06_pnl_invariant_post_fix_pass.txt",
     "test_file": "tests/test_sim_engine.py",
-    "commit_hash": "HEAD",
+    "commit_hash": "49af762",
     "notes": "Root-caused +$238.76 anomaly to cross-market WebSocket misattribution in src/paper_trader.py; enforced |PnL| <= initial_capital * 0.50 per hour sanity invariant and PAUSED_ANOMALY state in src/sim/engine.py; renamed reports to reports/rehearsal_*.md per Mandate v5 §1."
   },
   {
@@ -497,11 +497,11 @@
     "category": "METHODOLOGY",
     "summary": "Fill counts inflated by duplicate strategy instances (c50 and c100 produce identical executions)",
     "reproduction_status": "CONFIRMED",
-    "remediation_status": "OPEN",
-    "evidence_file": "",
+    "remediation_status": "FIXED",
+    "evidence_file": "evidence/2026-09-20/W-07_fill_dedup_post_fix_pass.txt",
     "test_file": "tests/test_sim_engine.py",
-    "commit_hash": "-",
-    "notes": "c50 and c100 duplicate quotes on min-clip assets. Unique observation key required for fill counting."
+    "commit_hash": "HEAD",
+    "notes": "Implemented canonical fill observation key (market, strategy, fill_model, quote_hash), added unique physical match tracking to SimEngine and PaperTrader, and added fill-model deduplication check to scripts/verify_report.py."
   },
   {
     "id": "W-08",

@@ -297,6 +297,11 @@ def verify_report(file_path: Path) -> Tuple[bool, List[str]]:
                 errors.append(
                     f"Report cites latency p50 of {cited_p50:.2f} ms which disagrees with canonical latency/latency_summary.json ({canonical_p50:.2f} ms)"
                 )
+    # Check fill-model deduplication disambiguation (W-07)
+    if "Total Simulated Fills:" in content and "Unique Physical Match" not in content and not is_superseded and "rehearsal" not in str(file_path):
+        errors.append(
+            "Report states 'Total Simulated Fills' without distinguishing unique physical match events (W-07)."
+        )
 
     is_valid = len(errors) == 0
     return is_valid, errors

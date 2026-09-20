@@ -1,6 +1,6 @@
 # Master Audit Ledger — Ground Truth & Defect Remediation
 
-**Generated At:** `2026-09-20 19:46:39 UTC`  
+**Generated At:** `2026-09-20 19:49:55 UTC`  
 **Evaluation Scope:** All Findings (V-01 through V-35, W-01 through W-14) from Mandates v3, v4, and v5  
 **Commit Discrepancy Note:** Prior reports referenced commit hash `23a03f3` which does not exist on the remote GitHub repository. This occurred because the initial repository setup was committed and pushed via a squashed root commit (`0905008`), obliterating local scratch commit IDs. From this point forward, strict verifiable linear Git history is maintained with one commit per defect/milestone.  
 
@@ -50,8 +50,8 @@
 | **W-03** | `MAJOR` | STRATEGY | Adaptive (OFI/microprice) strategy never receives microprice/OFI signal from engine | **CONFIRMED** | **OPEN** | - | [`tests/test_sim_engine.py`](tests/test_sim_engine.py) | - |
 | **W-04** | `MAJOR` | ECONOMICS | A +0.75 bps maker rebate assumed across pilot, prereg, and verify_report does not exist at base tier | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/W-04_maker_rebate_post_fix_pass.txt`](evidence/2026-09-20/W-04_maker_rebate_post_fix_pass.txt) | [`tests/test_pnl_accounting.py`](tests/test_pnl_accounting.py) | `7337fdb` |
 | **W-05** | `MAJOR` | ENGINE | Two items marked FIXED are not implemented in code (cross-margin/liquidation and 50ms speed bump) | **CONFIRMED** | **OPEN** | - | [`tests/test_sim_engine.py`](tests/test_sim_engine.py) | - |
-| **W-06** | `MAJOR` | REPORTING | Sunday rehearsal artifacts mislabeled as Monday and contain an impossible +$238.76 PnL | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/W-06_pnl_invariant_post_fix_pass.txt`](evidence/2026-09-20/W-06_pnl_invariant_post_fix_pass.txt) | [`tests/test_sim_engine.py`](tests/test_sim_engine.py) | `HEAD` |
-| **W-07** | `MAJOR` | METHODOLOGY | Fill counts inflated by duplicate strategy instances (c50 and c100 produce identical executions) | **CONFIRMED** | **OPEN** | - | [`tests/test_sim_engine.py`](tests/test_sim_engine.py) | - |
+| **W-06** | `MAJOR` | REPORTING | Sunday rehearsal artifacts mislabeled as Monday and contain an impossible +$238.76 PnL | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/W-06_pnl_invariant_post_fix_pass.txt`](evidence/2026-09-20/W-06_pnl_invariant_post_fix_pass.txt) | [`tests/test_sim_engine.py`](tests/test_sim_engine.py) | `49af762` |
+| **W-07** | `MAJOR` | METHODOLOGY | Fill counts inflated by duplicate strategy instances (c50 and c100 produce identical executions) | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/W-07_fill_dedup_post_fix_pass.txt`](evidence/2026-09-20/W-07_fill_dedup_post_fix_pass.txt) | [`tests/test_sim_engine.py`](tests/test_sim_engine.py) | `HEAD` |
 | **W-08** | `MAJOR` | LATENCY | Latency evidence is inconsistent and sourced from REST time pings rather than order round trips | **CONFIRMED** | **OPEN** | - | [`tests/test_harness_integrity.py`](tests/test_harness_integrity.py) | - |
 | **W-09** | `MINOR` | ENGINE | Model C definition discrepancy between spec (trade through by >=1 tick) and code (< price - 1e-6) | **CONFIRMED** | **OPEN** | - | [`tests/test_sim_engine.py`](tests/test_sim_engine.py) | - |
 | **W-10** | `MINOR` | BOOKKEEPING | Ledger count discrepancy between reports/status.md (34) and research/audit_status.json (35) | **CONFIRMED** | **OPEN** | - | [`scripts/generate_status_report.py`](scripts/generate_status_report.py) | - |
@@ -75,7 +75,7 @@ All referenced evidence and test suites are machine-validated to exist on disk:
 - **Total Findings Audited:** 49
 - **Confirmed Defects:** 49
 - **Refuted Defects:** 0
-- **Remediated (FIXED):** 37
+- **Remediated (FIXED):** 38
 - **In Progress:** 0
-- **Open:** 12
+- **Open:** 11
 
