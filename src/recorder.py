@@ -122,6 +122,17 @@ class ArcusStreamRecorder:
         return f"{date_str}/{market}/{channel}"
 
     def _get_or_open_file(self, file_key: str):
+        # Close file handles from prior dates to avoid leaking file descriptors
+        current_date = file_key.split("/")[0]
+        stale_keys = [k for k in list(self._file_handles.keys()) if not k.startswith(f"{current_date}/")]
+        for sk in stale_keys:
+            try:
+                self._file_handles[sk].flush()
+                self._file_handles[sk].close()
+            except Exception:
+                pass
+            del self._file_handles[sk]
+
         if file_key in self._file_handles:
             return self._file_handles[file_key]
 

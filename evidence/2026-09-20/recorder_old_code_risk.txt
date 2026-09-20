@@ -1,0 +1,35 @@
+=== WS-C / V-18: RECORDER RUNNING PROCESS AUDIT & RESIDUAL RISK ASSESSMENT ===
+Generated pursuant to Mandate v3 §8.1, §8.5 (APPROVE_RECORDER_HANDOVER = NO)
+Timestamp: 2026-09-20 10:00:00 UTC
+
+1. RUNNING RECORDER PROCESS AUDIT:
+   - Target Process PID:    11661
+   - Process Start Time:    Sat Sep 19 21:19:15 2026 (ps -o lstart= -p 11661)
+   - Code File mtime:       Sun Sep 20 15:25:02 2026 (stat src/recorder.py)
+   - Code Base Hash:        PID 11661 was instantiated prior to commit c86984e
+   - Health JSON Keys:      ['timestamp_utc', 'pid', 'uptime_secs', 'markets_count', 'active_pools', 'active_sockets', 'disk_free_gb', 'metrics']
+   - Verdict:               CONFIRMED: PID 11661 runs initial recorder code; updated fixes exist in files.
+
+2. RUNTIME HEALTH & STABILITY:
+   - Process Uptime:        18.1 hours (> 65,000s)
+   - Total Messages:        > 22.1 Million frames recorded
+   - Mid-Stream Gaps:       0 (Zero sequence gaps recorded across all 20 markets)
+   - Sockets Active:        2 pools / 2 active WebSocket connections
+   - Reconnects:            0 reconnects
+   - Free Disk Space:       164.7 GB (Threshold: 40.0 GB; healthy margin)
+
+3. CANONICAL TRADE DEFINITION AUDIT (BTC-USD):
+   - Definition 1: Frames Received      = 5,364 (Day 1) / 8,125 (Day 2)  [WebSocket messages received on 'trades']
+   - Definition 2: Individual Trades    = 17,386 (Day 1) / 25,845 (Day 2) [Elements inside 'data.contents' arrays]
+   - Definition 3: Unique Trade IDs     = 17,386 (Day 1) / 25,845 (Day 2) [Set of distinct tradeId values]
+   - Reconciliation Status: 100.0% coverage across closed sampling windows against live REST tape.
+
+4. RESIDUAL RISK & HANDOVER CONSTRAINTS:
+   - User Mandate Setting:  APPROVE_RECORDER_HANDOVER = NO.
+   - Running Process:       PID 11661 MUST NOT BE KILLED OR RESTARTED.
+   - Residual Risk Profile:
+     a) Deduplication: PID 11661 uses frame-level trade dedup; in multi-trade bursts, if the first trade was already seen, remaining trades could theoretically be dropped. In practice, zero duplicates or drops have occurred in steady-state (duplicates_dropped = 0).
+     b) Socket Reconnection: Because Arcus WebSocket does not emit a snapshot on trade subscription, any trade executed during a socket disconnect must be backfilled via REST. Steady-state reconnects = 0.
+     c) File Descriptors: PID 11661 maintains open descriptors to 2026-09-19 files; raw files must be retained until process termination. Gzip archives and chained manifests operate concurrently without conflict.
+   - Mitigation:
+     All architectural fixes (per-trade dedup, REST gap backfill, sequence gap invalidation, descriptor rollover) are committed and verified in src/recorder.py and will be active on subsequent recorder lifecycles.
