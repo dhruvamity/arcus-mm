@@ -13,17 +13,12 @@ Halt testnet order placement with a single line and write conformance report wit
 
 import argparse
 import datetime
-import json
 import logging
 import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
-
-from src.config import settings
-from src.exec.live_engine import LiveExecutionEngine, MAINNET_CONFIRMATION_PHRASE
-from src.strategies.fixed_spread import FixedSpreadStrategy
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("testnet_conformance")

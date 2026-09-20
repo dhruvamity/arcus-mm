@@ -22,17 +22,14 @@ Features:
   Stale feed watchdog, crossed-book detection, and cancel-all on shutdown.
 """
 
-import asyncio
-import hashlib
-import json
 import logging
 import os
 import time
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, Optional, Any, Tuple
 
 from src.config import ArcusConfig, settings
 from src.venue import get_market_spec
-from src.utils import snap_to_tick, snap_to_step, now_ns
+from src.utils import snap_to_tick, snap_to_step
 from src.strategies.base import BaseMarketMakingStrategy, Quote
 from src.rest_client import ArcusRestClient
 from src.ws_client import ArcusWsClient
