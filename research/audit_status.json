@@ -560,7 +560,7 @@
     "remediation_status": "FIXED",
     "evidence_file": "evidence/2026-09-20/W-12_clean_clone_post_fix_pass.txt",
     "test_file": "tests/test_storage_manager.py",
-    "commit_hash": "PENDING_COMMIT",
+    "commit_hash": "643d9d9",
     "notes": "data_manifest.py ensures target directory exists; test_storage_manager uses hermetic temp directories; venue.py adds fallback fixture for clean clones; MUT-21 verified."
   },
   {
