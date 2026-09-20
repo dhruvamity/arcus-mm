@@ -1,6 +1,6 @@
 COMMAND: bash scripts/ci.sh 
-GIT_HEAD: ab55a3f244d6c59aa29025a0c33ef461f4a51e20
-TIMESTAMP: 2026-09-20T09:20:15Z
+GIT_HEAD: 3c76152484af4271b9cc86033c6254f67a5bf724
+TIMESTAMP: 2026-09-20T20:35:00Z
 PYTHON_VERSION: Python 3.12.14
 EXIT_CODE: 0
 --- OUTPUT ---
@@ -12,34 +12,130 @@ Running pyflakes...
 Running offline unit tests...
 sss......[SOL-USD] Mid-stream sequence gap: expected 104, got 105
 ............[BTC-USD] Mid-stream sequence gap: expected 107, got 110
-............................../opt/homebrew/Cellar/python@3.12/3.12.14/Frameworks/Python.framework/Versions/3.12/lib/python3.12/json/decoder.py:354: ResourceWarning: unclosed <socket.socket fd=11, family=30, type=1, proto=6, laddr=('2405:201:48:400f:cd89:2261:c54a:1ac6', 63246, 0, 0), raddr=('2606:4700:9ae3:7e86:543:0:4c44:e037', 443, 0, 0)>
-  obj, end = self.scan_once(s, idx)
-ResourceWarning: Enable tracemalloc to get the object allocation traceback
-/opt/homebrew/Cellar/python@3.12/3.12.14/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/selector_events.py:879: ResourceWarning: unclosed transport <_SelectorSocketTransport fd=11>
-  _warn(f"unclosed transport {self!r}", ResourceWarning, source=self)
-ResourceWarning: Enable tracemalloc to get the object allocation traceback
-.................[BTC-USD] Sequence gap in l2OrderbookUpdates: expected 106, got 110. Marking book INVALID and emitting INVALID_BOOK_INTERVAL.
+................................[BTC-USD] Refusing configuration: non-positive spread (-1.0 bps) would self-cross.
+[BTC-USD] Self-cross protection: target bid 80005.0 >= target ask 80000.0. Refusing to quote.
+.Feed watchdog triggered: Stale or uninitialized BBO. Pausing quoting.
+.......................[BTC-USD] Sequence gap in l2OrderbookUpdates: expected 106, got 110. Marking book INVALID and emitting INVALID_BOOK_INTERVAL.
 ..[BTC-USD] Sequence gap in l2OrderbookUpdates: expected 106, got 110. Marking book INVALID and emitting INVALID_BOOK_INTERVAL.
-...................................WATCHDOG TRIGGERED: Heartbeat expired: 0.09s elapsed (limit: 0.05s). Executing emergency cleanup!
+..................[BTC-USD] PnL sanity invariant breached on strat (|PnL| > $25.00 in 1.00h). Transitioning to PAUSED_ANOMALY.
+...[BTC-USD] Delta received while orderbook is not synchronized
+.....[BTC-USD] PnL sanity invariant breached on strat (|PnL| > $50.00 in 1.00h). Transitioning to PAUSED_ANOMALY.
+.....[BTC-USD] LIQUIDATION TRIGGERED on strat (MODEL_B_MODERATE): Equity $-5.00 <= MaintMargin $4.50. Forced flatten SELL 2.0 @ 74.8000
+............................WATCHDOG TRIGGERED: Heartbeat expired: 0.09s elapsed (limit: 0.05s). Executing emergency cleanup!
 ......
 ----------------------------------------------------------------------
-Ran 111 tests in 1.969s
+Ran 144 tests in 1.257s
 
 OK (skipped=3)
+Generated status report: /var/folders/33/6hb_7rkd3v74jmphkh8b96480000gn/T/tmpdu0re5kp/status.md
+Hashing 1 files for date 2026-09-18 (chain parent: 0000000000000000...)...
+Generated chained manifest: /var/folders/33/6hb_7rkd3v74jmphkh8b96480000gn/T/tmpb3w3n7_l/data/MANIFEST_2026-09-18.sha256 (1 files, digest c1e800557e9b1607...)
+Hashing 1 files for date 2026-09-19 (chain parent: 0000000000000000...)...
+Generated chained manifest: /var/folders/33/6hb_7rkd3v74jmphkh8b96480000gn/T/tmpnsl2o9ha/fresh_clone_repo/data/MANIFEST_2026-09-19.sha256 (1 files, digest f143746907f8562e...)
 
 --- Testing with Python 3.14.5 ---
 Running pyflakes...
 Running offline unit tests...
 sss......[SOL-USD] Mid-stream sequence gap: expected 104, got 105
 ............[BTC-USD] Mid-stream sequence gap: expected 107, got 110
-...............................................[BTC-USD] Sequence gap in l2OrderbookUpdates: expected 106, got 110. Marking book INVALID and emitting INVALID_BOOK_INTERVAL.
+................................[BTC-USD] Refusing configuration: non-positive spread (-1.0 bps) would self-cross.
+[BTC-USD] Self-cross protection: target bid 80005.0 >= target ask 80000.0. Refusing to quote.
+.Feed watchdog triggered: Stale or uninitialized BBO. Pausing quoting.
+.......................[BTC-USD] Sequence gap in l2OrderbookUpdates: expected 106, got 110. Marking book INVALID and emitting INVALID_BOOK_INTERVAL.
 ..[BTC-USD] Sequence gap in l2OrderbookUpdates: expected 106, got 110. Marking book INVALID and emitting INVALID_BOOK_INTERVAL.
-...................................WATCHDOG TRIGGERED: Heartbeat expired: 0.09s elapsed (limit: 0.05s). Executing emergency cleanup!
-......
+..................[BTC-USD] PnL sanity invariant breached on strat (|PnL| > $25.00 in 1.00h). Transitioning to PAUSED_ANOMALY.
+...[BTC-USD] Delta received while orderbook is not synchronized
+.....[BTC-USD] PnL sanity invariant breached on strat (|PnL| > $50.00 in 1.00h). Transitioning to PAUSED_ANOMALY.
+.....[BTC-USD] LIQUIDATION TRIGGERED on strat (MODEL_B_MODERATE): Equity $-5.00 <= MaintMargin $4.50. Forced flatten SELL 2.0 @ 74.8000
+............................WATCHDOG TRIGGERED: Heartbeat expired: 0.08s elapsed (limit: 0.05s). Executing emergency cleanup!
+./Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/site-packages/pydantic_settings/main.py:503: ResourceWarning: unclosed <socket.socket fd=11, family=30, type=1, proto=6, laddr=('2606:4700:110:8a84:3be:dd0d:ff0d:7f46', 63236, 0, 0), raddr=('2606:4700::6812:c16', 443, 0, 0)>
+  matchable_names = set(alias_names)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/asyncio/selector_events.py:873: ResourceWarning: unclosed transport <_SelectorSocketTransport fd=11>
+  _warn(f"unclosed transport {self!r}", ResourceWarning, source=self)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/site-packages/pydantic_settings/main.py:503: ResourceWarning: unclosed <socket.socket fd=12, family=30, type=1, proto=6, laddr=('2606:4700:110:8a84:3be:dd0d:ff0d:7f46', 63237, 0, 0), raddr=('2606:4700::6812:c16', 443, 0, 0)>
+  matchable_names = set(alias_names)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/asyncio/selector_events.py:873: ResourceWarning: unclosed transport <_SelectorSocketTransport fd=12>
+  _warn(f"unclosed transport {self!r}", ResourceWarning, source=self)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+.....
 ----------------------------------------------------------------------
-Ran 111 tests in 2.833s
+Ran 144 tests in 1.315s
 
 OK (skipped=3)
+Generated status report: /var/folders/33/6hb_7rkd3v74jmphkh8b96480000gn/T/tmp0lbdwadg/status.md
+Hashing 1 files for date 2026-09-18 (chain parent: 0000000000000000...)...
+Generated chained manifest: /var/folders/33/6hb_7rkd3v74jmphkh8b96480000gn/T/tmpzlagyfha/data/MANIFEST_2026-09-18.sha256 (1 files, digest c1e800557e9b1607...)
+Hashing 1 files for date 2026-09-19 (chain parent: 0000000000000000...)...
+Generated chained manifest: /var/folders/33/6hb_7rkd3v74jmphkh8b96480000gn/T/tmpuk1iw4tb/fresh_clone_repo/data/MANIFEST_2026-09-19.sha256 (1 files, digest f143746907f8562e...)
+
+--- Running mutation verification suite ---
+[BTC-USD] PnL sanity invariant breached on strat (|PnL| > $25.00 in 1.00h). Transitioning to PAUSED_ANOMALY.
+================================================================================
+ARCUS SIMENGINE MUTATION VERIFICATION SUITE
+Applying 27 deliberate architectural mutations to verify test sensitivity...
+================================================================================
+[MUT-01] Invert Queue Priority            | CAUGHT (PASS)  | Target: TestSimEngine.test_5_queue_fifo_depletion
+        Failure Reason: AssertionError: 0.0 != 0.5 within 5 places (0.5 difference)
+[MUT-02] Lookahead Bias                   | CAUGHT (PASS)  | Target: TestSimEngine.test_8_no_lookahead
+        Failure Reason: AssertionError: 3 != 0 : Trade before order arrival must not fill order
+[MUT-03] Zero Cancel Latency              | CAUGHT (PASS)  | Target: TestSimEngine.test_3_cancel_latency_pickoff
+        Failure Reason: AssertionError: False is not true : In-flight cancel must be filled by aggressive trade
+[MUT-04] Funding Sign Flip                | CAUGHT (PASS)  | Target: TestSimEngine.test_7_funding_hourly_boundaries
+        Failure Reason: AssertionError: 0.01 != -0.01 within 5 places (0.02 difference)
+[MUT-05] Trade Side Semantics Inversion   | CAUGHT (PASS)  | Target: TestSimEngine.test_1_scripted_scenario_hand_computed_expectations
+        Failure Reason: AssertionError: 0 != 1 : Model A must fill on touch
+[MUT-06] Bypass Minimum Size              | CAUGHT (PASS)  | Target: TestSimEngine.test_6_quantization_and_min_size
+        Failure Reason: AssertionError: 2 != 0 : Sub-minimum notional quote must not be placed
+[MUT-07] Bypass Post-Only Crossing        | CAUGHT (PASS)  | Target: TestSimEngine.test_4_post_only_would_cross
+        Failure Reason: AssertionError: <OrderStatus.RESTING: 'RESTING'> != <OrderStatus.REJECTED: 'REJECTED'>
+[MUT-08] Disable Stale Watchdog           | CAUGHT (PASS)  | Target: TestSimEngine.test_10_kill_switches
+        Failure Reason: AssertionError: <RiskState.NORMAL: 'NORMAL'> != <RiskState.PAUSED_STALE_FEED: 'PAUSED_STALE_FEED'>
+[MUT-09] Fee Sign Flip                    | CAUGHT (PASS)  | Target: TestPnLAccounting.test_fee_separation_maker_vs_taker
+        Failure Reason: AssertionError: -0.0225 != 0.0225 within 6 places (0.045 difference)
+[MUT-10] Clamp Markout Horizons           | CAUGHT (PASS)  | Target: TestHarnessIntegrity.test_markout_horizons_random_walk
+        Failure Reason: AssertionError: 0.0 == 0.0
+[MUT-11] Charge Funding Per Message       | CAUGHT (PASS)  | Target: TestSimEngine.test_15_funding_predicted_vs_settlement_regression
+        Failure Reason: AssertionError: -0.6000000000000003 != 0.0 : Streaming predictedFunding messages must not debit funding PnL
+[MUT-12] Zero Queue Behind Touch          | CAUGHT (PASS)  | Target: TestSimEngine.test_14_l2_snapshot_delta_queue_depth
+        Failure Reason: AssertionError: 0.0 != 5.0 within 4 places (5.0 difference)
+[MUT-13] Never Recover From Pause         | CAUGHT (PASS)  | Target: TestSimEngine.test_16_risk_state_recovery_mechanisms
+        Failure Reason: AssertionError: <RiskState.PAUSED_STALE_FEED: 'PAUSED_STALE_FEED'> != <RiskState.NORMAL: 'NORMAL'>
+[MUT-14] Drop Stale Feed Watchdog         | CAUGHT (PASS)  | Target: TestSimEngine.test_10_kill_switches
+        Failure Reason: AssertionError: <RiskState.NORMAL: 'NORMAL'> != <RiskState.PAUSED_STALE_FEED: 'PAUSED_STALE_FEED'>
+[MUT-15] Ignore Rate Limit Denials        | CAUGHT (PASS)  | Target: TestSimEngine.test_18_subaccount_rate_limit_denial_and_drip
+        Failure Reason: AssertionError: 0 not greater than 0
+[MUT-16] Recv Time Order Fill (Lookahead) | CAUGHT (PASS)  | Target: TestSimEngine.test_8_no_lookahead
+        Failure Reason: AssertionError: 3 != 0 : Trade before order arrival must not fill order
+[MUT-17] C-World Shares Inventory         | CAUGHT (PASS)  | Target: TestSimEngine.test_17_independent_fill_worlds_quoting
+        Failure Reason: AssertionError: 0.1 != 0.0
+[MUT-18] Mid-Based Min-Clip Check         | CAUGHT (PASS)  | Target: TestSimEngine.test_19_w01_min_size_bids_not_rejected_on_min_clip_markets
+        Failure Reason: AssertionError: unexpectedly None : [BTC-USD] Bid order must not be None
+[MUT-19] Drop OFI/Microprice Signal       | CAUGHT (PASS)  | Target: TestSimEngine.test_22_w03_microprice_ofi_signal_wired_to_quotes
+        Failure Reason: AssertionError: 99.9 not greater than 99.9 : Bid price must shift upwards under positive microprice imbalance (was 99.9, got 99.9)
+[MUT-20] Model C Sub-Tick Fills           | CAUGHT (PASS)  | Target: TestSimEngine.test_23_w09_model_c_trade_strictly_through_by_tick
+        Failure Reason: AssertionError: 1 != 0 : Model C must NOT fill when trade does not clear resting quote by at least 1 full tick (99.85 vs 99.9 - 0.1 = 99.8)
+[MUT-21] Manifest Missing Target Dir      | CAUGHT (PASS)  | Target: TestStorageManager.test_w12_hermetic_manifest_generation_on_fresh_clone
+        Failure Reason: FileNotFoundError: [Errno 2] No such file or directory: '/var/folders/33/6hb_7rkd3v74jmphkh8b96480000gn/T/tmp59c2bu8z/fresh_clone_repo/data/MANIFEST_2026-09-19.sha256'
+[MUT-22] Uncalibrated Latency Sensitivity Grid | CAUGHT (PASS)  | Target: TestSimEngine.test_24_w08_latency_calibration_and_canonical_grid
+        Failure Reason: + [25.0, 60.0, 150.0, 300.0, 700.0] : Pre-declared sensitivity grid must strictly be [25.0, 60.0, 150.0, 300.0, 700.0]
+[MUT-23] Bypass Maintenance Margin Liquidation | CAUGHT (PASS)  | Target: TestSimEngine.test_25_w05_margin_liquidation_and_speed_bump
+        Failure Reason: AssertionError: <RiskState.PAUSED_ANOMALY: 'PAUSED_ANOMALY'> != <RiskState.FLATTENED_LIQUIDATION: 'FLATTENED_LIQUIDATION'> : Strategy must transition to FLATTENED_LIQUIDATION when equity <= maintenance margin
+[MUT-24] Tautological Metric Regression   | CAUGHT (PASS)  | Target: TestWalkForwardProtocol.test_w02_day_level_paired_t_test_and_bootstrap
+        Failure Reason: AssertionError: 5.5 != 5.319 within 3 places (0.18100000000000005 difference)
+Generated status report: /var/folders/33/6hb_7rkd3v74jmphkh8b96480000gn/T/tmpb44x3k90/status.md
+[MUT-25] Hardcoded Ledger Counts          | CAUGHT (PASS)  | Target: TestReportProvenance.test_w10_w14_status_report_ledger_counts_and_hygiene_advisory
+        Failure Reason: AssertionError: '| **Defect Ledger** | Total Findings | 49 |' not found in '# Arcus MM — Active System & Verification Status\n\n**Generated At:** `2026-09-20T20:35:06Z`  \n**Git Commit:** `3c76152`  \n**Headline Status:** `INCONCLUSIVE — no strategy validated`  \n\n## 1. Governance & Operating Constraints\n\n| Parameter | Configuration | Status / Notes |\n|---|---|---|\n| `APPROVE_MAINNET_ORDERS` | `NO` | Strictly zero mainnet order placement |\n| `APPROVE_TESTNET_FAUCET_FUNDING` | `NO` | No testnet faucet funding or order actions |\n| `APPROVE_RECORDER_HANDOVER` | `NO` | Continuous PID 11661 tape audit without termination |\n| `APPROVE_REPO_CLEANUP` | `YES` | All ~70 stale / invalid reports and scripts deleted |\n\n## 2. Gate Status & Defect Remediation\n\n| Milestone / Gate | Condition | Status | Evidence / Artifact |\n|---|---|---|---|\n| **Gate G0** | Bundler secure, 0 secrets, CI multi-version | **PASS** | [`evidence/2026-09-20/V-01_history_clean_git_log.txt`](evidence/2026-09-20/V-01_history_clean_git_log.txt) |\n| **Gate G1** | Unified SimEngine, L2 queue, discrete funding | **PASS** | [`evidence/2026-09-20/V-05_simengine_positive_control.txt`](evidence/2026-09-20/V-05_simengine_positive_control.txt) |\n| **Gate G1b** | Tape reconciliation, side semantics resolved | **PASS** | [`evidence/2026-09-20/V-20_trade_side_semantics_resolved.txt`](evidence/2026-09-20/V-20_trade_side_semantics_resolved.txt) |\n| **Gate G2** | Pilot & power rewrite, pre-registration v3.1 | **APPROVED** | [`research/prereg_backtest.md`](research/prereg_backtest.md) |\n\n## 3. Telemetry & Defect Inventory Summary\n\n| Subsystem | Metric | Current Value | Specification / Health |\n|---|---|---|---|\n| **Defect Ledger** | Total Findings | 34 | V-01..V-35 (35) + W-01..W-14 (14) |\n| **Defect Remediation** | Fixed / Open | 49 / 0 | Verified via `scripts/generate_audit_report.py` |\n| **Recorder PID 11661** | Uptime | 28.8 hours (103,547 s) | Status: ACTIVE / HEALTHY |\n| **Data Ingestion** | Recorded Messages | 36,828,360 frames | Free Disk: 150.0 GB |\n| **Wire Latency** | REST /v1/time p50 | 173.99 ms | Status: `PROVISIONAL` |\n\n## 4. Credential Hygiene Advisory (W-14)\n\n> [!IMPORTANT]\n> If any historical repository bundle containing an unredacted `.env` was previously shared externally,\n> the master Ethereum wallet address and subaccount API keys must be immediately rotated on Arcus venue.\n> Key material is never logged, printed, or committed in the repository.\n\n## 5. Key Takeaway\n\nAudit status tracks 49 findings across Mandates v3, v4, and v5. 49 findings stand verified and remediated; 0 findings are currently open for remediation under Mandate v5 Workstream A. Live execution is operating under PRE-FIX status with zero real orders placed. Tape recorder PID 11661 remains continuously active.\n'
+[MUT-26] RTH Tag Conflation               | CAUGHT (PASS)  | Target: TestCalendarRegimes.test_w11_rth_capture_tagging_and_separation
+        Failure Reason: + PRE
+[MUT-27] Bypass Two-Key Mainnet Guard     | CAUGHT (PASS)  | Target: TestLiveExecutionEngine.test_two_key_mainnet_guard
+        Failure Reason: AssertionError: TwoKeyMainnetGuardError not raised
+--------------------------------------------------------------------------------
+Summary: 27/27 mutations caught by unit test suite.
+================================================================================
+Detailed evidence written to: /Users/dhruv/Desktop/CodeWithD/arcus-mm/evidence/mutation_check.txt
 
 --- Running secret scanner on git-tracked files ---
 PASS: No secrets found (0 findings).
