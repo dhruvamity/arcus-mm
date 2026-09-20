@@ -70,7 +70,7 @@ async def run_paper_session(
     return summary
 
 
-def verify_session_replay_parity(session_dir: Path, live_summary: Dict[str, Any]) -> Dict[str, Any]:
+async def verify_session_replay_parity_async(session_dir: Path, live_summary: Dict[str, Any]) -> Dict[str, Any]:
     """Replays the raw WebSocket stream into a fresh SimEngine and asserts exact hash parity."""
     raw_stream = session_dir / "raw_stream.jsonl"
     if not raw_stream.exists():
@@ -86,7 +86,7 @@ def verify_session_replay_parity(session_dir: Path, live_summary: Dict[str, Any]
         strategy_types=["adaptive", "fixed_spread", "vol_clock", "donothing", "random_side"],
     )
 
-    asyncio.run(trader.initialize_engine())
+    await trader.initialize_engine()
     replay_engine = trader.engine
 
     replay_fills_count = 0
@@ -124,8 +124,23 @@ def verify_session_replay_parity(session_dir: Path, live_summary: Dict[str, Any]
         "live_fills_count": live_summary.get("total_fills_logged", 0),
         "replay_fills_count": replay_fills_count,
     }
-    logger.info(f"Replay Parity Result: {'PASS' if parity_passed else 'FAIL'} (Hash: {replay_hash[:16]}...)")
+    logger.info(f"Replay Parity Result: {'PASS' if parity_passed else 'FAIL'} (Hash: {str(replay_hash)[:16]}...)")
     return parity_res
+
+
+def verify_session_replay_parity(session_dir: Path, live_summary: Dict[str, Any]) -> Dict[str, Any]:
+    """Synchronous entry point that safely delegates to async replay verification."""
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
+    if loop and loop.is_running():
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            return pool.submit(lambda: asyncio.run(verify_session_replay_parity_async(session_dir, live_summary))).result()
+    else:
+        return asyncio.run(verify_session_replay_parity_async(session_dir, live_summary))
 
 
 def main():
