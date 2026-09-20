@@ -500,7 +500,7 @@
     "remediation_status": "FIXED",
     "evidence_file": "evidence/2026-09-20/W-07_fill_dedup_post_fix_pass.txt",
     "test_file": "tests/test_sim_engine.py",
-    "commit_hash": "HEAD",
+    "commit_hash": "00a64d6",
     "notes": "Implemented canonical fill observation key (market, strategy, fill_model, quote_hash), added unique physical match tracking to SimEngine and PaperTrader, and added fill-model deduplication check to scripts/verify_report.py."
   },
   {
