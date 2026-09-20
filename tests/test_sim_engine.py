@@ -820,6 +820,112 @@ class TestSimEngine(unittest.TestCase):
         sample = model.sample_ms("place")
         self.assertGreaterEqual(sample, 25.0)
 
+    def test_25_w05_margin_liquidation_and_speed_bump(self):
+        """W-05 / V-14: Verifies maintenance margin liquidation forced-flatten and 50ms taker speed bump."""
+        # --- PART 1: Maintenance Margin Liquidation Trigger ---
+        strat = FixedSpreadStrategy(
+            market=self.market,
+            tick_size=0.1,
+            step_size=0.0001,
+            spread_bps=20.0,
+            clip_notional=10.0,
+            min_notional=5.0,
+        )
+        engine_liq = SimEngine(
+            markets=[self.market],
+            market_specs=self.specs,
+            strategies={"strat": strat},
+            fill_models=[FillModelType.MODEL_B_MODERATE],
+            paired_common_quotes=False,
+            initial_capital=50.0,
+            latency_config=LatencyConfig(order_entry_latency_ms=0.0, cancel_latency_ms=0.0),
+        )
+        ctx = engine_liq.contexts["strat"]
+        pnl = ctx.pnl_engines[FillModelType.MODEL_B_MODERATE]
+        # Simulate an existing large long position
+        pnl.position = 2.0
+        pnl.cash = -155.0  # bought 2.0 @ 100.0, cash was 50 - 200 - fee = ~ -150
+        # At mid 100.0: equity = -155 + 2*100 = 45 > maint_margin = 2 * 100 * 0.03 = 6.0
+        t0 = 1_000_000_000
+        engine_liq.on_event(SimEvent(SimEventType.BBO, t0, self.market, {
+            "bid_price": 99.9, "ask_price": 100.1, "bid_size": 1.0, "ask_size": 1.0
+        }))
+        self.assertNotEqual(ctx.get_risk_state(self.market), RiskState.FLATTENED_LIQUIDATION)
+
+        # Market plunges to 75.0: equity = -155 + 2*75 = -5.0 <= maint_margin = 2 * 75 * 0.03 = 4.5
+        t1 = t0 + int(100e6)
+        engine_liq.on_event(SimEvent(SimEventType.BBO, t1, self.market, {
+            "bid_price": 74.9, "ask_price": 75.1, "bid_size": 1.0, "ask_size": 1.0
+        }))
+        self.assertEqual(
+            ctx.get_risk_state(self.market),
+            RiskState.FLATTENED_LIQUIDATION,
+            "Strategy must transition to FLATTENED_LIQUIDATION when equity <= maintenance margin",
+        )
+        self.assertAlmostEqual(pnl.position, 0.0, places=5, msg="Position must be forced-flattened to 0.0")
+        self.assertGreater(pnl.taker_fee_costs, 0.0, "Forced flatten must incur taker fee")
+
+        # --- PART 2: 50ms Taker Speed Bump Priority ---
+        # Engine WITH 50ms speed bump:
+        engine_bump = SimEngine(
+            markets=[self.market],
+            market_specs=self.specs,
+            strategies={"strat": strat},
+            fill_models=[FillModelType.MODEL_B_MODERATE],
+            paired_common_quotes=False,
+            latency_config=LatencyConfig(order_entry_latency_ms=10.0, cancel_latency_ms=10.0),
+            taker_speed_bump_ms=50.0,
+        )
+        ctx_b = engine_bump.contexts["strat"]
+
+        # 1. Establish resting bid at 99.90
+        engine_bump.on_event(SimEvent(SimEventType.BBO, t0, self.market, {
+            "bid_price": 99.9, "ask_price": 100.1, "bid_size": 1.0, "ask_size": 1.0
+        }))
+        engine_bump.on_event(SimEvent(SimEventType.CLOCK_TICK, t0 + int(30e6), self.market, {}))
+        bid_order = ctx_b.active_bid[FillModelType.MODEL_B_MODERATE]
+        self.assertIsNotNone(bid_order)
+
+        # 2. Market crash triggers cancel at t0 + 40ms -> cancel arrives at t0 + 50ms (10ms cancel latency)
+        t_cancel = t0 + int(40e6)
+        engine_bump.on_event(SimEvent(SimEventType.BBO, t_cancel, self.market, {
+            "bid_price": 95.0, "ask_price": 95.2, "bid_size": 1.0, "ask_size": 1.0
+        }))
+        self.assertEqual(bid_order.status, OrderStatus.CANCEL_REQUESTED)
+
+        # 3. Aggressive taker trade prints at t0 + 45ms.
+        # With 50ms speed bump, effective taker match timestamp is 45 + 50 = 95ms.
+        # Since cancel arrives at 50ms <= 95ms, maker ALO cancel beats the delayed taker!
+        t_trade = t0 + int(45e6)
+        fills_bump = engine_bump.on_event(SimEvent(SimEventType.TRADE, t_trade, self.market, {
+            "side": "SELL", "price": 99.8, "size": 1.0
+        }))
+        self.assertEqual(len(fills_bump), 0, "50ms taker speed bump must allow ALO cancel to beat aggressive taker")
+        self.assertEqual(bid_order.status, OrderStatus.CANCELLED)
+
+        # --- PART 3: Speed Bump Sensitivity Grid [0ms, 25ms, 50ms, 100ms] ---
+        sensitivity_results = {}
+        for bump_ms in [0.0, 25.0, 50.0, 100.0]:
+            eng = SimEngine(
+                markets=[self.market],
+                market_specs=self.specs,
+                strategies={"strat": strat},
+                fill_models=[FillModelType.MODEL_B_MODERATE],
+                paired_common_quotes=False,
+                latency_config=LatencyConfig(order_entry_latency_ms=10.0, cancel_latency_ms=10.0),
+                taker_speed_bump_ms=bump_ms,
+            )
+            eng.on_event(SimEvent(SimEventType.BBO, t0, self.market, {"bid_price": 99.9, "ask_price": 100.1, "bid_size": 1.0, "ask_size": 1.0}))
+            eng.on_event(SimEvent(SimEventType.CLOCK_TICK, t0 + int(30e6), self.market, {}))
+            eng.on_event(SimEvent(SimEventType.BBO, t_cancel, self.market, {"bid_price": 95.0, "ask_price": 95.2, "bid_size": 1.0, "ask_size": 1.0}))
+            f = eng.on_event(SimEvent(SimEventType.TRADE, t_trade, self.market, {"side": "SELL", "price": 99.8, "size": 1.0}))
+            sensitivity_results[bump_ms] = len(f)
+
+        self.assertEqual(sensitivity_results[0.0], 1)
+        self.assertEqual(sensitivity_results[25.0], 0)
+        self.assertEqual(sensitivity_results[50.0], 0)
+        self.assertEqual(sensitivity_results[100.0], 0)
+
     def test_13_mutation_tests(self):
         """Test 13: Mutation tests (at least 16 mutations applied to the engine fail test suite)."""
         from scripts.mutation_check import (
@@ -845,6 +951,7 @@ class TestSimEngine(unittest.TestCase):
             test_mutation_20_model_c_sub_tick_fills,
             test_mutation_21_manifest_missing_target_dir,
             test_mutation_22_latency_uncalibrated_grid,
+            test_mutation_23_margin_liquidation_bypass,
         )
         mutations = [
             test_mutation_1_invert_queue,
@@ -869,10 +976,11 @@ class TestSimEngine(unittest.TestCase):
             test_mutation_20_model_c_sub_tick_fills,
             test_mutation_21_manifest_missing_target_dir,
             test_mutation_22_latency_uncalibrated_grid,
+            test_mutation_23_margin_liquidation_bypass,
         ]
         results = [m() for m in mutations]
         caught = sum(1 for r in results if r.caught)
-        self.assertGreaterEqual(caught, 22, f"Must catch at least 22 mutations, caught {caught}")
+        self.assertGreaterEqual(caught, 23, f"Must catch at least 23 mutations, caught {caught}")
 
 
 if __name__ == "__main__":

@@ -550,6 +550,35 @@ def test_mutation_22_latency_uncalibrated_grid() -> MutationResult:
         lm.get_pre_declared_latency_grid = orig_func
 
 
+def test_mutation_23_margin_liquidation_bypass() -> MutationResult:
+    """MUT-23: Disables maintenance margin liquidation check in SimEngine."""
+    from src.sim import engine as se
+
+    orig_eval = se.SimEngine._evaluate_strategies_quoting
+
+    def mutated_eval(self, venue, ts_ns):
+        old_mmf = getattr(venue, "maintenance_margin_fraction", 0.03)
+        venue.maintenance_margin_fraction = -1e9
+        try:
+            return orig_eval(self, venue, ts_ns)
+        finally:
+            venue.maintenance_margin_fraction = old_mmf
+
+    se.SimEngine._evaluate_strategies_quoting = mutated_eval
+    try:
+        failed, msg = run_targeted_test(TestSimEngine, "test_25_w05_margin_liquidation_and_speed_bump")
+        return MutationResult(
+            "MUT-23",
+            "Bypass Maintenance Margin Liquidation",
+            "TestSimEngine.test_25_w05_margin_liquidation_and_speed_bump",
+            "Disables maintenance margin liquidation check, allowing underwater positions to avoid forced flatten",
+            failed,
+            msg,
+        )
+    finally:
+        se.SimEngine._evaluate_strategies_quoting = orig_eval
+
+
 def main():
     mutations: List[Callable[[], MutationResult]] = [
         test_mutation_1_invert_queue,
@@ -574,6 +603,7 @@ def main():
         test_mutation_20_model_c_sub_tick_fills,
         test_mutation_21_manifest_missing_target_dir,
         test_mutation_22_latency_uncalibrated_grid,
+        test_mutation_23_margin_liquidation_bypass,
     ]
 
     print("=" * 80)

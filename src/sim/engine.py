@@ -102,6 +102,7 @@ class RiskState(str, Enum):
     PAUSED_ANOMALY = "PAUSED_ANOMALY"
     FLATTENED_LOSS_LIMIT = "FLATTENED_LOSS_LIMIT"
     FLATTENED_CROSSED_BOOK = "FLATTENED_CROSSED_BOOK"
+    FLATTENED_LIQUIDATION = "FLATTENED_LIQUIDATION"
 
 
 class MarketState:
@@ -116,6 +117,8 @@ class MarketState:
         min_order_size: float = 0.0,
         max_order_size: float = 1_000_000.0,
         category: str = "CRYPTO",
+        initial_margin_fraction: float = 0.05,
+        maintenance_margin_fraction: float = 0.03,
     ):
         self.market = market
         self.tick_size = tick_size
@@ -124,6 +127,8 @@ class MarketState:
         self.min_order_size = min_order_size
         self.max_order_size = max_order_size
         self.category = category
+        self.initial_margin_fraction = initial_margin_fraction
+        self.maintenance_margin_fraction = maintenance_margin_fraction
 
         self.best_bid: float = 0.0
         self.best_ask: float = 0.0
@@ -280,6 +285,7 @@ class SimEngine:
         max_inventory_clips: float = 3.0,
         subaccount_rate_limiter: Optional[ArcusRateLimitSimulator] = None,
         random_seed: int = 42,
+        taker_speed_bump_ms: float = 0.0,
     ):
         if isinstance(markets, dict) and market_specs is None:
             market_specs = markets
@@ -295,6 +301,7 @@ class SimEngine:
         self.max_inventory_clips = max_inventory_clips
         self.random_seed = random_seed
         self.rng = random.Random(random_seed)
+        self.taker_speed_bump_ms = taker_speed_bump_ms
 
         # Latency model (Constant or Empirical, fix V-11)
         if latency_model is not None:
@@ -328,6 +335,8 @@ class SimEngine:
                 min_order_size=float(spec.get("min_order_size", 0.0)),
                 max_order_size=float(spec.get("max_order_size", 1_000_000.0)),
                 category=str(spec.get("category", "CRYPTO")),
+                initial_margin_fraction=float(spec.get("initial_margin_fraction", 0.05)),
+                maintenance_margin_fraction=float(spec.get("maintenance_margin_fraction", 0.03)),
             )
 
         # Strategy contexts
@@ -590,6 +599,18 @@ class SimEngine:
                     # 1. Check BID fills (taker sells hitting our bid)
                     bid_order = ctx.active_bid[fm]
                     if bid_order and bid_order.status in (OrderStatus.RESTING, OrderStatus.CANCEL_REQUESTED):
+                        # Speed bump modeling (fix W-05): MM ALO cancels bypass the taker speed bump
+                        if (
+                            bid_order.status == OrderStatus.CANCEL_REQUESTED
+                            and bid_order.cancel_arrival_ts_ns
+                            and self.taker_speed_bump_ms > 0
+                        ):
+                            effective_taker_match_ts = ts_ns + int(self.taker_speed_bump_ms * 1e6)
+                            if bid_order.cancel_arrival_ts_ns <= effective_taker_match_ts:
+                                bid_order.status = OrderStatus.CANCELLED
+                                ctx.active_bid[fm] = None
+                                continue
+
                         was_in_flight = (bid_order.status == OrderStatus.CANCEL_REQUESTED)
                         fill_qty = self._evaluate_fill_quantity(fm, bid_order, trade_side, trade_p, trade_s, venue.tick_size)
                         if fill_qty > 0:
@@ -626,6 +647,18 @@ class SimEngine:
                     # 2. Check ASK fills (taker buys lifting our ask)
                     ask_order = ctx.active_ask[fm]
                     if ask_order and ask_order.status in (OrderStatus.RESTING, OrderStatus.CANCEL_REQUESTED):
+                        # Speed bump modeling (fix W-05): MM ALO cancels bypass the taker speed bump
+                        if (
+                            ask_order.status == OrderStatus.CANCEL_REQUESTED
+                            and ask_order.cancel_arrival_ts_ns
+                            and self.taker_speed_bump_ms > 0
+                        ):
+                            effective_taker_match_ts = ts_ns + int(self.taker_speed_bump_ms * 1e6)
+                            if ask_order.cancel_arrival_ts_ns <= effective_taker_match_ts:
+                                ask_order.status = OrderStatus.CANCELLED
+                                ctx.active_ask[fm] = None
+                                continue
+
                         was_in_flight = (ask_order.status == OrderStatus.CANCEL_REQUESTED)
                         fill_qty = self._evaluate_fill_quantity(fm, ask_order, trade_side, trade_p, trade_s, venue.tick_size)
                         if fill_qty > 0:
@@ -736,6 +769,48 @@ class SimEngine:
             if hasattr(ctx.strategy, "market") and ctx.strategy.market != venue.market:
                 continue
 
+            # Maintenance margin & liquidation check (W-05 / V-14)
+            is_liquidated = False
+            for fm in ctx.fill_models:
+                pnl_eng = ctx.pnl_engines[fm]
+                pos = pnl_eng.position
+                if abs(pos) > 1e-9:
+                    mid = venue.current_mid
+                    mark = venue.current_mark if venue.current_mark > 0 else mid
+                    equity = pnl_eng.compute_equity(mid)
+                    mmf = getattr(venue, "maintenance_margin_fraction", 0.03)
+                    maint_margin = abs(pos) * mark * mmf
+                    if equity <= maint_margin:
+                        is_liquidated = True
+                        ctx.set_risk_state(venue.market, RiskState.FLATTENED_LIQUIDATION)
+                        if ctx.active_bid[fm]:
+                            ctx.active_bid[fm].status = OrderStatus.CANCELLED
+                            ctx.active_bid[fm] = None
+                        if ctx.active_ask[fm]:
+                            ctx.active_ask[fm].status = OrderStatus.CANCELLED
+                            ctx.active_ask[fm] = None
+
+                        flatten_side = "SELL" if pos > 0 else "BUY"
+                        flatten_qty = abs(pos)
+                        flatten_price = (venue.best_bid - venue.tick_size) if flatten_side == "SELL" else (venue.best_ask + venue.tick_size)
+                        if flatten_price <= 0:
+                            flatten_price = mid * (0.99 if flatten_side == "SELL" else 1.01)
+
+                        pnl_eng.record_fill(flatten_side, flatten_price, flatten_qty, mid, is_taker=True, ts_ns=ts_ns)
+                        logger.warning(
+                            f"[{venue.market}] LIQUIDATION TRIGGERED on {ctx.strategy_id} ({fm.value}): "
+                            f"Equity ${equity:.2f} <= MaintMargin ${maint_margin:.2f}. Forced flatten {flatten_side} {flatten_qty} @ {flatten_price:.4f}"
+                        )
+
+            if is_liquidated or ctx.get_risk_state(venue.market) in (
+                RiskState.PAUSED_GAP,
+                RiskState.PAUSED_STALE_FEED,
+                RiskState.PAUSED_ANOMALY,
+                RiskState.FLATTENED_CROSSED_BOOK,
+                RiskState.FLATTENED_LIQUIDATION,
+            ):
+                continue
+
             # Sanity invariant: |PnL| <= initial_capital * 0.50 per hour (W-06)
             max_pnl = ctx.initial_capital * 0.50 * elapsed_hours
             pnl_anomalous = False
@@ -760,14 +835,6 @@ class SimEngine:
                         if ctx.active_ask[fm]:
                             ctx.active_ask[fm].status = OrderStatus.CANCELLED
                             ctx.active_ask[fm] = None
-                continue
-
-            if ctx.get_risk_state(venue.market) in (
-                RiskState.PAUSED_GAP,
-                RiskState.PAUSED_STALE_FEED,
-                RiskState.PAUSED_ANOMALY,
-                RiskState.FLATTENED_CROSSED_BOOK,
-            ):
                 continue
 
             if self.paired_common_quotes:

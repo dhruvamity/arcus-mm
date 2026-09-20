@@ -161,11 +161,11 @@
     "category": "EXECUTION",
     "summary": "Missing venue mechanics (mark price PnL mark, margin liquidation checks, off-hours bands)",
     "reproduction_status": "CONFIRMED",
-    "remediation_status": "OPEN",
-    "evidence_file": "evidence/2026-09-20/V-06_l2_sequence_gap_recovery.txt",
+    "remediation_status": "FIXED",
+    "evidence_file": "evidence/2026-09-20/W-05_margin_speed_bump_post_fix_pass.txt",
     "test_file": "tests/test_sim_engine.py",
-    "commit_hash": "-",
-    "notes": "Reopened per Mandate v5 finding W-05: maintenance-margin/liquidation checks and 50ms taker speed bump not implemented in engine code."
+    "commit_hash": "PENDING_COMMIT",
+    "notes": "Re-closed per Mandate v5: implemented equity <= maintenance margin check with conservative forced-flatten and FLATTENED_LIQUIDATION state; modeled 50ms taker speed bump giving MM ALO cancels priority; verified with MUT-23."
   },
   {
     "id": "V-15",
@@ -473,11 +473,11 @@
     "category": "ENGINE",
     "summary": "Two items marked FIXED are not implemented in code (cross-margin/liquidation and 50ms speed bump)",
     "reproduction_status": "CONFIRMED",
-    "remediation_status": "OPEN",
-    "evidence_file": "",
+    "remediation_status": "FIXED",
+    "evidence_file": "evidence/2026-09-20/W-05_margin_speed_bump_post_fix_pass.txt",
     "test_file": "tests/test_sim_engine.py",
-    "commit_hash": "-",
-    "notes": "Margin/liquidation check and 50ms speed bump are docstring/config notes without engine enforcement. V-14 reopened."
+    "commit_hash": "PENDING_COMMIT",
+    "notes": "Implemented equity vs maintenance margin liquidation with conservative forced-flatten and FLATTENED_LIQUIDATION state; implemented 50ms taker speed bump with MM ALO cancel priority and evaluated sensitivity grid [0ms, 25ms, 50ms, 100ms]; verified with MUT-23."
   },
   {
     "id": "W-06",
