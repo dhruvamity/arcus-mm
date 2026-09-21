@@ -420,6 +420,18 @@
     "notes": "Mandate v4 §2 WS-L deep historical pull paged 1h candles backward across 20 markets discovering up to 305 days retention depth. Discovered severe activity depression (up to 71x) on weekend equity/commodity perps, justifying 13:00-20:30 UTC RTH window, while crypto perps confirmed stable regime."
   },
   {
+    "id": "V-36",
+    "severity": "MAJOR",
+    "category": "STRATEGY",
+    "summary": "Avellaneda-Stoikov order arrival intensity parameter kappa is hardcoded to 1.5 placeholder and calibrate_kappa_from_trades() is unwired dead code",
+    "reproduction_status": "CONFIRMED",
+    "remediation_status": "FIXED",
+    "evidence_file": "evidence/2026-09-20/V-36_kappa_post_fix_pass.txt",
+    "test_file": "tests/test_sim_engine.py",
+    "commit_hash": "ebd3a64",
+    "notes": "Wired calibrate_kappa_from_trades() into evaluate_strategies_on_events in scripts/run_pilot_analysis.py; relaxed upper clamp on fitted_kappa in src/strategies/avellaneda_stoikov.py from 50.0 to 50000.0; verified BTC-USD Model C produces 45.04 fills/hr (FEASIBLE) and ETH/SOL produce active fills; verified in test_sim_engine.py; MUT-28 added."
+  },
+  {
     "id": "W-01",
     "severity": "BLOCKER",
     "category": "SIMULATION",

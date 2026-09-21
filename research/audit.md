@@ -1,6 +1,6 @@
 # Master Audit Ledger — Ground Truth & Defect Remediation
 
-**Generated At:** `2026-09-20 20:35:17 UTC`  
+**Generated At:** `2026-09-21 12:05:06 UTC`  
 **Evaluation Scope:** All Findings (V-01 through V-35, W-01 through W-14) from Mandates v3, v4, and v5  
 **Commit Discrepancy Note:** Prior reports referenced commit hash `23a03f3` which does not exist on the remote GitHub repository. This occurred because the initial repository setup was committed and pushed via a squashed root commit (`0905008`), obliterating local scratch commit IDs. From this point forward, strict verifiable linear Git history is maintained with one commit per defect/milestone.  
 
@@ -45,6 +45,7 @@
 | **V-33** | `MINOR` | TESTS | Live paper trader tests non-hermetic without pre-existing data/raw snapshots | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/V-33_hermetic_live_paper_fixture.txt`](evidence/2026-09-20/V-33_hermetic_live_paper_fixture.txt) | [`tests/test_live_paper_trader.py`](tests/test_live_paper_trader.py) | `HEAD` |
 | **V-34** | `MAJOR` | METHODOLOGY | Primary paper session window (12:30-16:30 UTC) misses 4.5 of 6.5 NYSE RTH hours | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/V-34_rth_window_mismatch.txt`](evidence/2026-09-20/V-34_rth_window_mismatch.txt) | [`tests/test_calendar_regimes.py`](tests/test_calendar_regimes.py) | `HEAD` |
 | **V-35** | `MAJOR` | METHODOLOGY | Asset ranking rested solely on short-window weekend pilot tape without historical depth validation | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/V-35_deep_history_pull.txt`](evidence/2026-09-20/V-35_deep_history_pull.txt) | [`scripts/verify_report.py`](scripts/verify_report.py) | `HEAD` |
+| **V-36** | `MAJOR` | STRATEGY | Avellaneda-Stoikov order arrival intensity parameter kappa is hardcoded to 1.5 placeholder and calibrate_kappa_from_trades() is unwired dead code | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/V-36_kappa_post_fix_pass.txt`](evidence/2026-09-20/V-36_kappa_post_fix_pass.txt) | [`tests/test_sim_engine.py`](tests/test_sim_engine.py) | `ebd3a64` |
 | **W-01** | `BLOCKER` | SIMULATION | Minimum-size bids silently rejected (target_size x target_price vs mid clip) | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/W-01_min_size_bid_post_fix_pass.txt`](evidence/2026-09-20/W-01_min_size_bid_post_fix_pass.txt) | [`tests/test_sim_engine.py`](tests/test_sim_engine.py) | `12a78f7` |
 | **W-02** | `BLOCKER` | STATISTICS | Walk-forward significance test is tautological (spread at fill instant vs mid) | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/W-02_tautological_metric_post_fix_pass.txt`](evidence/2026-09-20/W-02_tautological_metric_post_fix_pass.txt) | [`tests/test_walk_forward_protocol.py`](tests/test_walk_forward_protocol.py) | `3bbe199` |
 | **W-03** | `MAJOR` | STRATEGY | Adaptive (OFI/microprice) strategy never receives microprice/OFI signal from engine | **CONFIRMED** | **FIXED** | [`evidence/2026-09-20/W-03_ofi_wire_post_fix_pass.txt`](evidence/2026-09-20/W-03_ofi_wire_post_fix_pass.txt) | [`tests/test_sim_engine.py`](tests/test_sim_engine.py) | `ce5e9d8` |
@@ -72,10 +73,10 @@ All referenced evidence and test suites are machine-validated to exist on disk:
 
 ## 3. Progress Metrics
 
-- **Total Findings Audited:** 49
-- **Confirmed Defects:** 49
+- **Total Findings Audited:** 50
+- **Confirmed Defects:** 50
 - **Refuted Defects:** 0
-- **Remediated (FIXED):** 49
+- **Remediated (FIXED):** 50
 - **In Progress:** 0
 - **Open:** 0
 
