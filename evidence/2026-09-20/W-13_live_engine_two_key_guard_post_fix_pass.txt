@@ -1,9 +1,0 @@
-=== POST-FIX PASSING DEMONSTRATION FOR W-13 (MUT-27) ===
-Command: .venv/bin/python -m unittest tests/test_live_engine.py -k test_two_key_mainnet_guard
-Target Test: TestLiveExecutionEngine.test_two_key_mainnet_guard
-
-.
-----------------------------------------------------------------------
-Ran 1 test in 0.004s
-
-OK

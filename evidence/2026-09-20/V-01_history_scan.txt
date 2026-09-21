@@ -1,8 +1,0 @@
-COMMAND: python3 scripts/secret_scan.py --history
-GIT_HEAD: ab55a3f244d6c59aa29025a0c33ef461f4a51e20
-TIMESTAMP: 2026-09-20T08:53:07Z
-PYTHON_VERSION: Python 3.14.5
-EXIT_CODE: 0
---- OUTPUT ---
-Scanning entire git history across all branches and commits...
-PASS: No secrets found (0 findings).

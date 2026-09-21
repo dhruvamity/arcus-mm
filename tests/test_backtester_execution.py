@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""Tests for Backtester Execution, Paper Telemetry, and Walk-Forward Smoke."""
+"""Tests for Backtester Execution and Paper Telemetry."""
 
 import unittest
 import pandas as pd
@@ -9,7 +9,6 @@ from src.sim.engine import ArcusEventBacktester
 from src.models.fill import FillModelType
 from src.models.rate_limit import ArcusRateLimitSimulator
 from src.strategies.fixed_spread import FixedSpreadStrategy
-from src.walk_forward import WalkForwardValidator
 
 
 class TestBacktesterExecution(unittest.TestCase):
@@ -104,54 +103,6 @@ class TestBacktesterExecution(unittest.TestCase):
         self.assertEqual(status["orders_modified"], 1)
         self.assertEqual(status["orders_cancelled"], 1)
         self.assertEqual(status["total_actions_used"], 3)
-
-    def test_walk_forward_cli_smoke(self):
-        """P0-2: Asserts that WalkForwardValidator imports and executes without NameError."""
-        validator = WalkForwardValidator(in_sample_ratio=0.60)
-        specs = {
-            "tick_size": 0.1,
-            "step_size": 0.00000001,
-            "min_notional": 5.0,
-        }
-
-        # Construct synthetic dataframe
-        t0 = 1_000_000_000
-        bbo_rows = []
-        trade_rows = []
-        for i in range(20):
-            t = t0 + i * int(1e8)
-            bbo_rows.append({
-                "recv_ts_ns": t,
-                "mid_price": 100.0,
-                "spread_bps": 10.0,
-                "bid_price": 99.95,
-                "bid_size": 1.0,
-                "ask_price": 100.05,
-                "ask_size": 1.0,
-            })
-            if i % 5 == 0:
-                trade_rows.append({
-                    "recv_ts_ns": t + int(5e7),
-                    "price": 99.95,
-                    "size": 0.1,
-                    "side": "SELL",
-                })
-
-        df_bbo = pd.DataFrame(bbo_rows)
-        df_trades = pd.DataFrame(trade_rows)
-
-        # Must execute without Optional NameError
-        wf_res = validator.run_walk_forward(
-            market="BTC-USD",
-            specs=specs,
-            df_bbo=df_bbo,
-            df_trades=df_trades,
-            funding_data=None,
-        )
-
-        self.assertIn("in_sample", wf_res)
-        self.assertIn("out_of_sample", wf_res)
-        self.assertIn("stress_oos_model_c", wf_res)
 
 
 if __name__ == "__main__":

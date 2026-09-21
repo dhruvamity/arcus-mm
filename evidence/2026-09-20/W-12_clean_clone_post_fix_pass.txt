@@ -1,8 +1,0 @@
-=== Command: python3 -m unittest tests/test_storage_manager.py -k test_w12_hermetic_manifest_generation_on_fresh_clone ===
-Hashing 1 files for date 2026-09-19 (chain parent: 0000000000000000...)...
-Generated chained manifest: /tmp/fresh_clone_repo/data/MANIFEST_2026-09-19.sha256 (1 files, digest f143746907f8562e...)
-.
-----------------------------------------------------------------------
-Ran 1 test in 0.002s
-
-OK

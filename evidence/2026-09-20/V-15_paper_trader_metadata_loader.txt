@@ -1,9 +1,0 @@
-COMMAND: python3 scripts/reproduce_audit_findings.py v15
-GIT_HEAD: ab55a3f244d6c59aa29025a0c33ef461f4a51e20
-TIMESTAMP: 2026-09-20T08:56:23Z
-PYTHON_VERSION: Python 3.14.5
-EXIT_CODE: 0
---- OUTPUT ---
-dict input: []
-list input: EXC AttributeError: 'list' object has no attribute 'get'
-CONFIRMED: V-15 Paper-trader metadata loader returns [] on dict and raises AttributeError on list.

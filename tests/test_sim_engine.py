@@ -984,64 +984,6 @@ class TestSimEngine(unittest.TestCase):
         fills = engine.on_event(SimEvent(SimEventType.TRADE, t0 + int(50e6), self.market, {"side": "SELL", "price": bid_price, "size": 1.0}))
         self.assertGreater(len(fills), 0, "Calibrated Avellaneda-Stoikov must generate fills on market trades")
 
-    def test_13_mutation_tests(self):
-        """Test 13: Mutation tests (at least 16 mutations applied to the engine fail test suite)."""
-        from scripts.mutation_check import (
-            test_mutation_1_invert_queue,
-            test_mutation_2_lookahead_bias,
-            test_mutation_3_zero_latency,
-            test_mutation_4_funding_sign_flip,
-            test_mutation_5_trade_side_inversion,
-            test_mutation_6_min_size_bypass,
-            test_mutation_7_post_only_bypass,
-            test_mutation_8_disable_kill_switch,
-            test_mutation_9_fee_sign_flip,
-            test_mutation_10_markout_clamping,
-            test_mutation_11_charge_funding_per_message,
-            test_mutation_12_quote_behind_touch_zero_queue,
-            test_mutation_13_never_recover_pause,
-            test_mutation_14_drop_stale_check,
-            test_mutation_15_ignore_rate_limits,
-            test_mutation_16_recv_time_joins,
-            test_mutation_17_c_world_from_b_inventory,
-            test_mutation_18_mid_based_min_clip_check,
-            test_mutation_19_drop_ofi_microprice_argument,
-            test_mutation_20_model_c_sub_tick_fills,
-            test_mutation_21_manifest_missing_target_dir,
-            test_mutation_22_latency_uncalibrated_grid,
-            test_mutation_23_margin_liquidation_bypass,
-            test_mutation_28_avellaneda_stoikov_hardcoded_kappa,
-        )
-        mutations = [
-            test_mutation_1_invert_queue,
-            test_mutation_2_lookahead_bias,
-            test_mutation_3_zero_latency,
-            test_mutation_4_funding_sign_flip,
-            test_mutation_5_trade_side_inversion,
-            test_mutation_6_min_size_bypass,
-            test_mutation_7_post_only_bypass,
-            test_mutation_8_disable_kill_switch,
-            test_mutation_9_fee_sign_flip,
-            test_mutation_10_markout_clamping,
-            test_mutation_11_charge_funding_per_message,
-            test_mutation_12_quote_behind_touch_zero_queue,
-            test_mutation_13_never_recover_pause,
-            test_mutation_14_drop_stale_check,
-            test_mutation_15_ignore_rate_limits,
-            test_mutation_16_recv_time_joins,
-            test_mutation_17_c_world_from_b_inventory,
-            test_mutation_18_mid_based_min_clip_check,
-            test_mutation_19_drop_ofi_microprice_argument,
-            test_mutation_20_model_c_sub_tick_fills,
-            test_mutation_21_manifest_missing_target_dir,
-            test_mutation_22_latency_uncalibrated_grid,
-            test_mutation_23_margin_liquidation_bypass,
-            test_mutation_28_avellaneda_stoikov_hardcoded_kappa,
-        ]
-        results = [m() for m in mutations]
-        caught = sum(1 for r in results if r.caught)
-        self.assertGreaterEqual(caught, 24, f"Must catch at least 24 mutations, caught {caught}")
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,6 +1,0 @@
-COMMAND: .venv/bin/python -m pyflakes src/models/latency.py scripts/run_live_paper_session.py 
-GIT_HEAD: ab55a3f244d6c59aa29025a0c33ef461f4a51e20
-TIMESTAMP: 2026-09-20T09:03:19Z
-PYTHON_VERSION: Python 3.14.5
-EXIT_CODE: 0
---- OUTPUT ---

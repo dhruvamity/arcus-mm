@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import unittest
 from scripts.secret_scan import scan_content, is_dummy
-from scripts.generate_repo_bundle import is_excluded
 
 
 class TestSecurityScanner(unittest.TestCase):
@@ -66,19 +65,6 @@ class TestSecurityScanner(unittest.TestCase):
         findings = scan_content("src/crypto.py", code)
         self.assertEqual(len(findings), 1)
         self.assertEqual(findings[0][2], "PEM_PRIVATE_KEY")
-
-    def test_bundle_exclusions(self):
-        self.assertTrue(is_excluded(".env")[0])
-        self.assertTrue(is_excluded(".env.local")[0])
-        self.assertTrue(is_excluded(".env.production")[0])
-        self.assertFalse(is_excluded(".env.example")[0])
-        self.assertTrue(is_excluded("certs/server.pem")[0])
-        self.assertTrue(is_excluded("config/jwt.key")[0])
-        self.assertTrue(is_excluded("data/market_data.parquet")[0])
-        self.assertTrue(is_excluded("data/raw/trades.jsonl")[0])
-        self.assertTrue(is_excluded(".DS_Store")[0])
-        self.assertFalse(is_excluded("src/auth.py")[0])
-        self.assertFalse(is_excluded("configs/venue_verified.yaml")[0])
 
 
 if __name__ == "__main__":

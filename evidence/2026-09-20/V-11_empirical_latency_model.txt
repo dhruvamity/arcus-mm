@@ -1,8 +1,0 @@
-COMMAND: .venv/bin/python -c from\ src.models.latency\ import\ ConstantLatencyModel\,\ EmpiricalLatencyModel\,\ LatencyConfig\;\ c\ =\ ConstantLatencyModel\(LatencyConfig\(\)\)\;\ print\(\'constant\ ns:\'\,\ c.sample_ns\(\'place\'\)\)\;\ e\ =\ EmpiricalLatencyModel\(\'reports/latency_benchmarks.json\'\)\;\ print\(\'empirical\ ms:\'\,\ e.sample_ms\(\'place\'\)\,\ \'ns:\'\,\ e.sample_ns\(\'place\'\)\) 
-GIT_HEAD: 15a0a9e0d214db666710df5548aff3fccefbf1d4
-TIMESTAMP: 2026-09-20T09:43:06Z
-PYTHON_VERSION: Python 3.12.14
-EXIT_CODE: 0
---- OUTPUT ---
-constant ns: 60000000
-empirical ms: 444.22 ns: 982770000

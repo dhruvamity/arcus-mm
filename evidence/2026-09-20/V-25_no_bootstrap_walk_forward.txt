@@ -1,7 +1,0 @@
-COMMAND: bash -c grep\ -n\ \"def\ evaluate_gates\"\ -A\ 40\ src/walk_forward.py\ \|\ grep\ -n\ \"bootstrap\"\ \|\|\ echo\ \"no\ bootstrap\ in\ walk_forward.py\" 
-GIT_HEAD: ab55a3f244d6c59aa29025a0c33ef461f4a51e20
-TIMESTAMP: 2026-09-20T08:59:40Z
-PYTHON_VERSION: Python 3.14.5
-EXIT_CODE: 0
---- OUTPUT ---
-no bootstrap in walk_forward.py

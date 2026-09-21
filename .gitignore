@@ -65,3 +65,7 @@ reports/generated/
 data/shadow/
 data/raw_v3/
 
+# Propr trial runtime data (isolated ledgers, credentials, and state)
+propr/data/
+
+

@@ -1,6 +1,0 @@
-=== Command: python3 -m unittest tests/test_sim_engine.py -k test_23_w09_model_c_trade_strictly_through_by_tick ===
-.
-----------------------------------------------------------------------
-Ran 1 test in 0.001s
-
-OK

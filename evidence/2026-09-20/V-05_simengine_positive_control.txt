@@ -1,8 +1,0 @@
-COMMAND: python3 scripts/reproduce_audit_findings.py v05_pos
-GIT_HEAD: ab55a3f244d6c59aa29025a0c33ef461f4a51e20
-TIMESTAMP: 2026-09-20T08:56:06Z
-PYTHON_VERSION: Python 3.14.5
-EXIT_CODE: 0
---- OUTPUT ---
-violations: 0 / 200
-CONFIRMED: SimEngine preserves A >= B >= C monotonicity in 200/200 runs.

@@ -1,9 +1,0 @@
-COMMAND: .venv/bin/python -c import\ pandas\ as\ pd\;\ df=pd.read_csv\(\'research/power_analysis_table.csv\'\)\;\ assert\ \'N_Req_1.0bps\'\ in\ df.columns\;\ print\(\'Power\ table\ rows:\'\,\ len\(df\)\)\;\ print\(\'Avellaneda\ Stoikov\ non-zero\ fills:\'\,\ \(df\[df\[\'Strategy\'\]==\'Avellaneda_Stoikov\'\]\[\'ModelCFillsHr\'\]\>0\).sum\(\)\)\;\ print\(\'Unimputed\ sigmas\ count:\'\,\ df\[\'SigmaBps\'\].notna\(\).sum\(\)\) 
-GIT_HEAD: b021b81750f88910ec758ea81302e899554a001f
-TIMESTAMP: 2026-09-20T14:02:28Z
-PYTHON_VERSION: Python 3.12.14
-EXIT_CODE: 0
---- OUTPUT ---
-Power table rows: 80
-Avellaneda Stoikov non-zero fills: 0
-Unimputed sigmas count: 13
