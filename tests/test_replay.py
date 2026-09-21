@@ -83,6 +83,14 @@ class TestReplayFills(unittest.TestCase):
         r = simulate(tape(rows), Params(**p))
         self.assertAlmostEqual(r.final_pos, 1.0)
 
+    def test_fair_value_anchor(self):
+        # fair says 99.00 while Arcus mid is 100.00: bid goes to 99.00*(1-5bps)=98.95, ask stays
+        # above the Arcus bid (clamped to 99.99 + tick = 100.00) instead of 99.05
+        fair = (np.array([0], dtype=np.int64), np.array([99.0]))
+        rows = book() + [(10, TRADE, 200, -1, 98.94, 0.01), (11, TRADE, 210, 1, 100.01, 0.01)]
+        r = simulate(tape(rows), Params(**dict(P, fair=fair)))
+        self.assertEqual(sorted((f[1], round(f[2], 2)) for f in r.fills), [(-1, 100.0), (1, 98.95)])
+
 
 if __name__ == "__main__":
     unittest.main()

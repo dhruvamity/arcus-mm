@@ -145,6 +145,9 @@ class Params:
     step: float = 1e-8
     min_notional: float = 5.0
     active: Optional[callable] = None   # f(recv_ns) -> bool; outside, pull quotes
+    # optional external fair value (e.g. Binance mid + Arcus basis): (observed_ns sorted, price).
+    # When set, quotes are placed around fair instead of the Arcus mid, never crossing the touch.
+    fair: Optional[tuple] = None
 
 
 @dataclass
@@ -263,14 +266,23 @@ def simulate(t: Dict[str, np.ndarray], p: Params) -> Result:
         bb, ba = px[i], sz[i]
         mid = (bb + ba) / 2
         on = p.active(now) if p.active else True
+        ref = mid
+        if p.fair is not None:
+            k = int(np.searchsorted(p.fair[0], now, side="right")) - 1
+            if k < 0 or not p.fair[1][k] > 0:
+                on = False
+            else:
+                ref = float(p.fair[1][k])
         inv_usd = pos * mid
         skew = -p.skew_bps * max(-1.0, min(1.0, inv_usd / p.max_pos_usd)) if p.max_pos_usd > 0 else 0.0
         for s in (1, -1):
             w = working[s]
             want = on and not (s * inv_usd >= p.max_pos_usd)
             if want:
-                target = mid * (1 - s * p.depth_bps * 1e-4 + skew * 1e-4)
+                target = ref * (1 - s * p.depth_bps * 1e-4 + skew * 1e-4)
                 target = rnd(target, up=(s == -1))
+                if p.fair is not None:  # post-only: rest at best at most one tick inside the spread
+                    target = min(target, ba - p.tick) if s == 1 else max(target, bb + p.tick)
                 if w is not None and w.qty > 1e-12 and w.cancel_at > now and abs(w.price - target) / mid * 1e4 < p.requote_bps:
                     continue
             elif w is None or w.cancel_at <= now:

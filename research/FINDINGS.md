@@ -64,7 +64,41 @@ Takeaways:
 * 52 hours; one trend day (BTC +6.5% on 2026-09-21). Multiple configs were tried, so the
   best ones are biased upward — hence the frozen out-of-sample test.
 
-## 5. Side experiment: Propr (`propr/`)
+## 5. Full Arcus history and Binance (added 2026-09-22)
+
+Data: Arcus keeps public trades back to **2026-06-30** (public perps launch; no older history
+exists, and no historical order book at all) — `scripts/pull_trade_history.py`. Binance
+aggTrades/klines via `scripts/pull_binance.py`: HYPE since 2025-05, NVDA/SPY/QQQ since 2026-03/04,
+gold (PAXG) since 2020. Candles alone cannot test this strategy (its edge lives in the 30 s after
+a sweep), so trade-by-trade data is used; candles are for regimes.
+
+**Trade-only estimate is validated** (`scripts/validate_sweep_proxy.py`): beyond the touch it
+matches true-BBO results in sign everywhere and is close or conservative in size (SPY 2–5 bps:
+true +2.05, estimate +1.79; BTC −0.53 vs −0.48). Not usable at the touch on thin markets or for GLD.
+
+**Deep-fill edge persists across Arcus's whole history** (`scripts/sweep_history.py`, weekly):
+0–10 bps behind the touch, maker fills were positive in 9/9 weeks (HYPE), 10/10 (SPY, NVDA) at
+0–2 and 2–5 bps. It is **shrinking** as Arcus grows: SPY 2–5 bps went from ≈+14 bps/fill in late
+July to ≈+1.2 in September.
+
+**On Binance's own tape the same rule loses** (HYPE: −2.2 bps/fill): Binance is where price is
+discovered, so sweeps there are informed. The Arcus edge is local — Arcus sweeps revert toward
+the price set elsewhere.
+
+**Binance price sorts Arcus maker fills into winners and losers** (`scripts/fair_value_study.py`,
+Sep 1–20, trailing basis only): fills priced 2–5 bps better than Binance-implied fair value won
+97% (SPY), 88% (NVDA), 68% (HYPE) of the time; fills worse than fair lost 70–96%. Binance leads
+Arcus by ~1–3 s.
+
+**But a slow quoter can't harvest that** (`scripts/fair_value_backtest.py`, queue-aware replay,
+Sep 19–20): with our real delays (Binance seen 150 ms late, 200 ms RTT to Arcus) every
+Binance-anchored config marks out negative (rs30 −1 to −4 bps) — faster makers take the good fills
+and we get picked off. With co-located delays (5 ms / 20 ms) markouts turn positive on HYPE, ETH
+and BTC (+0.2 to +3.9 bps), but PnL is still mixed (ETH 1 bps +$2.11, HYPE −$1 to −$3) because
+inventory drifts with the Arcus/Binance basis. Two weekend days only; stock perps need weekday
+Binance data (Sep 21 publishes 2026-09-22).
+
+## 6. Side experiment: Propr (`propr/`)
 
 REST loop polling every 2 s, quoting BTC on Hyperliquid through Propr at a **1.5 bps maker fee**.
 Arcus tape shows BTC makers near the touch lose ~1 bps *before* fees, and the real fills on
