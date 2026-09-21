@@ -926,6 +926,64 @@ class TestSimEngine(unittest.TestCase):
         self.assertEqual(sensitivity_results[50.0], 0)
         self.assertEqual(sensitivity_results[100.0], 0)
 
+    def test_26_v36_avellaneda_stoikov_trade_calibration_and_fills(self):
+        """V-36 / MUT-28: Avellaneda-Stoikov empirically calibrates kappa from trades and achieves fills."""
+        import pandas as pd
+        from src.strategies.avellaneda_stoikov import AvellanedaStoikovStrategy, calibrate_kappa_from_trades
+
+        # 1. Test calibration behavior
+        df_trades = pd.DataFrame([{"price": 100.0, "size": 1.0} for _ in range(500)])
+        duration_hours = 1.0
+        mean_spread_bps = 2.0
+        fitted_kappa, meta = calibrate_kappa_from_trades(
+            df_trades, duration_hours, mean_spread_bps=mean_spread_bps
+        )
+
+        self.assertTrue(meta["is_calibrated"], "Fitted kappa must be marked as calibrated")
+        self.assertEqual(meta["status"], "CALIBRATED")
+        self.assertGreater(fitted_kappa, 100.0, "Empirical kappa for high-frequency trades must exceed 100")
+
+        # 2. Test SimEngine integration with calibrated vs uncalibrated strategy
+        tick = self.specs[self.market]["tick_size"]
+        step = self.specs[self.market]["step_size"]
+        strat_calibrated = AvellanedaStoikovStrategy(
+            market=self.market,
+            tick_size=tick,
+            step_size=step,
+            gamma=0.10,
+            kappa=fitted_kappa,
+            is_calibrated=meta["is_calibrated"],
+            clip_notional=10.0,
+        )
+        self.assertTrue(strat_calibrated.is_calibrated)
+        self.assertEqual(strat_calibrated.status, "CALIBRATED")
+
+        engine = SimEngine(
+            markets=[self.market],
+            market_specs=self.specs,
+            strategies={"as": strat_calibrated},
+            fill_models=[FillModelType.MODEL_B_MODERATE, FillModelType.MODEL_C_CONSERVATIVE],
+            latency_config=LatencyConfig(order_entry_latency_ms=10.0, cancel_latency_ms=10.0),
+        )
+
+        # Feed BBO at 100.0 (bid 99.90, ask 100.10)
+        t0 = 1_000_000_000
+        engine.on_event(SimEvent(SimEventType.BBO, t0, self.market, {"bid_price": 99.90, "ask_price": 100.10, "bid_size": 10.0, "ask_size": 10.0}))
+        # Clock tick to let quotes reach exchange
+        engine.on_event(SimEvent(SimEventType.CLOCK_TICK, t0 + int(30e6), self.market, {}))
+
+        # Check resting orders
+        ctx = engine.contexts["as"]
+        bid_order = ctx.active_bid[FillModelType.MODEL_B_MODERATE]
+        self.assertIsNotNone(bid_order, "Calibrated Avellaneda-Stoikov must place resting bid")
+        bid_price = bid_order.price
+        # Calibrated bid must be near mid (>= 99.50)
+        self.assertGreaterEqual(bid_price, 99.50, f"Calibrated bid {bid_price} should be close to mid 100.0")
+
+        # Aggressive sell trade through our bid
+        fills = engine.on_event(SimEvent(SimEventType.TRADE, t0 + int(50e6), self.market, {"side": "SELL", "price": bid_price, "size": 1.0}))
+        self.assertGreater(len(fills), 0, "Calibrated Avellaneda-Stoikov must generate fills on market trades")
+
     def test_13_mutation_tests(self):
         """Test 13: Mutation tests (at least 16 mutations applied to the engine fail test suite)."""
         from scripts.mutation_check import (
@@ -952,6 +1010,7 @@ class TestSimEngine(unittest.TestCase):
             test_mutation_21_manifest_missing_target_dir,
             test_mutation_22_latency_uncalibrated_grid,
             test_mutation_23_margin_liquidation_bypass,
+            test_mutation_28_avellaneda_stoikov_hardcoded_kappa,
         )
         mutations = [
             test_mutation_1_invert_queue,
@@ -977,10 +1036,11 @@ class TestSimEngine(unittest.TestCase):
             test_mutation_21_manifest_missing_target_dir,
             test_mutation_22_latency_uncalibrated_grid,
             test_mutation_23_margin_liquidation_bypass,
+            test_mutation_28_avellaneda_stoikov_hardcoded_kappa,
         ]
         results = [m() for m in mutations]
         caught = sum(1 for r in results if r.caught)
-        self.assertGreaterEqual(caught, 23, f"Must catch at least 23 mutations, caught {caught}")
+        self.assertGreaterEqual(caught, 24, f"Must catch at least 24 mutations, caught {caught}")
 
 
 if __name__ == "__main__":

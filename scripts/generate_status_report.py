@@ -100,7 +100,7 @@ def generate_status_markdown(output_path: Path) -> None:
         "",
         "| Subsystem | Metric | Current Value | Specification / Health |",
         "|---|---|---|---|",
-        f"| **Defect Ledger** | Total Findings | {total_findings} | V-01..V-35 (35) + W-01..W-14 (14) |",
+        f"| **Defect Ledger** | Total Findings | {total_findings} | V-01..V-36 (36) + W-01..W-14 (14) |",
         f"| **Defect Remediation** | Fixed / Open | {fixed_findings} / {open_findings} | Verified via `scripts/generate_audit_report.py` |",
         f"| **Recorder PID {rec_pid}** | Uptime | {uptime_h:.1f} hours ({uptime_s:,} s) | Status: {rec_status} |",
         f"| **Data Ingestion** | Recorded Messages | {msgs_rec:,} frames | Free Disk: {free_gb:.1f} GB |",

@@ -610,6 +610,7 @@ def test_mutation_24_tautological_metric_regression() -> MutationResult:
 
 def test_mutation_25_hardcoded_status_ledger_counts() -> MutationResult:
     """MUT-25: Hardcodes defect finding counts in generate_status_report.py (W-10 regression)."""
+    import re
     import scripts.generate_status_report as gsr
     orig_func = gsr.generate_status_markdown
 
@@ -617,7 +618,7 @@ def test_mutation_25_hardcoded_status_ledger_counts() -> MutationResult:
         orig_func(output_path)
         content = output_path.read_text(encoding="utf-8")
         # BUG: Re-introduces hardcoded 34 count discrepancy
-        mutated_content = content.replace("Total Findings | 49", "Total Findings | 34")
+        mutated_content = re.sub(r"Total Findings \| \d+", "Total Findings | 34", content)
         output_path.write_text(mutated_content, encoding="utf-8")
 
     gsr.generate_status_markdown = mutated_generate_status_markdown
@@ -628,7 +629,7 @@ def test_mutation_25_hardcoded_status_ledger_counts() -> MutationResult:
             "MUT-25",
             "Hardcoded Ledger Counts",
             "TestReportProvenance.test_w10_w14_status_report_ledger_counts_and_hygiene_advisory",
-            "Hardcodes status report defect counts (e.g. 34 instead of programmatically derived 49), causing ledger discrepancies",
+            "Hardcodes status report defect counts (e.g. 34 instead of programmatically derived total), causing ledger discrepancies",
             failed,
             msg,
         )
@@ -690,6 +691,36 @@ def test_mutation_27_bypass_two_key_mainnet_guard() -> MutationResult:
         le.LiveExecutionEngine.verify_safety_guards = orig_verify
 
 
+def test_mutation_28_avellaneda_stoikov_hardcoded_kappa() -> MutationResult:
+    """MUT-28: Reverts Avellaneda-Stoikov calibration back to hardcoded default kappa=1.5."""
+    from src.strategies import avellaneda_stoikov as as_mod
+    orig_calib = as_mod.calibrate_kappa_from_trades
+
+    def mutated_calib(df_trades, duration_hours, mean_spread_bps=4.0):
+        # BUG: Revert to uncalibrated hardcoded default kappa=1.5 (V-36 regression)
+        return 1.5, {
+            "is_calibrated": False,
+            "status": "NOT CALIBRATED (hardcoded revert)",
+            "sample_count": len(df_trades),
+            "duration_hours": duration_hours,
+            "fitted_kappa": 1.5,
+        }
+
+    as_mod.calibrate_kappa_from_trades = mutated_calib
+    try:
+        failed, msg = run_targeted_test(TestSimEngine, "test_26_v36_avellaneda_stoikov_trade_calibration_and_fills")
+        return MutationResult(
+            "MUT-28",
+            "Hardcoded Avellaneda-Stoikov Kappa",
+            "TestSimEngine.test_26_v36_avellaneda_stoikov_trade_calibration_and_fills",
+            "Reverts Avellaneda-Stoikov trade arrival calibration to hardcoded default kappa=1.5 and uncalibrated status",
+            failed,
+            msg,
+        )
+    finally:
+        as_mod.calibrate_kappa_from_trades = orig_calib
+
+
 def main():
     mutations: List[Callable[[], MutationResult]] = [
         test_mutation_1_invert_queue,
@@ -719,6 +750,7 @@ def main():
         test_mutation_25_hardcoded_status_ledger_counts,
         test_mutation_26_rth_capture_tag_conflation,
         test_mutation_27_bypass_two_key_mainnet_guard,
+        test_mutation_28_avellaneda_stoikov_hardcoded_kappa,
     ]
 
     print("=" * 80)

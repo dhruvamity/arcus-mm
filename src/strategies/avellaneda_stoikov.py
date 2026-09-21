@@ -45,7 +45,7 @@ def calibrate_kappa_from_trades(
     # Fit kappa: lambda ~ exp(-kappa * delta_half) => kappa ~ ln(baseline / lambda) / delta_half
     # Standard normalized intensity parameter:
     raw_kappa = math.log(max(1.0, trades_per_hour)) / max(1e-4, delta_half * 100.0)
-    fitted_kappa = max(0.1, min(50.0, raw_kappa))
+    fitted_kappa = max(0.1, min(50000.0, raw_kappa))
 
     return fitted_kappa, {
         "is_calibrated": True,

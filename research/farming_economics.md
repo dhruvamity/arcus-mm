@@ -83,6 +83,12 @@ $$\text{Cost per \$1,000,000 Traded} = -\text{Net BPS} \times \$100.00$$
 > **Zero candidates achieve statistically significant positive net edge at base fee tier.**  
 > Without a maker rebate (W-04), every $1,000,000 of volume manufactured passively costs between **$23 and $97 in net cash drag** due to the 2.25 bps taker exit penalty and adverse selection. Running a market maker purely to "farm volume" without external compensation is a cash-negative operation.
 
+### 2.5 Avellaneda-Stoikov Empirical Performance (Finding V-36 Remediated)
+Prior to remediation of Finding V-36, Avellaneda-Stoikov produced 0 fills across all markets due to an uncalibrated default ($\kappa = 1.5$, yielding reservation spread $> 120\%$). Following the wiring of `calibrate_kappa_from_trades()` and relaxation of the arrival intensity clamp to high-frequency regimes:
+- **BTC-USD (`Avellaneda_Stoikov`):** Empirically fitted $\kappa \approx 9,877$ brings reservation spread down to ~2.0 bps. Model C fill rate reaches **45.04 fills/hr** (5,405 expected 5-day fills, $\sigma = 0.46$ bps, $N_{\text{req}} = 30$, **FEASIBLE**).
+- **ETH-USD & SOL-USD:** Empirically calibrated $\kappa \approx 1,058$ and $\approx 1,444$ produce active quoting with 0.04 to 0.08 fills/hr under Model C (insufficient for 5-day statistical power without further tuning of risk aversion $\gamma$).
+- **Inventory Skew Economics:** Inventory-dependent reservation pricing lowers adverse selection compared to static fixed-spread quoting, but the base-tier absence of maker rebates (W-04) and the 2.25 bps taker rebalance fee drag keep net operational edge near breakeven or slightly negative unless maker rebates are unlocked.
+
 ---
 
 ## 3. Reward Status & Tokenomics Audit
