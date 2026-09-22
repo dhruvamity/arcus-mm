@@ -20,7 +20,7 @@ CFG = {"markets": [{"market": "X-USD", "depth_bps": 10, "clip_usd": 25, "max_pos
 
 class FakeRest:
     def __init__(self):
-        self.config = SimpleNamespace(wallet_address="0xabc", account_index=0, environment="testnet")
+        self.config = SimpleNamespace(active_wallet_address="0xabc", account_index=0, environment="testnet")
         self.calls = []
         self.positions = []
         self.open_orders = []

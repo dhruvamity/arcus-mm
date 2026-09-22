@@ -103,7 +103,7 @@ class LiveTrader:
         await self.reconcile(initial=True)
         for mk in self.states:
             await self.ws.subscribe("bbo", mk, self.on_bbo)
-        addr = self.rest.config.wallet_address
+        addr = self.rest.config.active_wallet_address
         await self.ws.subscribe("userFills", addr, self.on_fill, {"accountIndex": self.rest.config.account_index})
         self.event("started", markets=list(self.states), dry_run=self.dry_run,
                    env=self.rest.config.environment, clip=self.cfg["clip_usd"])

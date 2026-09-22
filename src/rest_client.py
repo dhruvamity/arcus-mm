@@ -44,8 +44,8 @@ class ArcusRestClient:
         # Initialize signer if private key is available
         if signer:
             self.signer: Optional[ArcusSigner] = signer
-        elif self.config.api_private_key and self.config.api_private_key != "0" * 64:
-            self.signer = ArcusSigner(self.config.api_private_key)
+        elif self.config.active_private_key and self.config.active_private_key != "0" * 64:
+            self.signer = ArcusSigner(self.config.active_private_key)
         else:
             self.signer = None
 
@@ -217,14 +217,14 @@ class ArcusRestClient:
 
     async def get_account(self, address: Optional[str] = None) -> Dict[str, Any]:
         """Fetches account balance, equity, and free collateral."""
-        addr = (address or self.config.wallet_address).lower()
+        addr = (address or self.config.active_wallet_address).lower()
         params = {"address": addr}
         headers = {"X-API-Key": self.signer.api_key} if self.signer else {}
         return await self._request("GET", "/v1/account", "account", params=params, headers=headers)
 
     async def get_positions(self, address: Optional[str] = None) -> List[Dict[str, Any]]:
         """Fetches open perpetual positions for an address."""
-        addr = (address or self.config.wallet_address).lower()
+        addr = (address or self.config.active_wallet_address).lower()
         params = {"address": addr}
         res = await self._request("GET", "/v1/positions", "positions", params=params)
         return res.get("positions", [])
@@ -235,7 +235,7 @@ class ArcusRestClient:
         market_id: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
         """Fetches resting open orders for an address."""
-        addr = (address or self.config.wallet_address).lower()
+        addr = (address or self.config.active_wallet_address).lower()
         params: Dict[str, Any] = {"address": addr}
         if market_id is not None:
             params["marketId"] = market_id
@@ -248,7 +248,7 @@ class ArcusRestClient:
         account_index: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Fetches live snapshot of per-subaccount order and cancel pools."""
-        addr = (address or self.config.wallet_address).lower()
+        addr = (address or self.config.active_wallet_address).lower()
         idx = account_index if account_index is not None else self.config.account_index
         params = {"address": addr, "accountIndex": idx}
         res = await self._request("GET", "/v1/rateLimit", "rateLimit", params=params)
@@ -299,7 +299,7 @@ class ArcusRestClient:
 
         # Build Scheme 1 signed canonical payload
         payload_str, signature, ts = self.signer.build_place_order_payload(
-            address=self.config.wallet_address,
+            address=self.config.active_wallet_address,
             account_index=self.config.account_index,
             market_id=order.marketId,
             side_int=order.side.int_code,
@@ -312,7 +312,7 @@ class ArcusRestClient:
         )
 
         body: Dict[str, Any] = {
-            "address": self.config.wallet_address,
+            "address": self.config.active_wallet_address,
             "accountIndex": self.config.account_index,
             "marketId": order.marketId,
             "orderSide": order.side.value,
@@ -358,7 +358,7 @@ class ArcusRestClient:
 
         good_til_micros = good_til_micros or good_til_time_micros()
         payload_str, signature, ts = self.signer.build_modify_order_payload(
-            address=self.config.wallet_address,
+            address=self.config.active_wallet_address,
             account_index=self.config.account_index,
             market_id=market_id,
             order_id=str(order_id),
@@ -371,7 +371,7 @@ class ArcusRestClient:
             client_id=client_id,
         )
         body: Dict[str, Any] = {
-            "address": self.config.wallet_address,
+            "address": self.config.active_wallet_address,
             "accountIndex": self.config.account_index,
             "marketId": market_id,
             "orderId": str(order_id),
@@ -411,7 +411,7 @@ class ArcusRestClient:
             )
 
         payload_str, signature, ts = self.signer.build_cancel_order_payload(
-            address=self.config.wallet_address,
+            address=self.config.active_wallet_address,
             account_index=self.config.account_index,
             market_id=market_id,
             order_id=order_id,
@@ -419,7 +419,7 @@ class ArcusRestClient:
         )
 
         body: Dict[str, Any] = {
-            "address": self.config.wallet_address,
+            "address": self.config.active_wallet_address,
             "accountIndex": self.config.account_index,
             "marketId": market_id,
             "timestamp": ts,
@@ -450,7 +450,7 @@ class ArcusRestClient:
         self._assert_trading_allowed()
 
         body: Dict[str, Any] = {
-            "address": self.config.wallet_address,
+            "address": self.config.active_wallet_address,
             "accountIndex": self.config.account_index,
         }
         if market_id is not None:
@@ -471,13 +471,13 @@ class ArcusRestClient:
         self._assert_trading_allowed()
 
         body: Dict[str, Any] = {
-            "address": self.config.wallet_address,
+            "address": self.config.active_wallet_address,
             "accountIndex": self.config.account_index,
             "time": deadline_micros,
         }
         signature, ts = self.signer.sign_scheme_2("scheduleCancel", body)
         headers = self.signer.get_auth_headers(signature, ts)
-        params = {"address": self.config.wallet_address}
+        params = {"address": self.config.active_wallet_address}
         return await self._request(
             "POST",
             "/v1/scheduleCancel",
