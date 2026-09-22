@@ -165,6 +165,10 @@ class Params:
     # then quote nothing for stop_cooldown_s (0 = no stop-loss)
     stop_loss_bps: float = 0.0
     stop_cooldown_s: float = 60.0
+    # don't ADD to an open position while the mid has moved against it by >= trend_guard_bps over
+    # the last trend_window_s (stops stacking inventory into a trend; the closing quote keeps working)
+    trend_guard_bps: float = 0.0
+    trend_window_s: float = 300.0
 
 
 @dataclass
@@ -195,6 +199,9 @@ def simulate(t: Dict[str, np.ndarray], p: Params) -> Result:
     pos = cash = 0.0
     avg_px = 0.0          # average entry price of the open position
     cool_until = 0        # no quoting before this recv time (after a stop-loss)
+    hist_t: List[int] = []    # (recv time, mid) samples for the trend guard, ~1 per second
+    hist_m: List[float] = []
+    hist_i = 0
     res = Result()
     in_snap = -1
     day_ns = 86_400 * 10**9
@@ -347,6 +354,16 @@ def simulate(t: Dict[str, np.ndarray], p: Params) -> Result:
                 res.stop_losses += 1
                 cool_until = now + int(p.stop_cooldown_s * 1e9)
         cooling = now < cool_until
+        trend = 0.0   # bps move of the mid over the trend window (past only)
+        if p.trend_guard_bps > 0:
+            if not hist_t or now - hist_t[-1] >= 1_000_000_000:
+                hist_t.append(now)
+                hist_m.append(mid)
+            w_ns = int(p.trend_window_s * 1e9)
+            while hist_i + 1 < len(hist_t) and hist_t[hist_i + 1] <= now - w_ns:
+                hist_i += 1
+            if hist_t[hist_i] <= now - w_ns:
+                trend = (mid / hist_m[hist_i] - 1) * 1e4
         inv_usd = pos * mid
         skew = -p.skew_bps * max(-1.0, min(1.0, inv_usd / p.max_pos_usd)) if p.max_pos_usd > 0 else 0.0
         for s in (1, -1):
@@ -355,6 +372,9 @@ def simulate(t: Dict[str, np.ndarray], p: Params) -> Result:
             # the daily loss stop and cooldowns halt *new* risk but keep the exit quote working
             want = (on or (reduces and stopped and (p.active(now) if p.active else True))) and not cooling \
                 and not (s * inv_usd >= p.max_pos_usd)
+            # trend guard: holding long in a falling market (or short in a rising one) -> no adding
+            if want and p.trend_guard_bps > 0 and s * pos > 0 and -s * trend >= p.trend_guard_bps:
+                want = False
             if want:
                 if reduces and p.exit_mode == "touch":
                     target = ba if s == -1 else bb      # join the best price on the closing side

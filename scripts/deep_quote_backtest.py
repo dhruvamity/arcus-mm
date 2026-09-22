@@ -99,6 +99,8 @@ def main():
     ap.add_argument("--cancel-units", type=float, default=40_000.0, help="starting cancel-pool headroom")
     ap.add_argument("--exit-mode", default="mid", choices=["mid", "touch"], help="where the inventory-closing quote rests")
     ap.add_argument("--stop-loss-bps", type=float, default=0.0, help="taker-flatten when mid is this far against entry (0 = off)")
+    ap.add_argument("--trend-guard-bps", type=float, default=0.0, help="don't add to a position against a move this big (0 = off)")
+    ap.add_argument("--trend-window", type=float, default=300.0, help="trend guard lookback, seconds")
     ap.add_argument("--rth-only", action="store_true", help="equity-like markets quote only 13:30-20:00 UTC weekdays")
     ap.add_argument("--from-day", default="", help="YYYY-MM-DD: quote only from this UTC date (prior day replays as book warm-up)")
     ap.add_argument("--to-day", default="", help="YYYY-MM-DD: last UTC date of tape to use (inclusive)")
@@ -124,7 +126,7 @@ def main():
         def active(ns, start_ns=start_ns, gate_rth=gate_rth):
             return ns >= start_ns and (not gate_rth or rth(ns))
         for d in [float(x) for x in a.depths.split(",")]:
-            p = Params(depth_bps=d, exit_mode=a.exit_mode, stop_loss_bps=a.stop_loss_bps, requote_bps=a.requote, skew_bps=a.skew, daily_stop_usd=a.stop_usd, rate_limit=a.rate_limit,
+            p = Params(depth_bps=d, trend_guard_bps=a.trend_guard_bps, trend_window_s=a.trend_window, exit_mode=a.exit_mode, stop_loss_bps=a.stop_loss_bps, requote_bps=a.requote, skew_bps=a.skew, daily_stop_usd=a.stop_usd, rate_limit=a.rate_limit,
                        order_units=a.order_units, cancel_units=a.cancel_units, clip_usd=a.clip, max_pos_usd=a.max_pos, rtt_ms=a.rtt,
                        maker_fee_bps=a.maker_fee, tick=float(s["tickSize"]), step=float(s["stepSize"]),
                        min_notional=max(float(s["minOrderNotional"]), float(s["minOrderSize"]) * float(s["markPrice"])),

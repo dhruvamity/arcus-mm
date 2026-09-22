@@ -139,6 +139,17 @@ class TestReplayFills(unittest.TestCase):
         self.assertEqual([round(f[2], 2) for f in sells], [100.01])
         self.assertAlmostEqual(r.final_pos, 0.0)
 
+    def test_trend_guard_blocks_adding_into_a_fall(self):
+        # long after the first fill; mid then falls 1% over the 5 s window -> no second bid
+        p = dict(P, trend_guard_bps=50.0, trend_window_s=5.0, max_pos_usd=1e9, requote_bps=0.0)
+        rows = book() + [(10, TRADE, 200, -1, 99.90, 5.0),
+                         (11, BBO, 2000, 0, 99.49, 99.51), (12, BBO, 7000, 0, 98.99, 99.01),
+                         (20, TRADE, 7500, -1, 98.00, 5.0)]
+        r = simulate(tape(rows), Params(**p))
+        self.assertAlmostEqual(r.final_pos, 1.0)
+        r = simulate(tape(rows), Params(**dict(p, trend_guard_bps=0.0)))
+        self.assertAlmostEqual(r.final_pos, 2.0)                  # without the guard it buys again
+
 
 if __name__ == "__main__":
     unittest.main()
