@@ -145,6 +145,18 @@ class Params:
     step: float = 1e-8
     min_notional: float = 5.0
     active: Optional[callable] = None   # f(recv_ns) -> bool; outside, pull quotes
+    # optional external fair value (e.g. Binance mid + Arcus basis): (observed_ns sorted, price).
+    # When set, quotes are placed around fair instead of the Arcus mid, never crossing the touch.
+    fair: Optional[tuple] = None
+    # stop quoting for the rest of the UTC day once equity is down this much from the day's start
+    daily_stop_usd: float = 0.0
+    # Arcus per-subaccount action budget (docs: api-reference/rate-limits). Headroom starts at
+    # these values (20k/40k for a fresh subaccount), grows 10 units per $ filled, and once spent
+    # allows one action per 10 s per pool. A requote is a modify (1 order unit); pulling a quote
+    # is a cancel (1 cancel unit). Actions the budget cannot pay for are simply not taken.
+    rate_limit: bool = False
+    order_units: float = 20_000.0
+    cancel_units: float = 40_000.0
 
 
 @dataclass
@@ -152,6 +164,10 @@ class Result:
     fills: List[tuple] = field(default_factory=list)   # (recv_ns, side, price, qty, mid)
     actions: int = 0
     rejects: int = 0
+    stops: int = 0
+    throttled: int = 0
+    order_units_left: float = 0.0
+    cancel_units_left: float = 0.0
     final_pos: float = 0.0
     cash: float = 0.0
     final_mid: float = float("nan")
@@ -170,6 +186,23 @@ def simulate(t: Dict[str, np.ndarray], p: Params) -> Result:
     pos = cash = 0.0
     res = Result()
     in_snap = -1
+    day_ns = 86_400 * 10**9
+    cur_day, day_start_eq, stopped = -1, 0.0, False
+    units = {"o": p.order_units, "c": p.cancel_units}
+    next_drip = {"o": 0, "c": 0}
+
+    def pay(pool, now):
+        """Charge one action to a pool; False if the budget cannot pay for it right now."""
+        if not p.rate_limit:
+            return True
+        if units[pool] >= 1:
+            units[pool] -= 1
+            return True
+        if now >= next_drip[pool]:
+            next_drip[pool] = now + 10 * 10**9
+            return True
+        res.throttled += 1
+        return False
 
     def rnd(x, up):
         n = x / p.tick
@@ -190,6 +223,8 @@ def simulate(t: Dict[str, np.ndarray], p: Params) -> Result:
         pos += o.side * q
         cash -= o.side * q * o.price + q * o.price * p.maker_fee_bps * 1e-4
         res.fills.append((now, o.side, o.price, q, (bb + ba) / 2))
+        units["o"] += 10 * q * o.price
+        units["c"] += 10 * q * o.price
         res.max_abs_pos_usd = max(res.max_abs_pos_usd, abs(pos) * o.price)
 
     seq, kind, recv, side, px, sz, aux = (t[k] for k in ("seq", "kind", "recv", "side", "px", "sz", "aux"))
@@ -263,30 +298,52 @@ def simulate(t: Dict[str, np.ndarray], p: Params) -> Result:
         bb, ba = px[i], sz[i]
         mid = (bb + ba) / 2
         on = p.active(now) if p.active else True
+        if p.daily_stop_usd > 0:
+            eq = cash + pos * mid
+            if now // day_ns != cur_day:
+                cur_day, day_start_eq, stopped = now // day_ns, eq, False
+            if eq - day_start_eq <= -p.daily_stop_usd:
+                if not stopped:
+                    res.stops += 1
+                stopped = True
+            on = on and not stopped
+        ref = mid
+        if p.fair is not None:
+            k = int(np.searchsorted(p.fair[0], now, side="right")) - 1
+            if k < 0 or not p.fair[1][k] > 0:
+                on = False
+            else:
+                ref = float(p.fair[1][k])
         inv_usd = pos * mid
         skew = -p.skew_bps * max(-1.0, min(1.0, inv_usd / p.max_pos_usd)) if p.max_pos_usd > 0 else 0.0
         for s in (1, -1):
             w = working[s]
             want = on and not (s * inv_usd >= p.max_pos_usd)
             if want:
-                target = mid * (1 - s * p.depth_bps * 1e-4 + skew * 1e-4)
+                target = ref * (1 - s * p.depth_bps * 1e-4 + skew * 1e-4)
                 target = rnd(target, up=(s == -1))
+                if p.fair is not None:  # post-only: rest at best at most one tick inside the spread
+                    target = min(target, ba - p.tick) if s == 1 else max(target, bb + p.tick)
                 if w is not None and w.qty > 1e-12 and w.cancel_at > now and abs(w.price - target) / mid * 1e4 < p.requote_bps:
                     continue
             elif w is None or w.cancel_at <= now:
                 working[s] = None
                 continue
-            if w is not None and w.cancel_at > now and w.qty > 1e-12:
+            alive = w is not None and w.cancel_at > now and w.qty > 1e-12
+            # requote = one modify (order pool); pull = cancel (cancel pool); new = place (order pool)
+            if not pay("o" if want else "c", now):
+                continue
+            if alive:
                 w.cancel_at = now + rtt
-                res.actions += 1
             working[s] = None
+            res.actions += 1
             if want:
                 o = Order(side=s, price=target, qty=qty_for(target), live_at=now + rtt)
                 orders.append(o)
                 working[s] = o
-                res.actions += 1
 
     res.final_pos, res.cash = pos, cash
+    res.order_units_left, res.cancel_units_left = units["o"], units["c"]
     res.final_mid = (bb + ba) / 2
     res.hours = (int(recv[-1]) - first_recv) / 3.6e12 if n else 0.0
     return res

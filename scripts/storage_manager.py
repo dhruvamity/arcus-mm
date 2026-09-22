@@ -23,7 +23,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 # Constants
-ALARM_THRESHOLD_GB = 40.0
+ALARM_THRESHOLD_GB = float(os.getenv("ARCUS_DISK_ALARM_GB", "40"))
 RECORDING_TARGET_DAYS = 13.0
 
 

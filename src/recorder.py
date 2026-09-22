@@ -362,7 +362,7 @@ class ArcusStreamRecorder:
 
     async def _heartbeat_loop(self) -> None:
         """Writes heartbeat file every 5 seconds for watchdog monitoring."""
-        heartbeat_file = Path("data/recorder_heartbeat.json")
+        heartbeat_file = Path(os.getenv("ARCUS_HEARTBEAT_FILE", "data/recorder_heartbeat.json"))
         heartbeat_file.parent.mkdir(parents=True, exist_ok=True)
 
         while self._running:
@@ -424,7 +424,7 @@ class ArcusStreamRecorder:
 
     async def _health_report_loop(self) -> None:
         """Periodically writes hourly integrity reports to reports/recorder_health/."""
-        health_dir = Path("reports/recorder_health")
+        health_dir = Path(os.getenv("ARCUS_HEALTH_DIR", "reports/recorder_health"))
         health_dir.mkdir(parents=True, exist_ok=True)
 
         while self._running:

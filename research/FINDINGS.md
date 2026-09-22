@@ -64,7 +64,95 @@ Takeaways:
 * 52 hours; one trend day (BTC +6.5% on 2026-09-21). Multiple configs were tried, so the
   best ones are biased upward — hence the frozen out-of-sample test.
 
-## 5. Side experiment: Propr (`propr/`)
+## 5. Full Arcus history and Binance (added 2026-09-22)
+
+Data: Arcus keeps public trades back to **2026-06-30** (public perps launch; no older history
+exists, and no historical order book at all) — `scripts/pull_trade_history.py`. Binance
+aggTrades/klines via `scripts/pull_binance.py`: HYPE since 2025-05, NVDA/SPY/QQQ since 2026-03/04,
+gold (PAXG) since 2020. Candles alone cannot test this strategy (its edge lives in the 30 s after
+a sweep), so trade-by-trade data is used; candles are for regimes.
+
+**Trade-only estimate is validated** (`scripts/validate_sweep_proxy.py`): beyond the touch it
+matches true-BBO results in sign everywhere and is close or conservative in size (SPY 2–5 bps:
+true +2.05, estimate +1.79; BTC −0.53 vs −0.48). Not usable at the touch on thin markets or for GLD.
+
+**Deep-fill edge across Arcus's whole history** (`scripts/sweep_history.py` → `sweep_history.md`,
+weekly; history downloaded twice and cross-checked trade-by-trade with `scripts/compare_history.py`:
+0 missing, 0 differing rows). Only markets where the estimate was validated against true quotes
+are listed — thin markets (GLD, LIT, XRP, UNI, AAVE, CASHCAT, SLV, TSLA, GOOGL, AMD, SPCX, NEAR)
+come out inflated and are excluded.
+
+| market | 0–2 bps: weeks + | 2–5 bps: weeks + | 2–5 bps pooled | recent weeks (2–5 bps) |
+|---|---|---|---:|---|
+| SPY | 10/10 | 9/9 | +2.51 | still positive (+1.2 to +1.9) |
+| NVDA | 10/10 | 10/10 | +5.71 | still positive (+2.8 to +4.6) |
+| QQQ | 10/10 | 7/8 | +2.72 | positive |
+| HYPE | 9/9 | 9/9 | +3.65 | positive (+0.3 to +3.7) |
+| BTC | 10/13 | 12/13 | +1.13 | decayed to ≈0 / negative in September |
+| ETH | 11/11 | 8/10 | +1.87 | mixed, ≈0 in September |
+| SOL | 7/11 | 10/10 | +2.61 | small (+0.2 to +0.4), unstable |
+| ZEC | 5/6 | 5/6 | +4.24 | turned sharply negative in week 39 (−5.5) |
+
+The edge is **shrinking** as Arcus grows (SPY 2–5 bps ≈ +14 bps/fill in late July → ≈ +1.2 in
+September) and has already gone for the crypto majors. At the touch, BTC/ETH/SOL makers lose in
+most weeks.
+
+**Multi-year Binance check** (`binance_sweep_history.md`, monthly): fills 2–5 bps behind the touch
+were positive in 34/34 months for gold (PAXG, 2023-09 → 2026-08), 6/6 NVDA, 5/5 SPY, 5/5 QQQ, 9/9 XAU;
+at the touch they lost in nearly every month for every asset. HYPE needs ≥5 bps (14/16 months) and
+ZEC is negative until 10+ bps (29/36) — sweeps there are more informed. A 16-month queue-aware
+replay of the rule on Binance HYPE lost at 5 bps (0/16 months) and was positive only at 15 bps
+(13/16 months, +0.81 bps/fill) — `binance_replay.md`.
+
+**On Binance's own tape the same rule loses** (HYPE: −2.2 bps/fill): Binance is where price is
+discovered, so sweeps there are informed. The Arcus edge is local — Arcus sweeps revert toward
+the price set elsewhere.
+
+**Binance price sorts Arcus maker fills into winners and losers** (`scripts/fair_value_study.py`,
+Sep 1–20, trailing basis only): fills priced 2–5 bps better than Binance-implied fair value won
+97% (SPY), 88% (NVDA), 68% (HYPE) of the time; fills worse than fair lost 70–96%. Binance leads
+Arcus by ~1–3 s.
+
+**But a slow quoter can't harvest that** (`scripts/fair_value_backtest.py`, queue-aware replay,
+Sep 19–20): with our real delays (Binance seen 150 ms late, 200 ms RTT to Arcus) every
+Binance-anchored config marks out negative (rs30 −1 to −4 bps) — faster makers take the good fills
+and we get picked off. With co-located delays (5 ms / 20 ms) markouts turn positive on HYPE, ETH
+and BTC (+0.2 to +3.9 bps), but PnL is still mixed (ETH 1 bps +$2.11, HYPE −$1 to −$3) because
+inventory drifts with the Arcus/Binance basis. Two weekend days only; stock perps need weekday
+Binance data (Sep 21 publishes 2026-09-22).
+
+## 6. Can it run from this host without bleeding? (2026-09-22)
+
+**No backtest here can promise zero losses; what it can do is bound them and show where the edge
+survives our latency.** Evidence that is trustworthy:
+
+* **Order-book replay, Sep 19–21, daily loss stop $2/market** (`deep_quote_backtest.py --stop-usd 2`):
+  positive on every day at both 200 ms and 400 ms RTT for GLD 3 bps (+0.02/+0.17/+0.31 and
+  +0.02/+0.17/+0.40), NVDA 3 bps (+0.01/+0.29/+0.68; +0.01/+0.09/+0.92) and HYPE 5–8 bps
+  (e.g. 8 bps: +0.84/+4.40/+1.63; +0.76/+3.61/+4.69). SPY ≈ 0; QQQ lost on Monday; skip both for now.
+* **Depth statistics over all Arcus history** (§5): deep fills on these markets paid in almost
+  every week, and gold's did on Binance in 34/34 months.
+
+**Rejected tool:** a replay over the 12-week trade history (no order book) was built and calibrated
+against the order-book replay on the same days: it produced ~5× the fills and flipped HYPE 3 bps
+from +$5.58 to −$44.58, because quotes re-centred on a mid estimated from prints chase noise. It
+cannot judge the strategy either way and was deleted.
+
+**Arcus's action budget does not break it.** The replay now enforces the documented per-subaccount
+pools (20k order / 40k cancel units, +10 per $ traded, then one action per 10 s; a requote is one
+modify). With a fresh budget and with zero starting budget (steady state), at 200 and 400 ms,
+GLD 3 bps (+$0.50/+$0.59) and NVDA 3 bps (+$1.19/+$1.73) stayed positive on every day; HYPE 5 bps
+made +$3.8 to +$7.2 with one −$0.53 day in two of the four settings. Unthrottled, NVDA would have
+needed ~120k actions/day — far over budget — so earlier replays overstated re-quoting freedom.
+
+**Loss-bounding rules for any live run** (all testable in `src/replay.py`): post-only only (never
+pay the 2.25 bps taker fee); $25 clips, ≤$100 inventory per market; stop a market for the day at
+−$2; quote only GLD/NVDA/HYPE at the frozen depths; pull a market whose trailing public deep-maker
+edge turns ≤0 (ZEC/BTC/ETH already fail this). With 3 markets the designed worst day is ≈ −$6 plus
+the adverse move on ≤$300 of open inventory. The frozen Sep 22–28 week is the next real evidence;
+the recorder adds one day of order-book replay per day.
+
+## 7. Side experiment: Propr (`propr/`)
 
 REST loop polling every 2 s, quoting BTC on Hyperliquid through Propr at a **1.5 bps maker fee**.
 Arcus tape shows BTC makers near the touch lose ~1 bps *before* fees, and the real fills on

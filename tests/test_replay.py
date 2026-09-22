@@ -83,6 +83,40 @@ class TestReplayFills(unittest.TestCase):
         r = simulate(tape(rows), Params(**p))
         self.assertAlmostEqual(r.final_pos, 1.0)
 
+    def test_fair_value_anchor(self):
+        # fair says 99.00 while Arcus mid is 100.00: bid goes to 99.00*(1-5bps)=98.95, ask stays
+        # above the Arcus bid (clamped to 99.99 + tick = 100.00) instead of 99.05
+        fair = (np.array([0], dtype=np.int64), np.array([99.0]))
+        rows = book() + [(10, TRADE, 200, -1, 98.94, 0.01), (11, TRADE, 210, 1, 100.01, 0.01)]
+        r = simulate(tape(rows), Params(**dict(P, fair=fair)))
+        self.assertEqual(sorted((f[1], round(f[2], 2)) for f in r.fills), [(-1, 100.0), (1, 98.95)])
+
+    def test_daily_stop_pulls_quotes(self):
+        # bid fills at 99.95, then the market drops: equity falls $4.95 < -$1 stop -> no more quoting today
+        p = dict(P, daily_stop_usd=1.0)
+        rows = book() + [(10, TRADE, 200, -1, 99.90, 5.0), (11, BBO, 300, 0, 95.00, 95.10),
+                         (20, TRADE, 900, -1, 90.00, 5.0)]
+        r = simulate(tape(rows), Params(**p))
+        self.assertEqual(r.stops, 1)
+        self.assertAlmostEqual(r.final_pos, 1.0)             # second sweep finds no bid of ours
+
+        r = simulate(tape(rows), Params(**P))                 # without the stop it buys again
+        self.assertAlmostEqual(r.final_pos, 2.0)
+
+    def test_rate_limit_budget(self):
+        # 1 order unit. t=0: bid paid from the unit, ask rides the drip (next drip at 10 s).
+        # t=1 s: mid moved 1%, both requotes refused. t=13 s: one requote rides the drip.
+        p = dict(P, requote_bps=1.0, rate_limit=True, order_units=1, cancel_units=0, max_pos_usd=1e9)
+        rows = book() + [(10, BBO, 1000, 0, 98.99, 99.01), (11, BBO, 13000, 0, 97.99, 98.01)]
+        r = simulate(tape(rows), Params(**p))
+        self.assertEqual(r.actions, 3)
+        self.assertEqual(r.throttled, 3)
+
+    def test_fills_refill_budget(self):
+        p = dict(P, rate_limit=True, order_units=2, cancel_units=0)
+        r = simulate(tape(book() + [(10, TRADE, 200, -1, 99.94, 0.01)]), Params(**p))
+        self.assertAlmostEqual(r.order_units_left, 10 * 99.95)   # both units spent, $99.95 filled
+
 
 if __name__ == "__main__":
     unittest.main()
