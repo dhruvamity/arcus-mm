@@ -22,6 +22,9 @@ from src.models import (
     BBO,
     OrderRequest,
     OrderResponse,
+    OrderSide,
+    OrderType,
+    TimeInForce,
 )
 
 logger = logging.getLogger(__name__)
@@ -333,6 +336,60 @@ class ArcusRestClient:
             rateLimit=res.get("rateLimit"),
             raw=res,
         )
+
+    async def modify_order(
+        self,
+        market_id: int,
+        order_id: str,
+        price: Decimal,
+        quantity: Decimal,
+        side: OrderSide,
+        market: MarketMetadata,
+        client_id: Optional[str] = None,
+        good_til_micros: Optional[int] = None,
+    ) -> OrderResponse:
+        """Re-prices a resting ALO order (cancel-replace on the venue, 1 order-pool unit)."""
+        self._assert_trading_allowed()
+
+        if self.config.paper_trading_mode:
+            logger.info(f"[PAPER TRADING] Simulating modify {order_id} -> {quantity} @ {price}")
+            return OrderResponse(orderId=order_id, clientId=client_id, status="ACK",
+                                 marketId=market_id, raw={"paper": True})
+
+        good_til_micros = good_til_micros or good_til_time_micros()
+        payload_str, signature, ts = self.signer.build_modify_order_payload(
+            address=self.config.wallet_address,
+            account_index=self.config.account_index,
+            market_id=market_id,
+            order_id=str(order_id),
+            side_int=side.int_code,
+            price_ticks=to_ticks(price, market.tickSize),
+            quantity_quantums=to_quantums(quantity, market.stepSize),
+            tif_int=TimeInForce.ALO.int_code,
+            good_til_nanos=good_til_micros * 1000,
+            reduce_only=0,
+            client_id=client_id,
+        )
+        body: Dict[str, Any] = {
+            "address": self.config.wallet_address,
+            "accountIndex": self.config.account_index,
+            "marketId": market_id,
+            "orderId": str(order_id),
+            "orderSide": side.value,
+            "orderType": OrderType.LIMIT.value,
+            "quantity": str(quantity),
+            "price": str(price),
+            "timeInForce": TimeInForce.ALO.value,
+            "goodTilTime": str(good_til_micros),
+            "timestamp": ts,
+        }
+        if client_id:
+            body["clientId"] = client_id
+        headers = self.signer.get_auth_headers(signature, ts)
+        res = await self._request("POST", "/v1/modifyOrder", "modifyOrder", json_body=body, headers=headers)
+        return OrderResponse(orderId=res.get("orderId", order_id), clientId=res.get("clientId", client_id),
+                             status=res.get("status", "ACK"), marketId=market_id,
+                             rateLimit=res.get("rateLimit"), raw=res)
 
     async def cancel_order(
         self,

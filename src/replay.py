@@ -28,6 +28,7 @@ from typing import Dict, List, Optional
 
 import numpy as np
 
+from src.quoting import QuoteRules, needs_requote, plan
 from src.tape import RAW_ROOT, open_tape, tape_days
 
 DERIVED = RAW_ROOT.parent / "derived"
@@ -222,15 +223,10 @@ def simulate(t: Dict[str, np.ndarray], p: Params) -> Result:
         res.throttled += 1
         return False
 
-    def rnd(x, up):
-        n = x / p.tick
-        return (math.ceil(n - 1e-9) if up else math.floor(n + 1e-9)) * p.tick
-
-    def qty_for(price):
-        q = max(1, round(p.clip_usd / price / p.step)) * p.step
-        while q * price < p.min_notional:
-            q += p.step
-        return q
+    rules = QuoteRules(depth_bps=p.depth_bps, requote_bps=p.requote_bps, clip_usd=p.clip_usd,
+                       max_pos_usd=p.max_pos_usd, min_notional=p.min_notional, tick=p.tick, step=p.step,
+                       exit_mode=p.exit_mode, skew_bps=p.skew_bps, trend_guard_bps=p.trend_guard_bps,
+                       anchored=p.fair is not None)
 
     def book_fill(side_: int, price: float, q: float, now: int, taker: bool):
         nonlocal pos, cash, avg_px
@@ -364,26 +360,15 @@ def simulate(t: Dict[str, np.ndarray], p: Params) -> Result:
                 hist_i += 1
             if hist_t[hist_i] <= now - w_ns:
                 trend = (mid / hist_m[hist_i] - 1) * 1e4
-        inv_usd = pos * mid
-        skew = -p.skew_bps * max(-1.0, min(1.0, inv_usd / p.max_pos_usd)) if p.max_pos_usd > 0 else 0.0
+        # the daily loss stop and session gate halt *new* risk but keep the exit quote working
+        targets = plan(rules, bb=bb, ba=ba, ref=ref, pos=pos, trend_bps=trend, allow_open=on,
+                       allow_close=(p.active(now) if p.active else True) and not cooling)
         for s in (1, -1):
             w = working[s]
-            reduces = s * pos < 0   # this side's fill would shrink the position
-            # the daily loss stop and cooldowns halt *new* risk but keep the exit quote working
-            want = (on or (reduces and stopped and (p.active(now) if p.active else True))) and not cooling \
-                and not (s * inv_usd >= p.max_pos_usd)
-            # trend guard: holding long in a falling market (or short in a rising one) -> no adding
-            if want and p.trend_guard_bps > 0 and s * pos > 0 and -s * trend >= p.trend_guard_bps:
-                want = False
+            tgt = targets[s]
+            want = tgt is not None
             if want:
-                if reduces and p.exit_mode == "touch":
-                    target = ba if s == -1 else bb      # join the best price on the closing side
-                else:
-                    target = ref * (1 - s * p.depth_bps * 1e-4 + skew * 1e-4)
-                    target = rnd(target, up=(s == -1))
-                if p.fair is not None:  # post-only: rest at best at most one tick inside the spread
-                    target = min(target, ba - p.tick) if s == 1 else max(target, bb + p.tick)
-                if w is not None and w.qty > 1e-12 and w.cancel_at > now and abs(w.price - target) / mid * 1e4 < p.requote_bps:
+                if w is not None and w.qty > 1e-12 and w.cancel_at > now and not needs_requote(w.price, tgt, mid, p.requote_bps):
                     continue
             elif w is None or w.cancel_at <= now:
                 working[s] = None
@@ -397,7 +382,7 @@ def simulate(t: Dict[str, np.ndarray], p: Params) -> Result:
             working[s] = None
             res.actions += 1
             if want:
-                o = Order(side=s, price=target, qty=qty_for(target), live_at=now + rtt)
+                o = Order(side=s, price=tgt.price, qty=tgt.qty, live_at=now + rtt)
                 orders.append(o)
                 working[s] = o
 

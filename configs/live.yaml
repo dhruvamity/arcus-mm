@@ -1,0 +1,20 @@
+# Live quoting config (scripts/run_live.py). Same rule as the backtests; see research/FINDINGS.md.
+# Orders are post-only (0 bps maker). Nothing here can place an order unless run with --live
+# AND the environment guards in src/rest_client.py are satisfied.
+
+markets:
+  - {market: GLD-USD,  depth_bps: 3, clip_usd: 25, max_pos_usd: 100, daily_stop_usd: 2}
+  - {market: NVDA-USD, depth_bps: 3, clip_usd: 25, max_pos_usd: 100, daily_stop_usd: 2}
+
+requote_bps: 1.0        # move a quote once its target drifts this far
+clip_usd: 25            # default order size (per-market value wins)
+max_pos_usd: 100        # default inventory cap per market
+daily_stop_usd: 2       # default daily loss stop per market
+exit_mode: mid          # closing quote rests at mid ± depth (tested best)
+trend_guard_bps: 0      # off: no setting helped consistently (research/regime_study.md)
+
+stale_s: 300            # nothing at all on the socket for this long -> pull every quote
+                        # (a quiet market is not a dead feed: GLD can be idle for minutes)
+reconcile_s: 30         # re-check position and open orders against the venue
+dms_refresh_s: 20       # refresh the dead man's switch this often
+dms_window_s: 60        # venue cancels everything if we go quiet for this long
