@@ -134,10 +134,11 @@ def score_day(day: str, final: bool = False):
                 (out_dir / f"{stem}.json").write_text(json.dumps(row, indent=1))
                 with open(out_dir / f"{stem}.fills.csv", "w", newline="") as f:
                     w = csv.writer(f)
-                    w.writerow(["time_utc", "side", "price", "qty", "mid_at_fill"])
-                    for t, side, px, q, mid in res.fills:
+                    w.writerow(["time_utc", "side", "price", "qty", "mid_at_fill", "fee_usd", "liquidity"])
+                    for t, side, px, q, mid, fee, taker in res.fills:
                         w.writerow([dt.datetime.fromtimestamp(t / 1e9, dt.timezone.utc).isoformat(timespec="milliseconds"),
-                                    "BUY" if side > 0 else "SELL", round(px, 10), round(q, 10), round(mid, 10)])
+                                    "BUY" if side > 0 else "SELL", round(px, 10), round(q, 10), round(mid, 10),
+                                    round(fee, 8), "taker" if taker else "maker"])
                 log.info("%s %s %-8s fills=%d pnl=$%.2f%s", day, strat["id"], variant, r["fills"], r["pnl"], " FINAL" if final else "")
     write_summary()
 

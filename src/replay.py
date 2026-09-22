@@ -157,14 +157,23 @@ class Params:
     rate_limit: bool = False
     order_units: float = 20_000.0
     cancel_units: float = 40_000.0
+    # How inventory is worked off (all exits are post-only makers unless stop_loss_bps fires):
+    #   "mid"   the closing quote rests at mid ± depth like any other quote (original rule)
+    #   "touch" while holding inventory, the closing quote joins the best bid/ask to get out fast
+    exit_mode: str = "mid"
+    # taker-flatten the whole position once the mid is this many bps against its average entry,
+    # then quote nothing for stop_cooldown_s (0 = no stop-loss)
+    stop_loss_bps: float = 0.0
+    stop_cooldown_s: float = 60.0
 
 
 @dataclass
 class Result:
-    fills: List[tuple] = field(default_factory=list)   # (recv_ns, side, price, qty, mid)
+    fills: List[tuple] = field(default_factory=list)   # (recv_ns, side, price, qty, mid, fee_usd, is_taker)
     actions: int = 0
     rejects: int = 0
     stops: int = 0
+    stop_losses: int = 0
     throttled: int = 0
     order_units_left: float = 0.0
     cancel_units_left: float = 0.0
@@ -184,6 +193,8 @@ def simulate(t: Dict[str, np.ndarray], p: Params) -> Result:
     orders: List[Order] = []          # resting + in-flight
     working = {1: None, -1: None}     # latest order we intend to keep per side
     pos = cash = 0.0
+    avg_px = 0.0          # average entry price of the open position
+    cool_until = 0        # no quoting before this recv time (after a stop-loss)
     res = Result()
     in_snap = -1
     day_ns = 86_400 * 10**9
@@ -214,18 +225,27 @@ def simulate(t: Dict[str, np.ndarray], p: Params) -> Result:
             q += p.step
         return q
 
+    def book_fill(side_: int, price: float, q: float, now: int, taker: bool):
+        nonlocal pos, cash, avg_px
+        fee = q * price * (p.taker_fee_bps if taker else p.maker_fee_bps) * 1e-4
+        new_pos = pos + side_ * q
+        if pos == 0 or (pos > 0) == (side_ > 0):            # opening or adding
+            avg_px = (abs(pos) * avg_px + q * price) / abs(new_pos)
+        elif abs(new_pos) > 1e-12 and (new_pos > 0) != (pos > 0):  # flipped through zero
+            avg_px = price
+        pos = new_pos if abs(new_pos) > 1e-12 else 0.0
+        cash -= side_ * q * price + fee
+        res.fills.append((now, side_, price, q, (bb + ba) / 2, fee, taker))
+        units["o"] += 10 * q * price
+        units["c"] += 10 * q * price
+        res.max_abs_pos_usd = max(res.max_abs_pos_usd, abs(pos) * price)
+
     def fill(o: Order, q: float, now: int):
-        nonlocal pos, cash
         q = min(q, o.qty)
         if q <= 0:
             return
         o.qty -= q
-        pos += o.side * q
-        cash -= o.side * q * o.price + q * o.price * p.maker_fee_bps * 1e-4
-        res.fills.append((now, o.side, o.price, q, (bb + ba) / 2))
-        units["o"] += 10 * q * o.price
-        units["c"] += 10 * q * o.price
-        res.max_abs_pos_usd = max(res.max_abs_pos_usd, abs(pos) * o.price)
+        book_fill(o.side, o.price, q, now, taker=False)
 
     seq, kind, recv, side, px, sz, aux = (t[k] for k in ("seq", "kind", "recv", "side", "px", "sz", "aux"))
     n = len(seq)
@@ -314,14 +334,33 @@ def simulate(t: Dict[str, np.ndarray], p: Params) -> Result:
                 on = False
             else:
                 ref = float(p.fair[1][k])
+        # hard stop-loss: taker-flatten (sell at bid / buy at ask, one tick worse for slippage)
+        if p.stop_loss_bps > 0 and pos != 0 and avg_px > 0:
+            adverse = (avg_px - mid) / avg_px * 1e4 if pos > 0 else (mid - avg_px) / avg_px * 1e4
+            if adverse >= p.stop_loss_bps:
+                for w in working.values():
+                    if w is not None:
+                        w.cancel_at = min(w.cancel_at, now)
+                working[1] = working[-1] = None
+                px_exit = (bb - p.tick) if pos > 0 else (ba + p.tick)
+                book_fill(-1 if pos > 0 else 1, px_exit, abs(pos), now + rtt, taker=True)
+                res.stop_losses += 1
+                cool_until = now + int(p.stop_cooldown_s * 1e9)
+        cooling = now < cool_until
         inv_usd = pos * mid
         skew = -p.skew_bps * max(-1.0, min(1.0, inv_usd / p.max_pos_usd)) if p.max_pos_usd > 0 else 0.0
         for s in (1, -1):
             w = working[s]
-            want = on and not (s * inv_usd >= p.max_pos_usd)
+            reduces = s * pos < 0   # this side's fill would shrink the position
+            # the daily loss stop and cooldowns halt *new* risk but keep the exit quote working
+            want = (on or (reduces and stopped and (p.active(now) if p.active else True))) and not cooling \
+                and not (s * inv_usd >= p.max_pos_usd)
             if want:
-                target = ref * (1 - s * p.depth_bps * 1e-4 + skew * 1e-4)
-                target = rnd(target, up=(s == -1))
+                if reduces and p.exit_mode == "touch":
+                    target = ba if s == -1 else bb      # join the best price on the closing side
+                else:
+                    target = ref * (1 - s * p.depth_bps * 1e-4 + skew * 1e-4)
+                    target = rnd(target, up=(s == -1))
                 if p.fair is not None:  # post-only: rest at best at most one tick inside the spread
                     target = min(target, ba - p.tick) if s == 1 else max(target, bb + p.tick)
                 if w is not None and w.qty > 1e-12 and w.cancel_at > now and abs(w.price - target) / mid * 1e4 < p.requote_bps:

@@ -71,4 +71,4 @@ propr/data/
 
 
 # Paper bot volume (docker-compose)
-paper_data/
+paper_data*/
