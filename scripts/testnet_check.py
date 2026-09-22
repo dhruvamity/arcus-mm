@@ -23,6 +23,7 @@ from src.config import ArcusConfig  # noqa: E402
 from src.models.core import OrderRequest, OrderSide, TimeInForce  # noqa: E402
 from src.quoting import round_to_tick  # noqa: E402
 from src.rest_client import ArcusRestClient  # noqa: E402
+from src.utils import good_til_time_micros  # noqa: E402
 
 
 def show(step, ok, detail=""):
@@ -58,9 +59,10 @@ async def main_async(a):
 
         order_id = None
         try:
+            gtt = good_til_time_micros()
             res = await r.place_order(OrderRequest(
                 marketId=meta.marketId, side=OrderSide.BUY, price=Decimal(str(px)), quantity=Decimal(str(qty)),
-                timeInForce=TimeInForce.ALO), meta)
+                timeInForce=TimeInForce.ALO, goodTilTimeMicros=gtt), meta)
             order_id = res.orderId
             results.append(show("placeOrder signed and accepted", str(res.status).upper() in ("ACK", "PLACED", "OPEN"),
                                 f"status={res.status} id={order_id} rateLimit={res.rateLimit}"))
@@ -69,13 +71,18 @@ async def main_async(a):
             results.append(show("placeOrder signed (rejected for funds only)" if ok else "placeOrder", ok, e))
 
         if order_id:
-            opens = await r.get_open_orders(market_id=meta.marketId)
+            for attempt in range(6):        # the read lags the write by a moment
+                opens = await r.get_open_orders(market_id=meta.marketId)
+                if any(str(o.get("orderId")) == str(order_id) for o in opens):
+                    break
+                await asyncio.sleep(0.5)
             results.append(show("openOrders shows it", any(str(o.get("orderId")) == str(order_id) for o in opens),
-                                f"{len(opens)} open"))
+                                f"{len(opens)} open after {attempt + 1} read(s)"))
             try:
                 m = await r.modify_order(market_id=meta.marketId, order_id=order_id,
                                          price=Decimal(str(round_to_tick(px * 0.999, tick, up=False))),
-                                         quantity=Decimal(str(qty)), side=OrderSide.BUY, market=meta)
+                                         quantity=Decimal(str(qty)), side=OrderSide.BUY, market=meta,
+                                         good_til_micros=gtt)
                 order_id = m.orderId or order_id
                 results.append(show("modifyOrder", str(m.status).upper() in ("ACK", "PLACED", "OPEN"), m.status))
             except Exception as e:

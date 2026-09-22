@@ -23,7 +23,6 @@ from src.models import (
     OrderRequest,
     OrderResponse,
     OrderSide,
-    OrderType,
     TimeInForce,
 )
 
@@ -370,17 +369,20 @@ class ArcusRestClient:
             reduce_only=0,
             client_id=client_id,
         )
+        # field names per /api-reference/exchange/modify-order: "side" (not "orderSide"),
+        # reduceOnly explicit, and goodTilTime echoing the resting order or the engine
+        # cancel-replaces with the new expiry
         body: Dict[str, Any] = {
             "address": self.config.active_wallet_address,
             "accountIndex": self.config.account_index,
             "marketId": market_id,
             "orderId": str(order_id),
-            "orderSide": side.value,
-            "orderType": OrderType.LIMIT.value,
+            "side": side.value,
             "quantity": str(quantity),
             "price": str(price),
             "timeInForce": TimeInForce.ALO.value,
             "goodTilTime": str(good_til_micros),
+            "reduceOnly": False,
             "timestamp": ts,
         }
         if client_id:

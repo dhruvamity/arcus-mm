@@ -31,6 +31,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from src.models.core import MarketMetadata, OrderRequest, OrderSide, TimeInForce
+from src.utils import good_til_time_micros
 from src.quoting import QuoteRules, needs_requote, plan
 
 log = logging.getLogger("live")
@@ -181,23 +182,24 @@ class LiveTrader:
     # ------------------------------------------------------------ venue calls
     async def place(self, st: MarketState, side: int, tgt):
         cid = uuid.uuid4().hex[:16]
+        gtt = good_til_time_micros()      # modify must echo this, so keep it with the order
         self.actions += 1
         self.event("place", market=st.market, side="BUY" if side > 0 else "SELL",
                    price=tgt.price, qty=tgt.qty, client_id=cid)
         if self.dry_run:
-            st.working[side] = {"order_id": f"dry-{cid}", "client_id": cid, "price": tgt.price, "qty": tgt.qty}
+            st.working[side] = {"order_id": f"dry-{cid}", "client_id": cid, "price": tgt.price, "qty": tgt.qty, "gtt": gtt}
             return
         st.inflight[side] = True
         try:
             res = await self.rest.place_order(
                 OrderRequest(marketId=st.meta.marketId, side=OrderSide.BUY if side > 0 else OrderSide.SELL,
                              price=Decimal(str(tgt.price)), quantity=Decimal(str(tgt.qty)),
-                             timeInForce=TimeInForce.ALO, clientId=cid), st.meta)
+                             timeInForce=TimeInForce.ALO, clientId=cid, goodTilTimeMicros=gtt), st.meta)
             if str(res.status).upper() in ("REJECTED", "ERROR"):
                 self.event("rejected", market=st.market, side=side, reason=str(res.raw)[:200])
                 st.working[side] = None
             else:
-                st.working[side] = {"order_id": res.orderId, "client_id": cid, "price": tgt.price, "qty": tgt.qty}
+                st.working[side] = {"order_id": res.orderId, "client_id": cid, "price": tgt.price, "qty": tgt.qty, "gtt": gtt}
         except Exception as e:
             self.event("place_error", market=st.market, error=str(e)[:300])
             st.working[side] = None
@@ -217,7 +219,8 @@ class LiveTrader:
         try:
             res = await self.rest.modify_order(market_id=st.meta.marketId, order_id=cur["order_id"],
                                                price=Decimal(str(tgt.price)), quantity=Decimal(str(tgt.qty)),
-                                               side=OrderSide.BUY if side > 0 else OrderSide.SELL, market=st.meta)
+                                               side=OrderSide.BUY if side > 0 else OrderSide.SELL, market=st.meta,
+                                               good_til_micros=cur.get("gtt"))
             if str(res.status).upper() in ("REJECTED", "ERROR", "NOT_FOUND"):
                 st.working[side] = None
                 self.event("modify_rejected", market=st.market, side=side, reason=str(res.raw)[:200])
