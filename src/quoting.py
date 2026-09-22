@@ -45,10 +45,17 @@ def round_to_tick(price: float, tick: float, up: bool) -> float:
 
 
 def qty_for(rules: QuoteRules, price: float) -> float:
-    """Clip size in base units, on the step grid and at or above the venue minimum."""
-    q = max(1, round(rules.clip_usd / price / rules.step)) * rules.step
+    """Clip size in base units, exactly on the step grid and at or above the venue minimum.
+
+    Rounded like prices: 620563 * 1e-7 is 0.062056299999999995 in binary floating point and the
+    venue rejects it as "not an exact multiple of step size".
+    """
+    dp = max(0, -math.floor(math.log10(rules.step)) + 1)
+    n = max(1, round(rules.clip_usd / price / rules.step))
+    q = round(n * rules.step, dp)
     while q * price < rules.min_notional:
-        q += rules.step
+        n += 1
+        q = round(n * rules.step, dp)
     return q
 
 

@@ -155,6 +155,24 @@ class TestLiveTrader(unittest.IsolatedAsyncioTestCase):
         await self.t.on_fill(fill("BUY", 100.0, 0.1, snapshot=True))  # snapshot: {"fills": [...]}
         self.assertAlmostEqual(self.t.states["X-USD"].pos, 0.1)
 
+    async def test_quantities_are_exact_multiples_of_the_step(self):
+        await self.t.on_bbo(bbo(402.41, 402.67))
+        for c in [c for c in self.rest.calls if c[0] == "place"]:
+            qty, step = c[3], float(META.stepSize)
+            self.assertAlmostEqual(qty / step, round(qty / step), places=6, msg=f"{qty} off the step grid")
+
+    async def test_reconcile_readopts_our_own_order_instead_of_cancelling(self):
+        await self.t.on_bbo(bbo(99.99, 100.01))
+        st = self.t.states["X-USD"]
+        cid = st.working[1]["client_id"]
+        st.working[1] = None                       # a failed modify lost the id, order still resting
+        self.rest.open_orders = [{"orderId": "kept", "clientId": cid, "side": "BUY", "price": "99.90",
+                                  "remainingSize": "0.25", "goodTilTime": "1"}]
+        self.rest.calls.clear()
+        await self.t.reconcile()
+        self.assertEqual(st.working[1]["order_id"], "kept")
+        self.assertNotIn("cancel", [c[0] for c in self.rest.calls])
+
     async def test_reconcile_adopts_venue_position_and_kills_strays(self):
         self.rest.positions = [{"marketDisplayName": "X-USD", "positionSide": "SHORT", "size": "0.4"}]
         self.rest.open_orders = [{"orderId": "ghost"}]

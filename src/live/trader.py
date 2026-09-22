@@ -55,6 +55,7 @@ class MarketState:
     stopped: bool = False
     working: Dict[int, Optional[dict]] = field(default_factory=lambda: {1: None, -1: None})
     inflight: Dict[int, bool] = field(default_factory=lambda: {1: False, -1: False})
+    known_cids: set = field(default_factory=set)      # client ids we placed, to re-adopt our own orders
 
     @property
     def mid(self) -> float:
@@ -183,6 +184,7 @@ class LiveTrader:
     async def place(self, st: MarketState, side: int, tgt):
         cid = uuid.uuid4().hex[:16]
         gtt = good_til_time_micros()      # modify must echo this, so keep it with the order
+        st.known_cids.add(cid)
         self.actions += 1
         self.event("place", market=st.market, side="BUY" if side > 0 else "SELL",
                    price=tgt.price, qty=tgt.qty, client_id=cid)
@@ -227,7 +229,8 @@ class LiveTrader:
             else:
                 st.working[side] = {**cur, "order_id": res.orderId or cur["order_id"], "price": tgt.price, "qty": tgt.qty}
         except Exception as e:
-            self.event("modify_error", market=st.market, error=str(e)[:300])
+            self.event("modify_error", market=st.market, error=str(e)[:300], order_id=cur["order_id"],
+                       sent_price=tgt.price, sent_qty=tgt.qty, sent_gtt=cur.get("gtt"), from_price=cur["price"])
             st.working[side] = None
         finally:
             st.inflight[side] = False
@@ -270,14 +273,28 @@ class LiveTrader:
             except Exception:
                 continue
             ours = {o["order_id"] for o in st.working.values() if o}
-            stray = [o for o in open_orders if str(o.get("orderId")) not in ours]
-            if stray and not self.dry_run:
-                self.event("stray_orders", market=mk, count=len(stray), action="cancel")
-                for o in stray:
+            adopted = stray = 0
+            for o in open_orders:
+                oid, cid = str(o.get("orderId")), o.get("clientId")
+                if oid in ours:
+                    continue
+                side = 1 if str(o.get("side", o.get("orderSide", ""))).upper() == "BUY" else -1
+                # an order we placed whose id we lost (a modify failed after the venue kept it):
+                # take it back rather than cancelling and re-paying for a new one
+                if cid in st.known_cids and st.working[side] is None:
+                    st.working[side] = {"order_id": oid, "client_id": cid, "price": float(o.get("price", 0)),
+                                        "qty": float(o.get("remainingSize") or o.get("quantity") or 0),
+                                        "gtt": int(o.get("goodTilTime") or 0) or None}
+                    adopted += 1
+                    continue
+                stray += 1
+                if not self.dry_run:
                     try:
-                        await self.rest.cancel_order(market_id=st.meta.marketId, order_id=str(o.get("orderId")))
+                        await self.rest.cancel_order(market_id=st.meta.marketId, order_id=oid)
                     except Exception:
                         pass
+            if adopted or stray:
+                self.event("reconcile_orders", market=mk, adopted=adopted, cancelled=stray)
 
     async def dead_mans_switch(self):
         """Arcus cancels everything for this subaccount if we stop refreshing this deadline."""
