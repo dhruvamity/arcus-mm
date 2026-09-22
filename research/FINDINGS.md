@@ -76,10 +76,33 @@ a sweep), so trade-by-trade data is used; candles are for regimes.
 matches true-BBO results in sign everywhere and is close or conservative in size (SPY 2–5 bps:
 true +2.05, estimate +1.79; BTC −0.53 vs −0.48). Not usable at the touch on thin markets or for GLD.
 
-**Deep-fill edge persists across Arcus's whole history** (`scripts/sweep_history.py`, weekly):
-0–10 bps behind the touch, maker fills were positive in 9/9 weeks (HYPE), 10/10 (SPY, NVDA) at
-0–2 and 2–5 bps. It is **shrinking** as Arcus grows: SPY 2–5 bps went from ≈+14 bps/fill in late
-July to ≈+1.2 in September.
+**Deep-fill edge across Arcus's whole history** (`scripts/sweep_history.py` → `sweep_history.md`,
+weekly; history downloaded twice and cross-checked trade-by-trade with `scripts/compare_history.py`:
+0 missing, 0 differing rows). Only markets where the estimate was validated against true quotes
+are listed — thin markets (GLD, LIT, XRP, UNI, AAVE, CASHCAT, SLV, TSLA, GOOGL, AMD, SPCX, NEAR)
+come out inflated and are excluded.
+
+| market | 0–2 bps: weeks + | 2–5 bps: weeks + | 2–5 bps pooled | recent weeks (2–5 bps) |
+|---|---|---|---:|---|
+| SPY | 10/10 | 9/9 | +2.51 | still positive (+1.2 to +1.9) |
+| NVDA | 10/10 | 10/10 | +5.71 | still positive (+2.8 to +4.6) |
+| QQQ | 10/10 | 7/8 | +2.72 | positive |
+| HYPE | 9/9 | 9/9 | +3.65 | positive (+0.3 to +3.7) |
+| BTC | 10/13 | 12/13 | +1.13 | decayed to ≈0 / negative in September |
+| ETH | 11/11 | 8/10 | +1.87 | mixed, ≈0 in September |
+| SOL | 7/11 | 10/10 | +2.61 | small (+0.2 to +0.4), unstable |
+| ZEC | 5/6 | 5/6 | +4.24 | turned sharply negative in week 39 (−5.5) |
+
+The edge is **shrinking** as Arcus grows (SPY 2–5 bps ≈ +14 bps/fill in late July → ≈ +1.2 in
+September) and has already gone for the crypto majors. At the touch, BTC/ETH/SOL makers lose in
+most weeks.
+
+**Multi-year Binance check** (`binance_sweep_history.md`, monthly): fills 2–5 bps behind the touch
+were positive in 34/34 months for gold (PAXG, 2023-09 → 2026-08), 6/6 NVDA, 5/5 SPY, 5/5 QQQ, 9/9 XAU;
+at the touch they lost in nearly every month for every asset. HYPE needs ≥5 bps (14/16 months) and
+ZEC is negative until 10+ bps (29/36) — sweeps there are more informed. A 16-month queue-aware
+replay of the rule on Binance HYPE lost at 5 bps (0/16 months) and was positive only at 15 bps
+(13/16 months, +0.81 bps/fill) — `binance_replay.md`.
 
 **On Binance's own tape the same rule loses** (HYPE: −2.2 bps/fill): Binance is where price is
 discovered, so sweeps there are informed. The Arcus edge is local — Arcus sweeps revert toward

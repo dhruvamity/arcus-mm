@@ -26,15 +26,31 @@ API = "https://api.arcus.xyz"
 MIN_REAL_US = 1_750_000_000_000_000  # ignore placeholder rows dated 2026-01-01 and earlier
 
 
+def get_with_retry(client: httpx.Client, params: dict, attempts: int = 8) -> httpx.Response:
+    """GET /v1/trades, retrying timeouts, connection errors, 429 and 5xx with backoff."""
+    for i in range(attempts):
+        try:
+            r = client.get("/v1/trades", params=params)
+        except (httpx.TimeoutException, httpx.TransportError) as e:
+            print(f"\n  {type(e).__name__}, retry {i + 1}/{attempts}", file=sys.stderr)
+            time.sleep(min(60, 2 ** i))
+            continue
+        if r.status_code == 429:
+            time.sleep(float(r.json().get("retryAfterMs", 2000)) / 1000)
+            continue
+        if r.status_code >= 500:
+            time.sleep(min(60, 2 ** i))
+            continue
+        r.raise_for_status()
+        return r
+    raise RuntimeError(f"/v1/trades failed {attempts} times for {params}")
+
+
 def pull(client: httpx.Client, market: str, stop_us: int) -> dict:
     trades: dict = {}
     to = int(time.time() * 1e6)
     while True:
-        r = client.get("/v1/trades", params={"market": market, "to": to, "limit": 1000})
-        if r.status_code == 429:
-            time.sleep(float(r.json().get("retryAfterMs", 2000)) / 1000)
-            continue
-        r.raise_for_status()
+        r = get_with_retry(client, {"market": market, "to": to, "limit": 1000})
         page = [t for t in r.json().get("trades", []) if t["timestamp"] >= max(MIN_REAL_US, stop_us)]
         new = [t for t in page if t["tradeId"] not in trades]
         for t in new:
@@ -55,11 +71,13 @@ def pull(client: httpx.Client, market: str, stop_us: int) -> dict:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--markets", required=True)
+    ap.add_argument("--out-dir", default=str(OUT))
     a = ap.parse_args()
-    OUT.mkdir(parents=True, exist_ok=True)
-    with httpx.Client(base_url=API, timeout=30) as c:
+    out = Path(a.out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    with httpx.Client(base_url=API, timeout=60) as c:
         for m in a.markets.split(","):
-            f = OUT / f"{m}.jsonl.gz"
+            f = out / f"{m}.jsonl.gz"
             old = {}
             if f.exists():
                 with gzip.open(f, "rt") as fh:

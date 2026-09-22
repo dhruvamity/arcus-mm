@@ -15,6 +15,7 @@ import argparse
 import hashlib
 import re
 import sys
+import time
 import urllib.parse
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -36,8 +37,7 @@ DEFAULT = ("futures/um:HYPEUSDT,futures/um:NVDAUSDT,futures/um:SPYUSDT,futures/u
 def list_keys(c: httpx.Client, prefix: str) -> list[str]:
     keys, marker = [], ""
     while True:
-        r = c.get(LIST, params={"prefix": prefix, "marker": marker})
-        r.raise_for_status()
+        r = get(c, LIST + "?" + urllib.parse.urlencode({"prefix": prefix, "marker": marker}))
         ks = re.findall(r"<Key>([^<]+)</Key>", r.text)
         keys += ks
         if "<IsTruncated>true</IsTruncated>" not in r.text or not ks:
@@ -45,14 +45,30 @@ def list_keys(c: httpx.Client, prefix: str) -> list[str]:
         marker = ks[-1]
 
 
+def get(c: httpx.Client, url: str, attempts: int = 6) -> httpx.Response:
+    for i in range(attempts):
+        try:
+            r = c.get(url)
+            if r.status_code < 500:
+                r.raise_for_status()
+                return r
+        except (httpx.TimeoutException, httpx.TransportError) as e:
+            print(f"  {type(e).__name__} on {url.rsplit('/', 1)[-1]}, retry {i + 1}/{attempts}", file=sys.stderr, flush=True)
+        time.sleep(min(60, 2 ** i))
+    raise RuntimeError(f"giving up on {url}")
+
+
 def fetch(c: httpx.Client, key: str) -> str:
     dest = OUT / key.removeprefix("data/")
     if dest.exists():
         return "skip"
-    want = c.get(DL + urllib.parse.quote(key) + ".CHECKSUM").text.split()[0]
-    data = c.get(DL + urllib.parse.quote(key)).content
-    if hashlib.sha256(data).hexdigest() != want:
-        raise RuntimeError(f"checksum mismatch: {key}")
+    for _ in range(3):  # a corrupted transfer fails the checksum: download again
+        want = get(c, DL + urllib.parse.quote(key) + ".CHECKSUM").text.split()[0]
+        data = get(c, DL + urllib.parse.quote(key)).content
+        if hashlib.sha256(data).hexdigest() == want:
+            break
+    else:
+        raise RuntimeError(f"checksum mismatch 3 times: {key}")
     dest.parent.mkdir(parents=True, exist_ok=True)
     tmp = dest.with_suffix(".part")
     tmp.write_bytes(data)
