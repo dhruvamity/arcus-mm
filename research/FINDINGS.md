@@ -121,7 +121,31 @@ and BTC (+0.2 to +3.9 bps), but PnL is still mixed (ETH 1 bps +$2.11, HYPE −$1
 inventory drifts with the Arcus/Binance basis. Two weekend days only; stock perps need weekday
 Binance data (Sep 21 publishes 2026-09-22).
 
-## 6. Side experiment: Propr (`propr/`)
+## 6. Can it run from this host without bleeding? (2026-09-22)
+
+**No backtest here can promise zero losses; what it can do is bound them and show where the edge
+survives our latency.** Evidence that is trustworthy:
+
+* **Order-book replay, Sep 19–21, daily loss stop $2/market** (`deep_quote_backtest.py --stop-usd 2`):
+  positive on every day at both 200 ms and 400 ms RTT for GLD 3 bps (+0.02/+0.17/+0.31 and
+  +0.02/+0.17/+0.40), NVDA 3 bps (+0.01/+0.29/+0.68; +0.01/+0.09/+0.92) and HYPE 5–8 bps
+  (e.g. 8 bps: +0.84/+4.40/+1.63; +0.76/+3.61/+4.69). SPY ≈ 0; QQQ lost on Monday; skip both for now.
+* **Depth statistics over all Arcus history** (§5): deep fills on these markets paid in almost
+  every week, and gold's did on Binance in 34/34 months.
+
+**Rejected tool:** a replay over the 12-week trade history (no order book) was built and calibrated
+against the order-book replay on the same days: it produced ~5× the fills and flipped HYPE 3 bps
+from +$5.58 to −$44.58, because quotes re-centred on a mid estimated from prints chase noise. It
+cannot judge the strategy either way and was deleted.
+
+**Loss-bounding rules for any live run** (all testable in `src/replay.py`): post-only only (never
+pay the 2.25 bps taker fee); $25 clips, ≤$100 inventory per market; stop a market for the day at
+−$2; quote only GLD/NVDA/HYPE at the frozen depths; pull a market whose trailing public deep-maker
+edge turns ≤0 (ZEC/BTC/ETH already fail this). With 3 markets the designed worst day is ≈ −$6 plus
+the adverse move on ≤$300 of open inventory. The frozen Sep 22–28 week is the next real evidence;
+the recorder adds one day of order-book replay per day.
+
+## 7. Side experiment: Propr (`propr/`)
 
 REST loop polling every 2 s, quoting BTC on Hyperliquid through Propr at a **1.5 bps maker fee**.
 Arcus tape shows BTC makers near the touch lose ~1 bps *before* fees, and the real fills on

@@ -36,8 +36,12 @@ DEFAULT = "HYPEUSDT:HYPE-USD,NVDAUSDT:NVDA-USD,SPYUSDT:SPY-USD,QQQUSDT:QQQ-USD,P
 
 
 def month_tape(zpath):
-    """Interleave TRADE rows with proxy-BBO rows (bid/ask from latest taker sell/buy prints)."""
     ts, px, q, tb, _ = load_binance_month(zpath)
+    return trade_tape(ts, px, q, tb)
+
+
+def trade_tape(ts, px, q, tb):
+    """Interleave TRADE rows with proxy-BBO rows (bid/ask from latest taker sell/buy prints). ts in µs."""
     o = np.argsort(ts, kind="stable")
     ts, px, q, tb = ts[o], px[o], q[o], tb[o]
     n = len(ts)

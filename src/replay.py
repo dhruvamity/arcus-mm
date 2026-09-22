@@ -148,6 +148,8 @@ class Params:
     # optional external fair value (e.g. Binance mid + Arcus basis): (observed_ns sorted, price).
     # When set, quotes are placed around fair instead of the Arcus mid, never crossing the touch.
     fair: Optional[tuple] = None
+    # stop quoting for the rest of the UTC day once equity is down this much from the day's start
+    daily_stop_usd: float = 0.0
 
 
 @dataclass
@@ -155,6 +157,7 @@ class Result:
     fills: List[tuple] = field(default_factory=list)   # (recv_ns, side, price, qty, mid)
     actions: int = 0
     rejects: int = 0
+    stops: int = 0
     final_pos: float = 0.0
     cash: float = 0.0
     final_mid: float = float("nan")
@@ -173,6 +176,8 @@ def simulate(t: Dict[str, np.ndarray], p: Params) -> Result:
     pos = cash = 0.0
     res = Result()
     in_snap = -1
+    day_ns = 86_400 * 10**9
+    cur_day, day_start_eq, stopped = -1, 0.0, False
 
     def rnd(x, up):
         n = x / p.tick
@@ -266,6 +271,15 @@ def simulate(t: Dict[str, np.ndarray], p: Params) -> Result:
         bb, ba = px[i], sz[i]
         mid = (bb + ba) / 2
         on = p.active(now) if p.active else True
+        if p.daily_stop_usd > 0:
+            eq = cash + pos * mid
+            if now // day_ns != cur_day:
+                cur_day, day_start_eq, stopped = now // day_ns, eq, False
+            if eq - day_start_eq <= -p.daily_stop_usd:
+                if not stopped:
+                    res.stops += 1
+                stopped = True
+            on = on and not stopped
         ref = mid
         if p.fair is not None:
             k = int(np.searchsorted(p.fair[0], now, side="right")) - 1
