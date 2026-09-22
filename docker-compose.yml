@@ -1,0 +1,12 @@
+services:
+  paper:
+    build: .
+    image: arcus-paper:latest
+    container_name: arcus-paper
+    restart: unless-stopped
+    volumes:
+      - ./paper_data:/app/data     # everything the bot records and computes; copy this folder to move it
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}

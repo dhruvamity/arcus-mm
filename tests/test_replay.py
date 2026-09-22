@@ -103,6 +103,20 @@ class TestReplayFills(unittest.TestCase):
         r = simulate(tape(rows), Params(**P))                 # without the stop it buys again
         self.assertAlmostEqual(r.final_pos, 2.0)
 
+    def test_rate_limit_budget(self):
+        # 1 order unit. t=0: bid paid from the unit, ask rides the drip (next drip at 10 s).
+        # t=1 s: mid moved 1%, both requotes refused. t=13 s: one requote rides the drip.
+        p = dict(P, requote_bps=1.0, rate_limit=True, order_units=1, cancel_units=0, max_pos_usd=1e9)
+        rows = book() + [(10, BBO, 1000, 0, 98.99, 99.01), (11, BBO, 13000, 0, 97.99, 98.01)]
+        r = simulate(tape(rows), Params(**p))
+        self.assertEqual(r.actions, 3)
+        self.assertEqual(r.throttled, 3)
+
+    def test_fills_refill_budget(self):
+        p = dict(P, rate_limit=True, order_units=2, cancel_units=0)
+        r = simulate(tape(book() + [(10, TRADE, 200, -1, 99.94, 0.01)]), Params(**p))
+        self.assertAlmostEqual(r.order_units_left, 10 * 99.95)   # both units spent, $99.95 filled
+
 
 if __name__ == "__main__":
     unittest.main()

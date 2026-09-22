@@ -69,3 +69,6 @@ data/raw_v3/
 propr/data/
 
 
+
+# Paper bot volume (docker-compose)
+paper_data/

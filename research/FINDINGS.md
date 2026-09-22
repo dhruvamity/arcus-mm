@@ -138,6 +138,13 @@ against the order-book replay on the same days: it produced ~5× the fills and f
 from +$5.58 to −$44.58, because quotes re-centred on a mid estimated from prints chase noise. It
 cannot judge the strategy either way and was deleted.
 
+**Arcus's action budget does not break it.** The replay now enforces the documented per-subaccount
+pools (20k order / 40k cancel units, +10 per $ traded, then one action per 10 s; a requote is one
+modify). With a fresh budget and with zero starting budget (steady state), at 200 and 400 ms,
+GLD 3 bps (+$0.50/+$0.59) and NVDA 3 bps (+$1.19/+$1.73) stayed positive on every day; HYPE 5 bps
+made +$3.8 to +$7.2 with one −$0.53 day in two of the four settings. Unthrottled, NVDA would have
+needed ~120k actions/day — far over budget — so earlier replays overstated re-quoting freedom.
+
 **Loss-bounding rules for any live run** (all testable in `src/replay.py`): post-only only (never
 pay the 2.25 bps taker fee); $25 clips, ≤$100 inventory per market; stop a market for the day at
 −$2; quote only GLD/NVDA/HYPE at the frozen depths; pull a market whose trailing public deep-maker

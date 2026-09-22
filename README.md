@@ -40,6 +40,33 @@ cp .env.example .env   # fill in only if you need signed endpoints
 bash scripts/ci.sh     # pyflakes + unit tests + secret scan
 ```
 
+## Paper trading bot (Docker)
+
+Records public Arcus data for GLD, NVDA, HYPE, SPY and ETH, and every 30 minutes replays the day
+through the same engine as the backtests (`src/replay.py`, with queue position, latency, post-only
+rules and Arcus's action budget). No keys, no orders. Strategies and settings: `configs/paper.yaml`.
+
+```bash
+docker compose up -d --build        # start (restarts itself after reboots/crashes)
+docker compose logs -f              # watch
+cat paper_data/paper/SUMMARY.md     # results so far
+docker compose down                 # stop cleanly
+```
+
+Everything lands in `paper_data/` next to `docker-compose.yml`:
+
+| path | what |
+|---|---|
+| `paper/SUMMARY.md`, `paper/ledger.csv` | per strategy and day: fills, PnL, markout, inventory, actions |
+| `paper/days/<day>/<id>.<variant>.json` / `.fills.csv` | full day result and every simulated fill |
+| `paper/status.json` | heartbeat (recorder alive, disk free, closed days) |
+| `raw/<today>/`, `compressed/<day>/` | the tape itself (closed days gzip-verified, ~50–100 MB/day) |
+| `logs/` | bot and recorder logs |
+
+To hand results over: stop the container, copy the whole `paper_data/` folder to this repo on the
+other machine, then `.venv/bin/python scripts/paper_bot.py summary` (or re-score any day with
+`paper_bot.py score --day YYYY-MM-DD --final`) reproduces every number from the tape.
+
 ## Recorder
 
 ```bash
