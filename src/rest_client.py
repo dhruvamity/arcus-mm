@@ -235,9 +235,9 @@ class ArcusRestClient:
     ) -> List[Dict[str, Any]]:
         """Fetches resting open orders for an address."""
         addr = (address or self.config.active_wallet_address).lower()
-        params: Dict[str, Any] = {"address": addr}
+        params: Dict[str, Any] = {"address": addr, "accountIndex": self.config.account_index}
         if market_id is not None:
-            params["marketId"] = market_id
+            params["market"] = market_id        # the filter is `market`; `marketId` is silently ignored
         res = await self._request("GET", "/v1/openOrders", "openOrders", params=params)
         return res.get("orders", [])
 

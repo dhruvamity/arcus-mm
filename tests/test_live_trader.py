@@ -15,9 +15,6 @@ CFG = {"markets": [{"market": "X-USD", "depth_bps": 10, "clip_usd": 25, "max_pos
        "requote_bps": 5.0, "clip_usd": 25, "max_pos_usd": 50, "daily_stop_usd": 1, "stale_s": 5}
 
 
-
-
-
 class FakeRest:
     def __init__(self):
         self.config = SimpleNamespace(active_wallet_address="0xabc", account_index=0, environment="testnet")
@@ -172,6 +169,33 @@ class TestLiveTrader(unittest.IsolatedAsyncioTestCase):
         await self.t.reconcile()
         self.assertEqual(st.working[1]["order_id"], "kept")
         self.assertNotIn("cancel", [c[0] for c in self.rest.calls])
+
+    async def test_reconcile_leaves_other_markets_orders_alone(self):
+        # /v1/openOrders returned every market's orders when the filter param was wrong; the GLD pass
+        # then cancelled the live NVDA quotes (and vice versa), and the next modify hit a dead order
+        await self.t.on_bbo(bbo(99.99, 100.01))
+        st = self.t.states["X-USD"]
+        self.rest.open_orders = [{"orderId": o["order_id"], "clientId": o["client_id"], "marketId": 7}
+                                 for o in st.working.values()]
+        self.rest.open_orders.append({"orderId": "nvda-bid", "clientId": "other", "marketId": 8, "side": "BUY"})
+        self.rest.calls.clear()
+        await self.t.reconcile()
+        self.assertEqual(self.rest.calls, [])
+        self.assertIsNotNone(st.working[1])
+
+    async def test_reconcile_forgets_orders_the_venue_no_longer_lists(self):
+        await self.t.on_bbo(bbo(99.99, 100.01))
+        st = self.t.states["X-USD"]
+        self.rest.open_orders = []                     # both quotes filled / rejected after a modify
+        await self.t.reconcile()
+        self.assertIsNotNone(st.working[1])            # just placed: the read may simply lag the write
+        for o in st.working.values():
+            o["ts_ns"] -= 10 * 10**9
+        await self.t.reconcile()
+        self.assertEqual((st.working[1], st.working[-1]), (None, None))
+        self.rest.calls.clear()
+        await self.t.on_bbo(bbo(99.99, 100.01))        # next tick places fresh quotes instead of modifying
+        self.assertEqual([c[0] for c in self.rest.calls], ["place", "place"])
 
     async def test_reconcile_adopts_venue_position_and_kills_strays(self):
         self.rest.positions = [{"marketDisplayName": "X-USD", "positionSide": "SHORT", "size": "0.4"}]

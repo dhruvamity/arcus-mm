@@ -13,7 +13,7 @@ Safety, all enforced here and independent of the venue:
   * dead man's switch refreshed every dms_refresh_s so the venue cancels everything if we die
   * a STOP file in the log directory -> cancel everything and exit
   * periodic reconcile against the venue's own positions and open orders; on mismatch the
-    venue wins and unknown orders are cancelled
+    venue wins, unknown orders are cancelled and tracked orders it no longer lists are forgotten
 Mainnet orders additionally need the two-key guard in src/rest_client.py.
 """
 
@@ -189,7 +189,8 @@ class LiveTrader:
         self.event("place", market=st.market, side="BUY" if side > 0 else "SELL",
                    price=tgt.price, qty=tgt.qty, client_id=cid)
         if self.dry_run:
-            st.working[side] = {"order_id": f"dry-{cid}", "client_id": cid, "price": tgt.price, "qty": tgt.qty, "gtt": gtt}
+            st.working[side] = {"order_id": f"dry-{cid}", "client_id": cid, "price": tgt.price, "qty": tgt.qty,
+                                "gtt": gtt, "ts_ns": time.time_ns()}
             return
         st.inflight[side] = True
         try:
@@ -201,7 +202,8 @@ class LiveTrader:
                 self.event("rejected", market=st.market, side=side, reason=str(res.raw)[:200])
                 st.working[side] = None
             else:
-                st.working[side] = {"order_id": res.orderId, "client_id": cid, "price": tgt.price, "qty": tgt.qty, "gtt": gtt}
+                st.working[side] = {"order_id": res.orderId, "client_id": cid, "price": tgt.price, "qty": tgt.qty,
+                                    "gtt": gtt, "ts_ns": time.time_ns()}
         except Exception as e:
             self.event("place_error", market=st.market, error=str(e)[:300])
             st.working[side] = None
@@ -215,7 +217,7 @@ class LiveTrader:
         self.event("modify", market=st.market, side="BUY" if side > 0 else "SELL",
                    old_price=cur["price"], price=tgt.price, qty=tgt.qty, order_id=cur["order_id"])
         if self.dry_run:
-            st.working[side] = {**cur, "price": tgt.price, "qty": tgt.qty}
+            st.working[side] = {**cur, "price": tgt.price, "qty": tgt.qty, "ts_ns": time.time_ns()}
             return
         st.inflight[side] = True
         try:
@@ -227,7 +229,8 @@ class LiveTrader:
                 st.working[side] = None
                 self.event("modify_rejected", market=st.market, side=side, reason=str(res.raw)[:200])
             else:
-                st.working[side] = {**cur, "order_id": res.orderId or cur["order_id"], "price": tgt.price, "qty": tgt.qty}
+                st.working[side] = {**cur, "order_id": res.orderId or cur["order_id"], "price": tgt.price,
+                                    "qty": tgt.qty, "ts_ns": time.time_ns()}
         except Exception as e:
             self.event("modify_error", market=st.market, error=str(e)[:300], order_id=cur["order_id"],
                        sent_price=tgt.price, sent_qty=tgt.qty, sent_gtt=cur.get("gtt"), from_price=cur["price"])
@@ -272,7 +275,20 @@ class LiveTrader:
                 open_orders = await self.rest.get_open_orders(market_id=st.meta.marketId)
             except Exception:
                 continue
-            ours = {o["order_id"] for o in st.working.values() if o}
+            open_orders = [o for o in open_orders if o.get("marketId") in (None, st.meta.marketId)]
+            venue_ids = {str(o.get("orderId")) for o in open_orders}
+            # an order we track that the venue no longer lists was filled, rejected after an accepted
+            # (asynchronous) modify, or cancelled by the dead man's switch: stop modifying a dead id.
+            # The grace period covers the moment between our write and the read seeing it.
+            grace_ns = float(self.cfg.get("gone_grace_s", 5)) * NS
+            gone = 0
+            for side in (1, -1):
+                cur = st.working[side]
+                if (cur and not st.inflight[side] and str(cur["order_id"]) not in venue_ids
+                        and time.time_ns() - cur.get("ts_ns", 0) > grace_ns and not self.dry_run):
+                    st.working[side] = None
+                    gone += 1
+            ours = {str(o["order_id"]) for o in st.working.values() if o}
             adopted = stray = 0
             for o in open_orders:
                 oid, cid = str(o.get("orderId")), o.get("clientId")
@@ -284,7 +300,7 @@ class LiveTrader:
                 if cid in st.known_cids and st.working[side] is None:
                     st.working[side] = {"order_id": oid, "client_id": cid, "price": float(o.get("price", 0)),
                                         "qty": float(o.get("remainingSize") or o.get("quantity") or 0),
-                                        "gtt": int(o.get("goodTilTime") or 0) or None}
+                                        "gtt": int(o.get("goodTilTime") or 0) or None, "ts_ns": time.time_ns()}
                     adopted += 1
                     continue
                 stray += 1
@@ -293,8 +309,8 @@ class LiveTrader:
                         await self.rest.cancel_order(market_id=st.meta.marketId, order_id=oid)
                     except Exception:
                         pass
-            if adopted or stray:
-                self.event("reconcile_orders", market=mk, adopted=adopted, cancelled=stray)
+            if adopted or stray or gone:
+                self.event("reconcile_orders", market=mk, adopted=adopted, cancelled=stray, gone=gone)
 
     async def dead_mans_switch(self):
         """Arcus cancels everything for this subaccount if we stop refreshing this deadline."""
