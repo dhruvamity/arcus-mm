@@ -2,7 +2,7 @@
 
 Reads data/raw/<YYYY-MM-DD>/<MARKET>/{bbo,trades}.jsonl written by src/recorder.py.
 Timestamps are exchange timestamps in microseconds. Rows duplicated by the recorder's
-overlapping sockets are dropped (BBO by globalSequenceId, trades by tradeId).
+overlapping sockets are dropped (BBO by sequence id + content, trades by tradeId).
 """
 
 from __future__ import annotations
@@ -83,7 +83,9 @@ def load_bbo(market: str, days: Iterable[Path] | None = None) -> Bbo:
         bb, ba = c.get("bestBid"), c.get("bestAsk")
         if not bb or not ba:
             continue
-        key = c.get("globalSequenceId") or (c["timestamp"], c.get("lastSequenceId"))
+        # content, not the sequence id alone: Arcus can send two different frames under one id
+        key = (c.get("globalSequenceId") or (c["timestamp"], c.get("lastSequenceId")),
+               bb["price"], bb["size"], ba["price"], ba["size"])
         if key in seen:
             continue
         seen.add(key)

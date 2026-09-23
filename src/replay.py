@@ -35,6 +35,7 @@ DERIVED = RAW_ROOT.parent / "derived"
 
 # event kinds; at equal sequence numbers trades go first, then deltas, then snapshots, then BBO
 TRADE, DELTA, SNAP, BBO = 0, 1, 2, 3
+CACHE_VERSION = "v2"   # bump when _parse_day changes; v2: content-based dedupe of BBO/L2 frames
 VISIBLE_LEVELS = 45
 
 
@@ -61,9 +62,12 @@ def _parse_day(day: str, market: str):
                     k = SNAP
                     put(g, k, r["recv_ts_ns"], 0, 0.0, 0.0)  # marker: reset book before these levels
                 else:
-                    if g in seen:
+                    # overlapping recorder sockets deliver byte-identical copies; Arcus itself can send
+                    # two different frames under one globalSequenceId, and both are real
+                    key = (g, json.dumps(c["bids"]), json.dumps(c["asks"]))
+                    if key in seen:
                         continue
-                    seen.add(g)
+                    seen.add(key)
                     k = DELTA
                 for p, q in c["bids"]:
                     put(g, k, r["recv_ts_ns"], 1, float(p), float(q))
@@ -88,9 +92,13 @@ def _parse_day(day: str, market: str):
             if "bestBid" not in c or "bestAsk" not in c:
                 continue
             g = c["globalSequenceId"]
-            if g in seen:
+            # dedupe on content, not the sequence id alone: Arcus sends e.g. "bid back" and then "ask
+            # back" as two frames with the same globalSequenceId; keeping only the first left the
+            # replay on a book that no longer existed (NVDA 2026-09-23: ask 228.46 instead of 228.39)
+            key = (g, c["bestBid"]["price"], c["bestBid"]["size"], c["bestAsk"]["price"], c["bestAsk"]["size"])
+            if key in seen:
                 continue
-            seen.add(g)
+            seen.add(key)
             put(g, BBO, r["recv_ts_ns"], 0, float(c["bestBid"]["price"]), float(c["bestAsk"]["price"]),
                 float(c["timestamp"]))
     cols = dict(seq=np.frombuffer(seq, np.int64), kind=np.frombuffer(kind, np.int8),
@@ -106,7 +114,7 @@ def load_tape(market: str, days: Optional[List[str]] = None) -> Dict[str, np.nda
     DERIVED.mkdir(parents=True, exist_ok=True)
     parts = []
     for day in (days or tape_days(market)):
-        cache = DERIVED / f"{market}_{day}.npz"
+        cache = DERIVED / f"{market}_{day}.{CACHE_VERSION}.npz"
         src = RAW_ROOT / day / market
         # re-parse if the day's raw files are still growing (the recorder writes the current day)
         mtime = max((f.stat().st_mtime for f in src.iterdir()), default=0.0) if src.is_dir() else 0.0

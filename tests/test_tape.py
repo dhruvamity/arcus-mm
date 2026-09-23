@@ -57,6 +57,19 @@ class TestTape(unittest.TestCase):
         self.assertEqual(list(t.ts), [15, 25, 35])
         self.assertEqual(list(t.taker_buy), [True, False, True])
 
+    def test_same_sequence_id_different_content_is_kept(self):
+        # Arcus sent "bid back" then "ask back" under one globalSequenceId (NVDA 2026-09-23); the
+        # second frame is the real book. Only byte-identical copies (overlapping sockets) are dupes.
+        d = self.raw / "2026-01-03" / "Y-USD"
+        d.mkdir(parents=True)
+        (d / "bbo.jsonl").write_text(bbo_line(7, 70, 228.34, 228.46) + bbo_line(7, 71, 228.34, 228.39)
+                                     + bbo_line(7, 71, 228.34, 228.39))
+        (d / "trades.jsonl").write_text("")
+        self.assertEqual(list(tape.load_bbo("Y-USD").ask), [228.46, 228.39])
+        from src.replay import BBO, _parse_day
+        cols = _parse_day("2026-01-03", "Y-USD")
+        self.assertEqual(list(cols["sz"][cols["kind"] == BBO]), [228.46, 228.39])   # replay keeps ask in sz
+
 
 if __name__ == "__main__":
     unittest.main()

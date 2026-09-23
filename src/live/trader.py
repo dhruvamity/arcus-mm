@@ -250,7 +250,7 @@ class LiveTrader:
         st.known_cids.add(cid)
         self.actions += 1
         self.event("place", market=st.market, side="BUY" if side > 0 else "SELL",
-                   price=tgt.price, qty=tgt.qty, client_id=cid)
+                   price=tgt.price, qty=tgt.qty, client_id=cid, bb=st.bb, ba=st.ba)
         if self.dry_run:
             st.working[side] = {"order_id": f"dry-{cid}", "client_id": cid, "price": tgt.price, "qty": tgt.qty,
                                 "gtt": gtt, "ts_ns": time.time_ns()}
@@ -279,7 +279,7 @@ class LiveTrader:
         cur = st.working[side]
         self.actions += 1
         self.event("modify", market=st.market, side="BUY" if side > 0 else "SELL",
-                   old_price=cur["price"], price=tgt.price, qty=tgt.qty, order_id=cur["order_id"])
+                   old_price=cur["price"], price=tgt.price, qty=tgt.qty, order_id=cur["order_id"], bb=st.bb, ba=st.ba)
         if self.dry_run:
             st.working[side] = {**cur, "price": tgt.price, "qty": tgt.qty, "ts_ns": time.time_ns()}
             self._dry_round_trip(st, side)

@@ -50,7 +50,8 @@ def shadow_side(events, market, mark):
     cash = -sum((1 if f["side"] == "BUY" else -1) * f["qty"] * f["price"] for f in fills)
     notional = sum(f["qty"] * f["price"] for f in fills)
     edge = [(f["mid"] - f["price"]) / f["mid"] * 1e4 * (1 if f["side"] == "BUY" else -1) for f in fills if f.get("mid")]
-    return dict(fills=len(fills), notional=notional, pnl=cash + pos * mark, end_pos_usd=pos * mark,
+    actions = sum(1 for e in events if e["kind"] in ("place", "modify", "cancel") and e.get("market") == market)
+    return dict(fills=len(fills), notional=notional, pnl=cash + pos * mark, end_pos_usd=pos * mark, actions=actions,
                 edge_bps=float(np.mean(edge)) if edge else float("nan"),
                 times=[(ts_ns(f["ts_utc"]), 1 if f["side"] == "BUY" else -1, f["price"]) for f in fills])
 
@@ -60,6 +61,7 @@ def replay_side(tp, p, mark):
     notional = sum(q * px for _, _, px, q, *_ in r.fills)
     edge = [(mid - px) / mid * 1e4 * s for _, s, px, _, mid, *_ in r.fills]
     return dict(fills=len(r.fills), notional=notional, pnl=r.cash + r.final_pos * mark, end_pos_usd=r.final_pos * mark,
+                actions=r.actions,
                 edge_bps=float(np.mean(edge)) if edge else float("nan"),
                 times=[(t, s, px) for t, s, px, *_ in r.fills], throttled=r.throttled)
 
@@ -85,7 +87,7 @@ def main():
     sp = specs()
     hours = (end_ns - start_ns) / 3.6e12
     print(f"window {starts[-1]['ts_utc'][:19]} -> {events[-1]['ts_utc'][:19]} UTC ({hours:.2f} h), replay rtt {a.rtt_ms:g} ms\n")
-    print(f"{'market':9} {'run':13} {'fills':>6} {'notional$':>10} {'pnl$':>8} {'pnl bps':>8} {'edge bps':>9} {'end inv$':>9}")
+    print(f"{'market':9} {'run':13} {'fills':>6} {'notional$':>10} {'pnl$':>8} {'pnl bps':>8} {'edge bps':>9} {'end inv$':>9} {'actions':>8}")
     for m in cfg["markets"]:
         mk = m["market"]
         q = status["markets"][mk]
@@ -110,7 +112,7 @@ def main():
         for name, r in runs.items():
             bps = r["pnl"] / r["notional"] * 1e4 if r["notional"] else float("nan")
             print(f"{mk:9} {name:13} {r['fills']:6d} {r['notional']:10.2f} {r['pnl']:8.3f} {bps:8.2f} "
-                  f"{r['edge_bps']:9.2f} {r['end_pos_usd']:9.2f}")
+                  f"{r['edge_bps']:9.2f} {r['end_pos_usd']:9.2f} {r['actions']:8d}")
         sh, tt = runs["shadow"]["times"], runs["replay-tt"]["times"]
         print(f"{'':9} match: {matched(sh, tt, 2 * 10**9)}/{len(sh)} shadow fills have a replay-tt twin within 2 s, "
               f"{matched(tt, sh, 2 * 10**9)}/{len(tt)} the other way\n")
