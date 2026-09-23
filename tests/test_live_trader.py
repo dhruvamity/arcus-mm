@@ -220,7 +220,8 @@ class TestLiveTrader(unittest.IsolatedAsyncioTestCase):
         await t.on_trade(trade("c", "SELL", 99.89, 0.01))      # duplicate tradeId ignored
         self.assertAlmostEqual(st.pos, 0.25)
         for o in st.working.values():
-            o["ts_ns"] -= 10**9
+            if o:                                              # the refilled bid is still in flight
+                o["ts_ns"] -= 10**9
         await t.on_trade(trade("d", "BUY", 100.11, 5))         # taker buy through our ask
         self.assertAlmostEqual(st.pos, 0.0)
         self.assertAlmostEqual(st.realized, -0.25 * 99.90 + 0.25 * 100.10)
@@ -262,6 +263,18 @@ class TestLiveTrader(unittest.IsolatedAsyncioTestCase):
         t.request_stop()                                        # flat: no need to wait the 600 s
         await asyncio.wait_for(task, 3)
         self.assertEqual(t.rest.calls[-1], ("dms", None))
+
+    async def test_dry_run_holds_each_side_for_the_round_trip(self):
+        import asyncio
+        t = LiveTrader({**CFG, "shadow_latency_ms": 50}, FakeRest(), FakeWs(), Path(self.tmp.name), dry_run=True)
+        await t.start()
+        t.running = True
+        st = t.states["X-USD"]
+        await t.on_bbo(bbo(99.99, 100.01))
+        await t.on_bbo(bbo(100.09, 100.11))                    # moved, but the placement is still "in flight"
+        self.assertEqual(st.working[1]["price"], 99.90)
+        await asyncio.sleep(0.1)                                # response "arrives": catch up once
+        self.assertEqual(st.working[1]["price"], 99.99)         # 100.10 - 10 bps, rounded down
 
     async def test_reconcile_adopts_venue_position_and_kills_strays(self):
         self.rest.positions = [{"marketDisplayName": "X-USD", "positionSide": "SHORT", "size": "0.4"}]

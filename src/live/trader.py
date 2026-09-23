@@ -254,6 +254,7 @@ class LiveTrader:
         if self.dry_run:
             st.working[side] = {"order_id": f"dry-{cid}", "client_id": cid, "price": tgt.price, "qty": tgt.qty,
                                 "gtt": gtt, "ts_ns": time.time_ns()}
+            self._dry_round_trip(st, side)
             return
         st.inflight[side] = True
         try:
@@ -281,6 +282,7 @@ class LiveTrader:
                    old_price=cur["price"], price=tgt.price, qty=tgt.qty, order_id=cur["order_id"])
         if self.dry_run:
             st.working[side] = {**cur, "price": tgt.price, "qty": tgt.qty, "ts_ns": time.time_ns()}
+            self._dry_round_trip(st, side)
             return
         st.inflight[side] = True
         try:
@@ -300,6 +302,22 @@ class LiveTrader:
             st.working[side] = None
         finally:
             st.inflight[side] = False
+
+    def _dry_round_trip(self, st: MarketState, side: int):
+        """A real place/modify blocks its side until the response returns (~100-300 ms), which
+        naturally skips book flicker; hold the side for shadow_latency_ms so a dry run makes the
+        same number of decisions as a live run and as the replay (rtt_ms)."""
+        ms = float(self.cfg.get("shadow_latency_ms", 0))
+        if ms <= 0:
+            return
+        st.inflight[side] = True
+        loop = asyncio.get_running_loop()
+        loop.call_later(ms / 1000, self._dry_release, st, side)
+
+    def _dry_release(self, st: MarketState, side: int):
+        st.inflight[side] = False
+        if self.running:
+            asyncio.ensure_future(self.quote(st))       # catch up with whatever moved meanwhile
 
     async def cancel(self, st: MarketState, side: int):
         cur = st.working[side]
