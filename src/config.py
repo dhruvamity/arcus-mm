@@ -50,6 +50,14 @@ class ArcusConfig(BaseSettings):
     api_private_key: str = Field(
         default="", description="Ed25519 32-byte private key in 64-character hex"
     )
+    # Optional separate testnet credentials (ARCUS_TESTNET_KEY / ARCUS_TESTNET_PRIVATE_KEY).
+    # When environment is "testnet" these are used, so a mainnet key can never sign a testnet
+    # order or the reverse.
+    testnet_key: str = Field(default="", description="Ed25519 public key for testnet")
+    testnet_private_key: str = Field(default="", description="Ed25519 private key for testnet")
+    testnet_wallet_address: str = Field(
+        default="", description="Ethereum address the testnet API key is registered to (if different)"
+    )
 
     # Safety Guards
     paper_trading_mode: bool = Field(
@@ -66,7 +74,7 @@ class ArcusConfig(BaseSettings):
     request_timeout_secs: float = 10.0
     ws_ping_interval_secs: float = 30.0
 
-    @field_validator("wallet_address")
+    @field_validator("wallet_address", "testnet_wallet_address")
     @classmethod
     def clean_address(cls, v: str) -> str:
         addr = v.strip().lower()
@@ -74,10 +82,31 @@ class ArcusConfig(BaseSettings):
             addr = "0x" + addr
         return addr
 
-    @field_validator("api_key", "api_private_key")
+    @field_validator("api_key", "api_private_key", "testnet_key", "testnet_private_key")
     @classmethod
     def clean_hex_keys(cls, v: str) -> str:
         return v.strip().lower()
+
+    @property
+    def active_wallet_address(self) -> str:
+        """Address that owns the key for the configured environment."""
+        if self.environment == "testnet" and self.testnet_wallet_address:
+            return self.testnet_wallet_address
+        return self.wallet_address
+
+    @property
+    def active_api_key(self) -> str:
+        """Public key for the configured environment."""
+        if self.environment == "testnet" and self.testnet_key:
+            return self.testnet_key
+        return self.api_key
+
+    @property
+    def active_private_key(self) -> str:
+        """Signing key for the configured environment."""
+        if self.environment == "testnet" and self.testnet_private_key:
+            return self.testnet_private_key
+        return self.api_private_key
 
     @property
     def rest_url(self) -> str:

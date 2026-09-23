@@ -117,6 +117,39 @@ class TestReplayFills(unittest.TestCase):
         r = simulate(tape(book() + [(10, TRADE, 200, -1, 99.94, 0.01)]), Params(**p))
         self.assertAlmostEqual(r.order_units_left, 10 * 99.95)   # both units spent, $99.95 filled
 
+    def test_stop_loss_flattens_as_taker(self):
+        # long 1.0 @ 99.95, then mid falls to 95.05 (~490 bps against) -> taker sell at bid - tick
+        p = dict(P, stop_loss_bps=100.0)
+        rows = book() + [(10, TRADE, 200, -1, 99.90, 5.0), (11, BBO, 300, 0, 95.00, 95.10)]
+        r = simulate(tape(rows), Params(**p))
+        self.assertEqual(r.stop_losses, 1)
+        self.assertAlmostEqual(r.final_pos, 0.0)
+        last = r.fills[-1]
+        self.assertEqual((last[1], round(last[2], 2), last[6]), (-1, 94.99, True))
+        self.assertAlmostEqual(last[5], 94.99 * 2.25e-4)             # taker fee charged
+        self.assertAlmostEqual(r.cash, -99.95 + 94.99 - 94.99 * 2.25e-4)
+
+    def test_exit_at_touch_while_holding_inventory(self):
+        # after the bid fills, the closing ask joins the best ask (100.01) instead of mid+5 bps (100.05)
+        p = dict(P, exit_mode="touch", requote_bps=0.0)
+        rows = book() + [(10, TRADE, 200, -1, 99.90, 5.0), (11, BBO, 300, 0, 99.99, 100.01),
+                         (20, TRADE, 600, 1, 100.02, 5.0)]
+        r = simulate(tape(rows), Params(**p))
+        sells = [f for f in r.fills if f[1] == -1]
+        self.assertEqual([round(f[2], 2) for f in sells], [100.01])
+        self.assertAlmostEqual(r.final_pos, 0.0)
+
+    def test_trend_guard_blocks_adding_into_a_fall(self):
+        # long after the first fill; mid then falls 1% over the 5 s window -> no second bid
+        p = dict(P, trend_guard_bps=50.0, trend_window_s=5.0, max_pos_usd=1e9, requote_bps=0.0)
+        rows = book() + [(10, TRADE, 200, -1, 99.90, 5.0),
+                         (11, BBO, 2000, 0, 99.49, 99.51), (12, BBO, 7000, 0, 98.99, 99.01),
+                         (20, TRADE, 7500, -1, 98.00, 5.0)]
+        r = simulate(tape(rows), Params(**p))
+        self.assertAlmostEqual(r.final_pos, 1.0)
+        r = simulate(tape(rows), Params(**dict(p, trend_guard_bps=0.0)))
+        self.assertAlmostEqual(r.final_pos, 2.0)                  # without the guard it buys again
+
 
 if __name__ == "__main__":
     unittest.main()

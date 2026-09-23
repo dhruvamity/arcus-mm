@@ -28,12 +28,14 @@ from typing import Dict, List, Optional
 
 import numpy as np
 
+from src.quoting import QuoteRules, needs_requote, plan
 from src.tape import RAW_ROOT, open_tape, tape_days
 
 DERIVED = RAW_ROOT.parent / "derived"
 
 # event kinds; at equal sequence numbers trades go first, then deltas, then snapshots, then BBO
 TRADE, DELTA, SNAP, BBO = 0, 1, 2, 3
+CACHE_VERSION = "v2"   # bump when _parse_day changes; v2: content-based dedupe of BBO/L2 frames
 VISIBLE_LEVELS = 45
 
 
@@ -60,9 +62,12 @@ def _parse_day(day: str, market: str):
                     k = SNAP
                     put(g, k, r["recv_ts_ns"], 0, 0.0, 0.0)  # marker: reset book before these levels
                 else:
-                    if g in seen:
+                    # overlapping recorder sockets deliver byte-identical copies; Arcus itself can send
+                    # two different frames under one globalSequenceId, and both are real
+                    key = (g, json.dumps(c["bids"]), json.dumps(c["asks"]))
+                    if key in seen:
                         continue
-                    seen.add(g)
+                    seen.add(key)
                     k = DELTA
                 for p, q in c["bids"]:
                     put(g, k, r["recv_ts_ns"], 1, float(p), float(q))
@@ -87,9 +92,13 @@ def _parse_day(day: str, market: str):
             if "bestBid" not in c or "bestAsk" not in c:
                 continue
             g = c["globalSequenceId"]
-            if g in seen:
+            # dedupe on content, not the sequence id alone: Arcus sends e.g. "bid back" and then "ask
+            # back" as two frames with the same globalSequenceId; keeping only the first left the
+            # replay on a book that no longer existed (NVDA 2026-09-23: ask 228.46 instead of 228.39)
+            key = (g, c["bestBid"]["price"], c["bestBid"]["size"], c["bestAsk"]["price"], c["bestAsk"]["size"])
+            if key in seen:
                 continue
-            seen.add(g)
+            seen.add(key)
             put(g, BBO, r["recv_ts_ns"], 0, float(c["bestBid"]["price"]), float(c["bestAsk"]["price"]),
                 float(c["timestamp"]))
     cols = dict(seq=np.frombuffer(seq, np.int64), kind=np.frombuffer(kind, np.int8),
@@ -105,7 +114,7 @@ def load_tape(market: str, days: Optional[List[str]] = None) -> Dict[str, np.nda
     DERIVED.mkdir(parents=True, exist_ok=True)
     parts = []
     for day in (days or tape_days(market)):
-        cache = DERIVED / f"{market}_{day}.npz"
+        cache = DERIVED / f"{market}_{day}.{CACHE_VERSION}.npz"
         src = RAW_ROOT / day / market
         # re-parse if the day's raw files are still growing (the recorder writes the current day)
         mtime = max((f.stat().st_mtime for f in src.iterdir()), default=0.0) if src.is_dir() else 0.0
@@ -157,14 +166,30 @@ class Params:
     rate_limit: bool = False
     order_units: float = 20_000.0
     cancel_units: float = 40_000.0
+    # How inventory is worked off (all exits are post-only makers unless stop_loss_bps fires):
+    #   "mid"   the closing quote rests at mid ± depth like any other quote (original rule)
+    #   "touch" while holding inventory, the closing quote joins the best bid/ask to get out fast
+    exit_mode: str = "mid"
+    # taker-flatten the whole position once the mid is this many bps against its average entry,
+    # then quote nothing for stop_cooldown_s (0 = no stop-loss)
+    stop_loss_bps: float = 0.0
+    stop_cooldown_s: float = 60.0
+    # don't ADD to an open position while the mid has moved against it by >= trend_guard_bps over
+    # the last trend_window_s (stops stacking inventory into a trend; the closing quote keeps working)
+    trend_guard_bps: float = 0.0
+    trend_window_s: float = 300.0
+    # count only fills from trades printed strictly through our price (the live shadow's rule);
+    # ignores the queue model's fills at our own price, so it is a lower bound on fills
+    trade_through_only: bool = False
 
 
 @dataclass
 class Result:
-    fills: List[tuple] = field(default_factory=list)   # (recv_ns, side, price, qty, mid)
+    fills: List[tuple] = field(default_factory=list)   # (recv_ns, side, price, qty, mid, fee_usd, is_taker)
     actions: int = 0
     rejects: int = 0
     stops: int = 0
+    stop_losses: int = 0
     throttled: int = 0
     order_units_left: float = 0.0
     cancel_units_left: float = 0.0
@@ -184,6 +209,11 @@ def simulate(t: Dict[str, np.ndarray], p: Params) -> Result:
     orders: List[Order] = []          # resting + in-flight
     working = {1: None, -1: None}     # latest order we intend to keep per side
     pos = cash = 0.0
+    avg_px = 0.0          # average entry price of the open position
+    cool_until = 0        # no quoting before this recv time (after a stop-loss)
+    hist_t: List[int] = []    # (recv time, mid) samples for the trend guard, ~1 per second
+    hist_m: List[float] = []
+    hist_i = 0
     res = Result()
     in_snap = -1
     day_ns = 86_400 * 10**9
@@ -204,28 +234,32 @@ def simulate(t: Dict[str, np.ndarray], p: Params) -> Result:
         res.throttled += 1
         return False
 
-    def rnd(x, up):
-        n = x / p.tick
-        return (math.ceil(n - 1e-9) if up else math.floor(n + 1e-9)) * p.tick
+    rules = QuoteRules(depth_bps=p.depth_bps, requote_bps=p.requote_bps, clip_usd=p.clip_usd,
+                       max_pos_usd=p.max_pos_usd, min_notional=p.min_notional, tick=p.tick, step=p.step,
+                       exit_mode=p.exit_mode, skew_bps=p.skew_bps, trend_guard_bps=p.trend_guard_bps,
+                       anchored=p.fair is not None)
 
-    def qty_for(price):
-        q = max(1, round(p.clip_usd / price / p.step)) * p.step
-        while q * price < p.min_notional:
-            q += p.step
-        return q
+    def book_fill(side_: int, price: float, q: float, now: int, taker: bool):
+        nonlocal pos, cash, avg_px
+        fee = q * price * (p.taker_fee_bps if taker else p.maker_fee_bps) * 1e-4
+        new_pos = pos + side_ * q
+        if pos == 0 or (pos > 0) == (side_ > 0):            # opening or adding
+            avg_px = (abs(pos) * avg_px + q * price) / abs(new_pos)
+        elif abs(new_pos) > 1e-12 and (new_pos > 0) != (pos > 0):  # flipped through zero
+            avg_px = price
+        pos = new_pos if abs(new_pos) > 1e-12 else 0.0
+        cash -= side_ * q * price + fee
+        res.fills.append((now, side_, price, q, (bb + ba) / 2, fee, taker))
+        units["o"] += 10 * q * price
+        units["c"] += 10 * q * price
+        res.max_abs_pos_usd = max(res.max_abs_pos_usd, abs(pos) * price)
 
     def fill(o: Order, q: float, now: int):
-        nonlocal pos, cash
         q = min(q, o.qty)
         if q <= 0:
             return
         o.qty -= q
-        pos += o.side * q
-        cash -= o.side * q * o.price + q * o.price * p.maker_fee_bps * 1e-4
-        res.fills.append((now, o.side, o.price, q, (bb + ba) / 2))
-        units["o"] += 10 * q * o.price
-        units["c"] += 10 * q * o.price
-        res.max_abs_pos_usd = max(res.max_abs_pos_usd, abs(pos) * o.price)
+        book_fill(o.side, o.price, q, now, taker=False)
 
     seq, kind, recv, side, px, sz, aux = (t[k] for k in ("seq", "kind", "recv", "side", "px", "sz", "aux"))
     n = len(seq)
@@ -287,7 +321,7 @@ def simulate(t: Dict[str, np.ndarray], p: Params) -> Result:
                 through = tp < o.price if hit == 1 else tp > o.price
                 if through:
                     fill(o, o.qty, now)
-                elif tp == o.price and o.queue < math.inf:
+                elif tp == o.price and o.queue < math.inf and not p.trade_through_only:
                     rem = tq - o.queue
                     o.queue = max(0.0, o.queue - tq)
                     if rem > 0:
@@ -314,17 +348,38 @@ def simulate(t: Dict[str, np.ndarray], p: Params) -> Result:
                 on = False
             else:
                 ref = float(p.fair[1][k])
-        inv_usd = pos * mid
-        skew = -p.skew_bps * max(-1.0, min(1.0, inv_usd / p.max_pos_usd)) if p.max_pos_usd > 0 else 0.0
+        # hard stop-loss: taker-flatten (sell at bid / buy at ask, one tick worse for slippage)
+        if p.stop_loss_bps > 0 and pos != 0 and avg_px > 0:
+            adverse = (avg_px - mid) / avg_px * 1e4 if pos > 0 else (mid - avg_px) / avg_px * 1e4
+            if adverse >= p.stop_loss_bps:
+                for w in working.values():
+                    if w is not None:
+                        w.cancel_at = min(w.cancel_at, now)
+                working[1] = working[-1] = None
+                px_exit = (bb - p.tick) if pos > 0 else (ba + p.tick)
+                book_fill(-1 if pos > 0 else 1, px_exit, abs(pos), now + rtt, taker=True)
+                res.stop_losses += 1
+                cool_until = now + int(p.stop_cooldown_s * 1e9)
+        cooling = now < cool_until
+        trend = 0.0   # bps move of the mid over the trend window (past only)
+        if p.trend_guard_bps > 0:
+            if not hist_t or now - hist_t[-1] >= 1_000_000_000:
+                hist_t.append(now)
+                hist_m.append(mid)
+            w_ns = int(p.trend_window_s * 1e9)
+            while hist_i + 1 < len(hist_t) and hist_t[hist_i + 1] <= now - w_ns:
+                hist_i += 1
+            if hist_t[hist_i] <= now - w_ns:
+                trend = (mid / hist_m[hist_i] - 1) * 1e4
+        # the daily loss stop and session gate halt *new* risk but keep the exit quote working
+        targets = plan(rules, bb=bb, ba=ba, ref=ref, pos=pos, trend_bps=trend, allow_open=on,
+                       allow_close=(p.active(now) if p.active else True) and not cooling)
         for s in (1, -1):
             w = working[s]
-            want = on and not (s * inv_usd >= p.max_pos_usd)
+            tgt = targets[s]
+            want = tgt is not None
             if want:
-                target = ref * (1 - s * p.depth_bps * 1e-4 + skew * 1e-4)
-                target = rnd(target, up=(s == -1))
-                if p.fair is not None:  # post-only: rest at best at most one tick inside the spread
-                    target = min(target, ba - p.tick) if s == 1 else max(target, bb + p.tick)
-                if w is not None and w.qty > 1e-12 and w.cancel_at > now and abs(w.price - target) / mid * 1e4 < p.requote_bps:
+                if w is not None and w.qty > 1e-12 and w.cancel_at > now and not needs_requote(w.price, tgt, mid, p.requote_bps):
                     continue
             elif w is None or w.cancel_at <= now:
                 working[s] = None
@@ -338,7 +393,7 @@ def simulate(t: Dict[str, np.ndarray], p: Params) -> Result:
             working[s] = None
             res.actions += 1
             if want:
-                o = Order(side=s, price=target, qty=qty_for(target), live_at=now + rtt)
+                o = Order(side=s, price=tgt.price, qty=tgt.qty, live_at=now + rtt)
                 orders.append(o)
                 working[s] = o
 

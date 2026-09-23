@@ -1,0 +1,25 @@
+# First real-money run: GLD only, smallest sizes. Same rule as configs/live.yaml, scaled down so
+# the worst realistic outcome is about a dollar or two. Run only after the shadow report passes.
+#   .venv/bin/python scripts/run_live.py --config configs/canary.yaml --live --duration 7200
+# Orders are post-only (0 bps maker). Nothing here can place an order unless run with --live
+# AND the environment guards in src/rest_client.py are satisfied.
+
+markets:
+  - {market: GLD-USD,  depth_bps: 3, clip_usd: 10, max_pos_usd: 20, daily_stop_usd: 1}
+
+requote_bps: 1.0        # move a quote once its target drifts this far
+clip_usd: 10            # default order size (per-market value wins)
+max_pos_usd: 20         # default inventory cap per market
+daily_stop_usd: 1       # default daily loss stop per market
+max_loss_usd: 1.5       # session loss limit, all markets together: stop opening everywhere
+wind_down_s: 1800       # on a normal stop, work inventory off with post-only exits for up to this long
+exit_mode: mid          # closing quote rests at mid ± depth (tested best)
+trend_guard_bps: 0      # off: no setting helped consistently (research/regime_study.md)
+
+stale_s: 300            # nothing at all on the socket for this long -> pull every quote
+                        # (a quiet market is not a dead feed: GLD can be idle for minutes)
+shadow_fills: true      # dry run only: book a fill when a real trade prints through our resting price
+shadow_latency_ms: 250  # dry run only: a quote must rest this long before it can be shadow-filled
+reconcile_s: 30         # re-check position and open orders against the venue
+dms_refresh_s: 20       # refresh the dead man's switch this often
+dms_window_s: 60        # venue cancels everything if we go quiet for this long

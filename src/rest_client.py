@@ -22,6 +22,8 @@ from src.models import (
     BBO,
     OrderRequest,
     OrderResponse,
+    OrderSide,
+    TimeInForce,
 )
 
 logger = logging.getLogger(__name__)
@@ -41,8 +43,8 @@ class ArcusRestClient:
         # Initialize signer if private key is available
         if signer:
             self.signer: Optional[ArcusSigner] = signer
-        elif self.config.api_private_key and self.config.api_private_key != "0" * 64:
-            self.signer = ArcusSigner(self.config.api_private_key)
+        elif self.config.active_private_key and self.config.active_private_key != "0" * 64:
+            self.signer = ArcusSigner(self.config.active_private_key)
         else:
             self.signer = None
 
@@ -214,14 +216,14 @@ class ArcusRestClient:
 
     async def get_account(self, address: Optional[str] = None) -> Dict[str, Any]:
         """Fetches account balance, equity, and free collateral."""
-        addr = (address or self.config.wallet_address).lower()
+        addr = (address or self.config.active_wallet_address).lower()
         params = {"address": addr}
         headers = {"X-API-Key": self.signer.api_key} if self.signer else {}
         return await self._request("GET", "/v1/account", "account", params=params, headers=headers)
 
     async def get_positions(self, address: Optional[str] = None) -> List[Dict[str, Any]]:
         """Fetches open perpetual positions for an address."""
-        addr = (address or self.config.wallet_address).lower()
+        addr = (address or self.config.active_wallet_address).lower()
         params = {"address": addr}
         res = await self._request("GET", "/v1/positions", "positions", params=params)
         return res.get("positions", [])
@@ -232,10 +234,10 @@ class ArcusRestClient:
         market_id: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
         """Fetches resting open orders for an address."""
-        addr = (address or self.config.wallet_address).lower()
-        params: Dict[str, Any] = {"address": addr}
+        addr = (address or self.config.active_wallet_address).lower()
+        params: Dict[str, Any] = {"address": addr, "accountIndex": self.config.account_index}
         if market_id is not None:
-            params["marketId"] = market_id
+            params["market"] = market_id        # the filter is `market`; `marketId` is silently ignored
         res = await self._request("GET", "/v1/openOrders", "openOrders", params=params)
         return res.get("orders", [])
 
@@ -245,7 +247,7 @@ class ArcusRestClient:
         account_index: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Fetches live snapshot of per-subaccount order and cancel pools."""
-        addr = (address or self.config.wallet_address).lower()
+        addr = (address or self.config.active_wallet_address).lower()
         idx = account_index if account_index is not None else self.config.account_index
         params = {"address": addr, "accountIndex": idx}
         res = await self._request("GET", "/v1/rateLimit", "rateLimit", params=params)
@@ -296,7 +298,7 @@ class ArcusRestClient:
 
         # Build Scheme 1 signed canonical payload
         payload_str, signature, ts = self.signer.build_place_order_payload(
-            address=self.config.wallet_address,
+            address=self.config.active_wallet_address,
             account_index=self.config.account_index,
             market_id=order.marketId,
             side_int=order.side.int_code,
@@ -309,7 +311,7 @@ class ArcusRestClient:
         )
 
         body: Dict[str, Any] = {
-            "address": self.config.wallet_address,
+            "address": self.config.active_wallet_address,
             "accountIndex": self.config.account_index,
             "marketId": order.marketId,
             "orderSide": order.side.value,
@@ -334,6 +336,63 @@ class ArcusRestClient:
             raw=res,
         )
 
+    async def modify_order(
+        self,
+        market_id: int,
+        order_id: str,
+        price: Decimal,
+        quantity: Decimal,
+        side: OrderSide,
+        market: MarketMetadata,
+        client_id: Optional[str] = None,
+        good_til_micros: Optional[int] = None,
+    ) -> OrderResponse:
+        """Re-prices a resting ALO order (cancel-replace on the venue, 1 order-pool unit)."""
+        self._assert_trading_allowed()
+
+        if self.config.paper_trading_mode:
+            logger.info(f"[PAPER TRADING] Simulating modify {order_id} -> {quantity} @ {price}")
+            return OrderResponse(orderId=order_id, clientId=client_id, status="ACK",
+                                 marketId=market_id, raw={"paper": True})
+
+        good_til_micros = good_til_micros or good_til_time_micros()
+        payload_str, signature, ts = self.signer.build_modify_order_payload(
+            address=self.config.active_wallet_address,
+            account_index=self.config.account_index,
+            market_id=market_id,
+            order_id=str(order_id),
+            side_int=side.int_code,
+            price_ticks=to_ticks(price, market.tickSize),
+            quantity_quantums=to_quantums(quantity, market.stepSize),
+            tif_int=TimeInForce.ALO.int_code,
+            good_til_nanos=good_til_micros * 1000,
+            reduce_only=0,
+            client_id=client_id,
+        )
+        # field names per /api-reference/exchange/modify-order: "side" (not "orderSide"),
+        # reduceOnly explicit, and goodTilTime echoing the resting order or the engine
+        # cancel-replaces with the new expiry
+        body: Dict[str, Any] = {
+            "address": self.config.active_wallet_address,
+            "accountIndex": self.config.account_index,
+            "marketId": market_id,
+            "orderId": str(order_id),
+            "side": side.value,
+            "quantity": str(quantity),
+            "price": str(price),
+            "timeInForce": TimeInForce.ALO.value,
+            "goodTilTime": str(good_til_micros),
+            "reduceOnly": False,
+            "timestamp": ts,
+        }
+        if client_id:
+            body["clientId"] = client_id
+        headers = self.signer.get_auth_headers(signature, ts)
+        res = await self._request("POST", "/v1/modifyOrder", "modifyOrder", json_body=body, headers=headers)
+        return OrderResponse(orderId=res.get("orderId", order_id), clientId=res.get("clientId", client_id),
+                             status=res.get("status", "ACK"), marketId=market_id,
+                             rateLimit=res.get("rateLimit"), raw=res)
+
     async def cancel_order(
         self,
         market_id: int,
@@ -354,7 +413,7 @@ class ArcusRestClient:
             )
 
         payload_str, signature, ts = self.signer.build_cancel_order_payload(
-            address=self.config.wallet_address,
+            address=self.config.active_wallet_address,
             account_index=self.config.account_index,
             market_id=market_id,
             order_id=order_id,
@@ -362,7 +421,7 @@ class ArcusRestClient:
         )
 
         body: Dict[str, Any] = {
-            "address": self.config.wallet_address,
+            "address": self.config.active_wallet_address,
             "accountIndex": self.config.account_index,
             "marketId": market_id,
             "timestamp": ts,
@@ -393,7 +452,7 @@ class ArcusRestClient:
         self._assert_trading_allowed()
 
         body: Dict[str, Any] = {
-            "address": self.config.wallet_address,
+            "address": self.config.active_wallet_address,
             "accountIndex": self.config.account_index,
         }
         if market_id is not None:
@@ -414,13 +473,13 @@ class ArcusRestClient:
         self._assert_trading_allowed()
 
         body: Dict[str, Any] = {
-            "address": self.config.wallet_address,
+            "address": self.config.active_wallet_address,
             "accountIndex": self.config.account_index,
             "time": deadline_micros,
         }
         signature, ts = self.signer.sign_scheme_2("scheduleCancel", body)
         headers = self.signer.get_auth_headers(signature, ts)
-        params = {"address": self.config.wallet_address}
+        params = {"address": self.config.active_wallet_address}
         return await self._request(
             "POST",
             "/v1/scheduleCancel",

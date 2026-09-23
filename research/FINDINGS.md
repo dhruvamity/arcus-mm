@@ -30,6 +30,28 @@ bootstrap. No fill model involved.
 
 ## 3. Can a small, slow participant capture it? (queue-aware replay)
 
+> **Correction 2026-09-23 — the numbers in this section and §6 came from a buggy tape loader.**
+> Arcus can send two *different* BBO / L2 frames under one `globalSequenceId` (e.g. "bid back"
+> then "ask back" 12 µs apart). The loader de-duplicated on the id alone, kept the first and
+> dropped the real final book: about a third of NVDA's BBO frames on 2026-09-23. Found because
+> the live shadow run re-priced NVDA 4× more than the replay on the same window; after the fix
+> they agree within 0.5% (1,334 vs 1,327 actions). Re-run on corrected data, Sep 19–22 (80 h),
+> rate limits on, $2 daily stop (`deep_quote_backtest.py --markets GLD-USD,NVDA-USD,HYPE-USD,SPY-USD
+> --depths 2,3,5,8 --rate-limit --stop-usd 2 --rtt 200|400 --to-day 2026-09-22`; the 200 ms run is
+> `deep_quote_backtest.md`):
+>
+> | market, depth | PnL 200 ms | days + | PnL 400 ms | days + | daily PnL (200 ms) |
+> |---|---:|---|---:|---|---|
+> | **GLD 3 bps** | **+$1.26** | **4/4** | **+$1.39** | **4/4** | 0.02, 0.15, 0.31, 0.77 |
+> | GLD 2 bps | +$0.62 | 4/4 | +$0.44 | 3/4 | 0.02, 0.10, 0.04, 0.46 |
+> | NVDA 3 bps | +$1.21 | 2/4 | +$1.22 | 2/4 | 0.00, 0.63, 0.59, −0.02 |
+> | HYPE 5 bps | −$0.62 | 2/4 | +$3.95 | 3/4 | 2.00, 1.98, −2.17, −2.43 |
+> | SPY 3 bps | +$0.05 | 3/4 | +$0.06 | 3/4 | 0.05, 0.36, −0.60, 0.24 |
+>
+> **GLD 3 bps still holds on every day at both latencies. NVDA 3 bps is positive overall but no
+> longer on every day** (Sep 22 slightly negative), and needs ~950 actions/hour — it drains the
+> order budget. HYPE is unstable. The first real-money run is GLD only.
+
 `src/replay.py` + `scripts/deep_quote_backtest.py` → `deep_quote_backtest.md`. Replays the
 sequenced L2 + trade tape with price-time priority, RTT latency on every place/cancel, ALO
 rejection, and conservative handling of levels outside the 50-level feed. Rule: one bid at
@@ -122,6 +144,8 @@ inventory drifts with the Arcus/Binance basis. Two weekend days only; stock perp
 Binance data (Sep 21 publishes 2026-09-22).
 
 ## 6. Can it run from this host without bleeding? (2026-09-22)
+
+> Superseded in part: see the correction at the top of §3 (tape de-duplication bug, 2026-09-23).
 
 **No backtest here can promise zero losses; what it can do is bound them and show where the edge
 survives our latency.** Evidence that is trustworthy:

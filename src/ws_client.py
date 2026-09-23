@@ -36,8 +36,8 @@ class ArcusWsClient:
         self.config = config or settings
         self.ws_url = self.config.ws_url
         self.signer = signer or (
-            ArcusSigner(self.config.api_private_key)
-            if self.config.api_private_key and self.config.api_private_key != "0" * 64
+            ArcusSigner(self.config.active_private_key)
+            if self.config.active_private_key and self.config.active_private_key != "0" * 64
             else None
         )
 
