@@ -36,6 +36,10 @@ DERIVED = RAW_ROOT.parent / "derived"
 # event kinds; at equal sequence numbers trades go first, then deltas, then snapshots, then BBO
 TRADE, DELTA, SNAP, BBO = 0, 1, 2, 3
 CACHE_VERSION = "v2"   # bump when _parse_day changes; v2: content-based dedupe of BBO/L2 frames
+
+# The recorder writes marker lines without "data" (INVALID_BOOK_INTERVAL). Seen on 2026-09-23 with
+# gap size 1 at exactly 00:00 and 08:00 UTC in GLD/NVDA/SPY only (not ETH/HYPE): a scheduled venue
+# event using one sequence number, not a lost book update. They carry no market data; skip them.
 VISIBLE_LEVELS = 45
 
 
@@ -53,7 +57,9 @@ def _parse_day(day: str, market: str):
         with fh:
             for line in fh:
                 r = json.loads(line)
-                d = r["data"]
+                d = r.get("data")
+                if not d:
+                    continue  # recorder marker line (INVALID_BOOK_INTERVAL), see note above
                 c = d.get("contents")
                 if d.get("type") not in ("subscribed", "channel_data") or not c or "globalSequenceId" not in c:
                     continue  # unsubscribe/error frames
@@ -77,7 +83,7 @@ def _parse_day(day: str, market: str):
     with open_tape(day, market, "trades.jsonl") as fh:
         for line in fh:
             r = json.loads(line)
-            for t in r["data"]["contents"]:
+            for t in (r.get("data") or {}).get("contents") or []:
                 if t["tradeId"] in seen:
                     continue
                 seen.add(t["tradeId"])
@@ -88,7 +94,7 @@ def _parse_day(day: str, market: str):
     with open_tape(day, market, "bbo.jsonl") as fh:
         for line in fh:
             r = json.loads(line)
-            c = r["data"]["contents"]
+            c = (r.get("data") or {}).get("contents") or {}
             if "bestBid" not in c or "bestAsk" not in c:
                 continue
             g = c["globalSequenceId"]

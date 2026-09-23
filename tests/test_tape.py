@@ -70,6 +70,23 @@ class TestTape(unittest.TestCase):
         cols = _parse_day("2026-01-03", "Y-USD")
         self.assertEqual(list(cols["sz"][cols["kind"] == BBO]), [228.46, 228.39])   # replay keeps ask in sz
 
+    def test_recorder_marker_lines_are_skipped(self):
+        # the server recorder writes INVALID_BOOK_INTERVAL markers with no "data" key; scoring
+        # crashed on them from 2026-09-23 00:12 UTC
+        marker = json.dumps({"session_id": "s", "recv_ts_ns": 1, "market": "Z-USD", "type": "INVALID_BOOK_INTERVAL",
+                             "gap_info": {"expected_seq": 5, "received_seq": 6, "gap_size": 1}}) + "\n"
+        d = self.raw / "2026-01-04" / "Z-USD"
+        d.mkdir(parents=True)
+        (d / "bbo.jsonl").write_text(bbo_line(1, 10, 99, 101) + marker + bbo_line(2, 20, 100, 102))
+        (d / "trades.jsonl").write_text(marker + trade_line("z", 15, "BUY", 101))
+        (d / "l2OrderbookUpdates.jsonl").write_text(marker)
+        self.assertEqual(list(tape.load_bbo("Z-USD").mid), [100.0, 101.0])
+        self.assertEqual(len(tape.load_trades("Z-USD").ts), 1)
+        from src.replay import BBO, TRADE, _parse_day
+        cols = _parse_day("2026-01-04", "Z-USD")
+        self.assertEqual(int((cols["kind"] == BBO).sum()), 2)
+        self.assertEqual(int((cols["kind"] == TRADE).sum()), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

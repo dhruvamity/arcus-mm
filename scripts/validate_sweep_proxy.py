@@ -27,7 +27,7 @@ from src.tape import _lines, load_bbo, market_days  # noqa: E402
 def recorded_trades(market):
     rows, seen = [], set()
     for line in _lines(market_days(market), "trades.jsonl"):
-        for t in json.loads(line)["data"]["contents"]:
+        for t in (json.loads(line).get("data") or {}).get("contents") or []:
             if t["tradeId"] not in seen:
                 seen.add(t["tradeId"])
                 rows.append((t["timestamp"], float(t["price"]), float(t["size"]), t["side"] == "BUY", t["sequenceNumber"]))
