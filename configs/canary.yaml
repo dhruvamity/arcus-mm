@@ -1,17 +1,18 @@
-# Live quoting config (scripts/run_live.py). Same rule as the backtests; see research/FINDINGS.md.
+# First real-money run: GLD only, smallest sizes. Same rule as configs/live.yaml, scaled down so
+# the worst realistic outcome is about a dollar or two. Run only after the shadow report passes.
+#   .venv/bin/python scripts/run_live.py --config configs/canary.yaml --live --duration 7200
 # Orders are post-only (0 bps maker). Nothing here can place an order unless run with --live
 # AND the environment guards in src/rest_client.py are satisfied.
 
 markets:
-  - {market: GLD-USD,  depth_bps: 3, clip_usd: 25, max_pos_usd: 100, daily_stop_usd: 2}
-  - {market: NVDA-USD, depth_bps: 3, clip_usd: 25, max_pos_usd: 100, daily_stop_usd: 2}
+  - {market: GLD-USD,  depth_bps: 3, clip_usd: 10, max_pos_usd: 20, daily_stop_usd: 1}
 
 requote_bps: 1.0        # move a quote once its target drifts this far
-clip_usd: 25            # default order size (per-market value wins)
-max_pos_usd: 100        # default inventory cap per market
-daily_stop_usd: 2       # default daily loss stop per market
-max_loss_usd: 3         # session loss limit, all markets together: stop opening everywhere
-wind_down_s: 600        # on a normal stop, work inventory off with post-only exits for up to this long
+clip_usd: 10            # default order size (per-market value wins)
+max_pos_usd: 20         # default inventory cap per market
+daily_stop_usd: 1       # default daily loss stop per market
+max_loss_usd: 1.5       # session loss limit, all markets together: stop opening everywhere
+wind_down_s: 1800       # on a normal stop, work inventory off with post-only exits for up to this long
 exit_mode: mid          # closing quote rests at mid ± depth (tested best)
 trend_guard_bps: 0      # off: no setting helped consistently (research/regime_study.md)
 

@@ -226,6 +226,43 @@ class TestLiveTrader(unittest.IsolatedAsyncioTestCase):
         self.assertAlmostEqual(st.realized, -0.25 * 99.90 + 0.25 * 100.10)
         self.assertEqual([c for c in t.rest.calls if c[0] in ("place", "modify", "cancel")], [])
 
+    async def test_session_loss_limit_stops_opening_but_keeps_the_exit(self):
+        t = LiveTrader({**CFG, "max_loss_usd": 0.5, "daily_stop_usd": 0,
+                        "markets": [{**CFG["markets"][0], "daily_stop_usd": 0}]},
+                       FakeRest(), FakeWs(), Path(self.tmp.name), dry_run=False)
+        await t.start()
+        t.running = True
+        st = t.states["X-USD"]
+        await t.on_bbo(bbo(99.99, 100.01))
+        await t.on_fill(fill("BUY", 100.00, 0.2))
+        await t.on_bbo(bbo(96.99, 97.01))                      # -$0.6 marked: past the $0.5 session limit
+        self.assertTrue(t.session_stopped)
+        self.assertIsNone(st.working[1])
+        self.assertIsNotNone(st.working[-1])
+
+    async def test_wind_down_works_inventory_off_then_stops(self):
+        st = self.t.states["X-USD"]
+        self.t.cfg = {**self.t.cfg, "wind_down_s": 600}
+        await self.t.on_bbo(bbo(99.99, 100.01))
+        await self.t.on_fill(fill("BUY", 99.90, 0.25))         # long $25
+        self.t.request_stop()
+        await self.t.on_bbo(bbo(99.99, 100.01))
+        self.assertIsNone(st.working[1])                        # no new longs
+        self.assertIsNotNone(st.working[-1])                    # exit still working
+        self.assertTrue(self.t.running)
+        self.t.request_stop()                                   # second Ctrl-C: stop now
+        self.assertFalse(self.t.running)
+
+    async def test_flat_wind_down_shuts_down_cleanly(self):
+        import asyncio
+        t = LiveTrader({**CFG, "wind_down_s": 600}, FakeRest(), FakeWs(), Path(self.tmp.name), dry_run=False)
+        task = asyncio.create_task(t.run())
+        await asyncio.sleep(0.05)
+        await t.on_bbo(bbo(99.99, 100.01))
+        t.request_stop()                                        # flat: no need to wait the 600 s
+        await asyncio.wait_for(task, 3)
+        self.assertEqual(t.rest.calls[-1], ("dms", None))
+
     async def test_reconcile_adopts_venue_position_and_kills_strays(self):
         self.rest.positions = [{"marketDisplayName": "X-USD", "positionSide": "SHORT", "size": "0.4"}]
         self.rest.open_orders = [{"orderId": "ghost"}]

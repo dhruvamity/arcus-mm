@@ -12,6 +12,9 @@ Safety, all enforced here and independent of the venue:
     trader running the exact live code path, since fills at our own price are never counted
   * inventory cap per market; the closing quote keeps working when opening is halted
   * daily loss stop per market (UTC day), closing quote stays live
+  * session loss limit (max_loss_usd, all markets together): every market stops opening
+  * wind-down on a normal stop (duration reached, Ctrl-C): stop opening, let the post-only
+    closing quotes work inventory off for up to wind_down_s, then cancel everything
   * stale feed: no BBO for stale_s -> pull that market's quotes
   * dead man's switch refreshed every dms_refresh_s so the venue cancels everything if we die
   * a STOP file in the log directory -> cancel everything and exit
@@ -56,6 +59,7 @@ class MarketState:
     day: str = ""
     day_start_equity: float = 0.0
     stopped: bool = False
+    session_start_equity: Optional[float] = None
     working: Dict[int, Optional[dict]] = field(default_factory=lambda: {1: None, -1: None})
     inflight: Dict[int, bool] = field(default_factory=lambda: {1: False, -1: False})
     known_cids: set = field(default_factory=set)      # client ids we placed, to re-adopt our own orders
@@ -78,6 +82,8 @@ class LiveTrader:
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self.states: Dict[str, MarketState] = {}
         self.running = False
+        self.winding_since: Optional[float] = None     # set by request_stop(): no new inventory
+        self.session_stopped = False
         self.actions = 0
         self.last_msg_ns = time.time_ns()   # any frame on the socket; a quiet market is not a dead feed
         self.shadow = dry_run and bool(cfg.get("shadow_fills", False))
@@ -190,9 +196,16 @@ class LiveTrader:
         if st.daily_stop_usd > 0 and st.equity() - st.day_start_equity <= -st.daily_stop_usd and not st.stopped:
             st.stopped = True
             self.event("daily_stop", market=st.market, day_pnl=round(st.equity() - st.day_start_equity, 4))
+        if st.session_start_equity is None:
+            st.session_start_equity = st.equity()
+        max_loss = float(self.cfg.get("max_loss_usd", 0))
+        if max_loss > 0 and not self.session_stopped and self.session_pnl() <= -max_loss:
+            self.session_stopped = True
+            self.event("session_loss_limit", session_pnl=round(self.session_pnl(), 4), limit=max_loss)
         fresh = self.feed_ok()
+        opening = not st.stopped and not self.session_stopped and self.winding_since is None
         targets = plan(st.rules, bb=st.bb, ba=st.ba, ref=st.mid, pos=st.pos,
-                       allow_open=not st.stopped and fresh, allow_close=fresh)
+                       allow_open=opening and fresh, allow_close=fresh)
         for side in (1, -1):
             if st.inflight[side]:
                 continue
@@ -204,6 +217,21 @@ class LiveTrader:
                 await self.place(st, side, tgt)
             elif needs_requote(cur["price"], tgt, st.mid, st.rules.requote_bps):
                 await self.modify(st, side, tgt)
+
+    def session_pnl(self) -> float:
+        return sum(st.equity() - st.session_start_equity for st in self.states.values()
+                   if st.session_start_equity is not None)
+
+    def request_stop(self):
+        """Normal stop: stop adding inventory, work it off, then shut down (see run())."""
+        if self.winding_since is None:
+            self.winding_since = time.time()
+            self.event("wind_down", positions={mk: round(st.pos, 10) for mk, st in self.states.items()},
+                       max_s=float(self.cfg.get("wind_down_s", 0)))
+            for st in self.states.values():
+                asyncio.ensure_future(self.quote(st))      # pull opening quotes now, not on the next tick
+        else:
+            self.running = False                           # second request: stop immediately
 
     def feed_ok(self) -> bool:
         """Our data path is alive: socket connected and something arrived recently.
@@ -378,6 +406,8 @@ class LiveTrader:
         (self.log_dir / "status.json").write_text(json.dumps({
             "updated_utc": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
             "dry_run": self.dry_run, "environment": self.rest.config.environment, "actions": self.actions,
+            "session_pnl_usd": round(self.session_pnl(), 4), "session_stopped": self.session_stopped,
+            "winding_down": self.winding_since is not None,
             "markets": {mk: {"bid": st.bb, "ask": st.ba, "position": round(st.pos, 10),
                              "position_usd": round(st.pos * st.mid, 2) if st.mid == st.mid else None,
                              "day_pnl_usd": round(st.equity() - st.day_start_equity, 4), "stopped": st.stopped,
@@ -392,6 +422,13 @@ class LiveTrader:
         try:
             while self.running:
                 await asyncio.sleep(0.5)
+                if self.winding_since is not None:
+                    flat = all(abs(st.pos) * (st.mid if st.mid == st.mid else 0) < st.rules.min_notional
+                               for st in self.states.values())
+                    if flat or time.time() - self.winding_since >= float(self.cfg.get("wind_down_s", 0)):
+                        self.event("wind_down_done", flat=flat,
+                                   positions={mk: round(st.pos, 10) for mk, st in self.states.items()})
+                        self.running = False
         finally:
             self.running = False
             for t in tasks:

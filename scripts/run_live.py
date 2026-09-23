@@ -46,9 +46,9 @@ async def main_async(a):
         trader = LiveTrader(cfg, rest, ws, log_dir=log_dir, dry_run=dry)
         loop = asyncio.get_running_loop()
         for sig in (signal.SIGINT, signal.SIGTERM):
-            loop.add_signal_handler(sig, lambda: setattr(trader, "running", False))
+            loop.add_signal_handler(sig, trader.request_stop)      # twice = stop at once
         if a.duration:
-            loop.call_later(a.duration, lambda: setattr(trader, "running", False))
+            loop.call_later(a.duration, trader.request_stop)
         try:
             await trader.run()
         finally:
