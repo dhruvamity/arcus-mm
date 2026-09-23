@@ -197,6 +197,35 @@ class TestLiveTrader(unittest.IsolatedAsyncioTestCase):
         await self.t.on_bbo(bbo(99.99, 100.01))        # next tick places fresh quotes instead of modifying
         self.assertEqual([c[0] for c in self.rest.calls], ["place", "place"])
 
+    async def test_shadow_fills_only_on_trade_through_after_latency(self):
+        t = LiveTrader({**CFG, "shadow_fills": True, "shadow_latency_ms": 250}, FakeRest(), FakeWs(),
+                       Path(self.tmp.name), dry_run=True)
+        await t.start()
+        t.running = True
+        self.assertIn(("trades", "X-USD", None), t.ws.subs)
+        st = t.states["X-USD"]
+        await t.on_bbo(bbo(99.99, 100.01))                     # dry quotes 99.90 / 100.10
+
+        def trade(tid, side, px, sz):
+            return {"id": "X-USD", "contents": [{"tradeId": tid, "side": side, "price": str(px), "size": str(sz)}]}
+
+        await t.on_trade(trade("a", "SELL", 99.80, 1))         # through our bid, but quote is too young
+        self.assertEqual(st.pos, 0)
+        for o in st.working.values():
+            o["ts_ns"] -= 10**9
+        await t.on_trade(trade("b", "SELL", 99.90, 1))         # at our price: queue unknown -> no fill
+        self.assertEqual(st.pos, 0)
+        await t.on_trade(trade("c", "SELL", 99.89, 0.01))      # through: the whole 0.25 bid is filled
+        self.assertAlmostEqual(st.pos, 0.25)
+        await t.on_trade(trade("c", "SELL", 99.89, 0.01))      # duplicate tradeId ignored
+        self.assertAlmostEqual(st.pos, 0.25)
+        for o in st.working.values():
+            o["ts_ns"] -= 10**9
+        await t.on_trade(trade("d", "BUY", 100.11, 5))         # taker buy through our ask
+        self.assertAlmostEqual(st.pos, 0.0)
+        self.assertAlmostEqual(st.realized, -0.25 * 99.90 + 0.25 * 100.10)
+        self.assertEqual([c for c in t.rest.calls if c[0] in ("place", "modify", "cancel")], [])
+
     async def test_reconcile_adopts_venue_position_and_kills_strays(self):
         self.rest.positions = [{"marketDisplayName": "X-USD", "positionSide": "SHORT", "size": "0.4"}]
         self.rest.open_orders = [{"orderId": "ghost"}]

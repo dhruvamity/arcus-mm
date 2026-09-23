@@ -14,6 +14,8 @@ exit_mode: mid          # closing quote rests at mid ± depth (tested best)
 trend_guard_bps: 0      # off: no setting helped consistently (research/regime_study.md)
 
 stale_s: 300            # nothing at all on the socket for this long -> pull every quote
+shadow_fills: true      # dry run only: book a fill when a real trade prints through our resting price
+shadow_latency_ms: 250  # dry run only: a quote must rest this long before it can be shadow-filled
                         # (a quiet market is not a dead feed: GLD can be idle for minutes)
 reconcile_s: 30         # re-check position and open orders against the venue
 dms_refresh_s: 20       # refresh the dead man's switch this often

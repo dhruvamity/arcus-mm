@@ -6,7 +6,10 @@ replay does not: this module only turns those decisions into venue calls and kee
 orders and position honest.
 
 Safety, all enforced here and independent of the venue:
-  * dry run by default: intents are logged, no mutating request is sent
+  * dry run by default: intents are logged, no mutating request is sent. With shadow_fills a
+    dry run books a fill whenever a real trade prints strictly through one of its resting
+    prices (at least shadow_latency_ms after the quote went up): a conservative live paper
+    trader running the exact live code path, since fills at our own price are never counted
   * inventory cap per market; the closing quote keeps working when opening is halted
   * daily loss stop per market (UTC day), closing quote stays live
   * stale feed: no BBO for stale_s -> pull that market's quotes
@@ -77,6 +80,8 @@ class LiveTrader:
         self.running = False
         self.actions = 0
         self.last_msg_ns = time.time_ns()   # any frame on the socket; a quiet market is not a dead feed
+        self.shadow = dry_run and bool(cfg.get("shadow_fills", False))
+        self._seen_trades: Dict[str, None] = {}
         self._events = open(self.log_dir / "events.jsonl", "a", buffering=1)
 
     # ---------------------------------------------------------------- logging
@@ -105,6 +110,8 @@ class LiveTrader:
         await self.reconcile(initial=True)
         for mk in self.states:
             await self.ws.subscribe("bbo", mk, self.on_bbo)
+            if self.shadow:
+                await self.ws.subscribe("trades", mk, self.on_trade)
         addr = self.rest.config.active_wallet_address
         await self.ws.subscribe("userFills", addr, self.on_fill, {"accountIndex": self.rest.config.account_index})
         self.event("started", markets=list(self.states), dry_run=self.dry_run,
@@ -119,6 +126,33 @@ class LiveTrader:
             return
         st.bb, st.ba = float(c["bestBid"]["price"]), float(c["bestAsk"]["price"])
         st.last_bbo_ns = self.last_msg_ns = time.time_ns()
+        await self.quote(st)
+
+    async def on_trade(self, msg: Dict[str, Any]):
+        """Shadow fills for a dry run: a taker trade priced through our resting quote fills it."""
+        self.last_msg_ns = now = time.time_ns()
+        st = self.states.get(msg.get("id") or msg.get("market"))
+        rows = msg.get("contents")
+        if not st or not isinstance(rows, list):
+            return
+        latency_ns = float(self.cfg.get("shadow_latency_ms", 250)) * 1e6
+        for t in rows:
+            if not isinstance(t, dict) or t.get("tradeId") in self._seen_trades:
+                continue
+            self._seen_trades[t.get("tradeId")] = None
+            if len(self._seen_trades) > 50_000:
+                self._seen_trades.pop(next(iter(self._seen_trades)))
+            px = float(t["price"])
+            side = -1 if str(t.get("side", "")).upper() == "BUY" else 1   # taker buys hit our ask
+            cur = st.working[side]
+            if not cur or now - cur.get("ts_ns", now) < latency_ns:
+                continue
+            # price-time priority: a taker only prints through our price after clearing every
+            # better level, ours included, so the whole order is filled (same rule as the replay)
+            if (side == 1 and px < cur["price"]) or (side == -1 and px > cur["price"]):
+                st.working[side] = None
+                await self.on_fill({"contents": [{"marketDisplayName": st.market, "side": "BUY" if side > 0 else "SELL",
+                                                  "price": cur["price"], "size": cur["qty"], "fee": 0, "shadow": True}]})
         await self.quote(st)
 
     async def on_fill(self, msg: Dict[str, Any]):
@@ -143,6 +177,7 @@ class LiveTrader:
             st.pos = new_pos if abs(new_pos) > 1e-12 else 0.0
             st.realized -= side * q * px + fee
             self.event("fill", market=mk, side="BUY" if side > 0 else "SELL", price=px, qty=q, fee=fee,
+                       mid=st.mid if st.mid == st.mid else None, shadow=bool(f.get("shadow")),
                        position=round(st.pos, 10), day_pnl=round(st.equity() - st.day_start_equity, 4))
 
     # -------------------------------------------------------------- decisions

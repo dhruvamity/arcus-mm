@@ -170,6 +170,9 @@ class Params:
     # the last trend_window_s (stops stacking inventory into a trend; the closing quote keeps working)
     trend_guard_bps: float = 0.0
     trend_window_s: float = 300.0
+    # count only fills from trades printed strictly through our price (the live shadow's rule);
+    # ignores the queue model's fills at our own price, so it is a lower bound on fills
+    trade_through_only: bool = False
 
 
 @dataclass
@@ -310,7 +313,7 @@ def simulate(t: Dict[str, np.ndarray], p: Params) -> Result:
                 through = tp < o.price if hit == 1 else tp > o.price
                 if through:
                     fill(o, o.qty, now)
-                elif tp == o.price and o.queue < math.inf:
+                elif tp == o.price and o.queue < math.inf and not p.trade_through_only:
                     rem = tq - o.queue
                     o.queue = max(0.0, o.queue - tq)
                     if rem > 0:
