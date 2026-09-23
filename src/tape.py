@@ -79,7 +79,7 @@ def load_bbo(market: str, days: Iterable[Path] | None = None) -> Bbo:
     seen = set()
     rows = []
     for line in _lines(days, "bbo.jsonl"):
-        c = json.loads(line)["data"]["contents"]
+        c = (json.loads(line).get("data") or {}).get("contents") or {}   # skip recorder markers
         bb, ba = c.get("bestBid"), c.get("bestAsk")
         if not bb or not ba:
             continue
@@ -103,7 +103,7 @@ def load_trades(market: str, days: Iterable[Path] | None = None) -> Trades:
     seen = set()
     rows = []
     for line in _lines(days, "trades.jsonl"):
-        for t in json.loads(line)["data"]["contents"]:
+        for t in (json.loads(line).get("data") or {}).get("contents") or []:
             if t["tradeId"] in seen:
                 continue
             seen.add(t["tradeId"])
